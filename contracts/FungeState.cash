@@ -1,8 +1,6 @@
 pragma cashscript ^0.14.0;
 
-// State commitment (24 bytes) = passCount (bytes4, script-number encoding)
-//                             + holderPkh (bytes20)
-// This is responsible for moving the NFT
+// State commitment (24 bytes) = passCount (4 bytes, script number) + holderPkh (20 bytes)
 contract FungeState(
     bytes potLockingBytecode,
     bytes32 pusdCategory,
@@ -11,48 +9,42 @@ contract FungeState(
     int timeoutBlocks
 ) {
     function pass(bytes20 newHolder) {
-        // Layout: input 0 = state, input 1 = pot, inputs 2+ = player
-        require(this.activeInputIndex == 0);
-        require(tx.inputs[1].lockingBytecode == potLockingBytecode);
-        require(tx.inputs[1].tokenCategory == pusdCategory);
+        require(this.activeInputIndex == 0, "State must be input 0");
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory == pusdCategory, "Pot must hold PUSD");
 
         int passCount = int(tx.inputs[0].nftCommitment.split(4)[0]);
         int price = basePrice + passCount * priceStep;
 
-        // Output 0: new state, same script, same NFT (capability kept)
-        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
-        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
-        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount);
-        require(tx.outputs[0].nftCommitment == toPaddedBytes(passCount + 1, 4) + newHolder);
-        require(tx.outputs[0].value >= tx.inputs[0].value);
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode, "Output 0 must be the state contract");
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory, "State NFT must be kept");
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount, "State token amount changed");
+        require(tx.outputs[0].nftCommitment == toPaddedBytes(passCount + 1, 4) + newHolder, "Bad new commitment");
+        require(tx.outputs[0].value >= tx.inputs[0].value, "State BCH shrank");
 
-        // Output 1: new pot, grown by at least the price
-        require(tx.outputs[1].lockingBytecode == potLockingBytecode);
-        require(tx.outputs[1].tokenCategory == pusdCategory);
-        require(tx.outputs[1].tokenAmount >= tx.inputs[1].tokenAmount + price);
-        require(tx.outputs[1].value >= tx.inputs[1].value);
+        require(tx.outputs[1].lockingBytecode == potLockingBytecode, "Output 1 must be the pot");
+        require(tx.outputs[1].tokenCategory == pusdCategory, "Pot output must hold PUSD");
+        require(tx.outputs[1].tokenAmount >= tx.inputs[1].tokenAmount + price, "Price not paid");
+        require(tx.outputs[1].value >= tx.inputs[1].value, "Pot BCH shrank");
     }
 
     function settle() {
-        require(this.activeInputIndex == 0);
+        require(this.activeInputIndex == 0, "State must be input 0");
         require(this.age >= timeoutBlocks);
-        require(tx.inputs[1].lockingBytecode == potLockingBytecode);
-        require(tx.inputs[1].tokenCategory == pusdCategory);
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory == pusdCategory, "Pot must hold PUSD");
 
-        // P2PKH lock for the holder stored in the commitment
         bytes holderPkh = tx.inputs[0].nftCommitment.split(4)[1];
         bytes holderLock = 0x76a914 + holderPkh + 0x88ac;
 
-        // Output 0: whole pot to the holder
-        require(tx.outputs[0].lockingBytecode == holderLock);
-        require(tx.outputs[0].tokenCategory == pusdCategory);
-        require(tx.outputs[0].tokenAmount == tx.inputs[1].tokenAmount);
+        require(tx.outputs[0].lockingBytecode == holderLock, "Pot must go to the holder");
+        require(tx.outputs[0].tokenCategory == pusdCategory, "Payout must be PUSD");
+        require(tx.outputs[0].tokenAmount == tx.inputs[1].tokenAmount, "Whole pot must be paid");
 
-        // Output 1: immutable trophy NFT (category only, no capability byte)
         bytes gameCategory = tx.inputs[0].tokenCategory.split(32)[0];
-        require(tx.outputs[1].lockingBytecode == holderLock);
-        require(tx.outputs[1].tokenCategory == gameCategory);
-        require(tx.outputs[1].nftCommitment == tx.inputs[0].nftCommitment);
-        require(tx.outputs[1].tokenAmount == 0);
+        require(tx.outputs[1].lockingBytecode == holderLock, "Trophy must go to the holder");
+        require(tx.outputs[1].tokenCategory == gameCategory, "Trophy must be immutable");
+        require(tx.outputs[1].nftCommitment == tx.inputs[0].nftCommitment, "Trophy commitment changed");
+        require(tx.outputs[1].tokenAmount == 0, "Trophy must carry no tokens");
     }
 }

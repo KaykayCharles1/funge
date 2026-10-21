@@ -16,6 +16,7 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
+    "@bitauth/libauth": "3.1.0-next.8",
     "cashscript": "0.14.0",
     "mainnet-js": "3.1.7"
   }
