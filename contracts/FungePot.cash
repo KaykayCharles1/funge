@@ -1,0 +1,11 @@
+pragma cashscript ^0.14.0;
+
+// Holds the PUSD pot. It can only be spent in a tx where input 0 is the
+// game state NFT (mutable). Only FungeState can move that NFT, so only a
+// valid pass() or settle() can spend the pot.
+contract FungePot(bytes32 gameCategory) {
+    function release() {
+        require(this.activeInputIndex == 1);
+        require(tx.inputs[0].tokenCategory == gameCategory + 0x01);
+    }
+}

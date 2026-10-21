@@ -1,0 +1,30 @@
+{
+  "contractName": "FungePot",
+  "constructorInputs": [
+    { "name": "gameCategory", "type": "bytes32" }
+  ],
+  "abi": [
+    { "name": "release", "inputs": [] }
+  ],
+  "bytecode": "OP_INPUTINDEX OP_1 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY OP_SWAP OP_1 OP_CAT OP_EQUAL",
+  "source": "pragma cashscript ^0.14.0;\r\n\r\n// Holds the PUSD pot. It can only be spent in a tx where input 0 is the\r\n// game state NFT (mutable). Only FungeState can move that NFT, so only a\r\n// valid pass() or settle() can spend the pot.\r\ncontract FungePot(bytes32 gameCategory) {\r\n    function release() {\r\n        require(this.activeInputIndex == 1);\r\n        require(tx.inputs[0].tokenCategory == gameCategory + 0x01);\r\n    }\r\n}",
+  "fingerprint": "531855863533dc06ed79df89687f48da14f2b7262a1b3e4c5083ba10c24fd3e9",
+  "debug": {
+    "bytecode": "c0519d00ce7c517e87",
+    "sourceMap": "8:16:8:37;:41::42;:8::44:1;9:26:9:27:0;:16::42:1;:46::58:0;:61::65;:46:::1;:8::67",
+    "logs": [],
+    "requires": [
+      { "ip": 3, "line": 8 },
+      { "ip": 10, "line": 9 }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-10-21T08:59:16.218Z"
+}

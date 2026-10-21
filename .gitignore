@@ -1,0 +1,34 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and Build Outputs
+node_modules/
+dist/
+dist-ssr/
+
+# Security, Secrets, and Wallets
+.env*
+*.local
+.wallet.*.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# CashScript Compiler Artifacts (Uncomment the line below if you don't want build JSONs on GitHub)
+# *.json
+# !package.json
+# !tsconfig.json
