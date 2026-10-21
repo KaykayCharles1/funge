@@ -2,6 +2,7 @@ pragma cashscript ^0.14.0;
 
 // State commitment (24 bytes) = passCount (bytes4, script-number encoding)
 //                             + holderPkh (bytes20)
+// This is responsible for moving the NFT
 contract FungeState(
     bytes potLockingBytecode,
     bytes32 pusdCategory,
