@@ -29,3 +29,10 @@
 - Writes public/game.chipnet.json (addresses, categories, params) for the front end to read.
 - Game category: 29c5d721...a473f. State UTXO decoded as passCount 0 with the creator as initial holder.
 - Needed three attempts: Electrum connection drops and a possible race on spending an unconfirmed output. Plan: wait for the previous tx to be visible and retry connection errors.
+
+
+## Step 3c: chipnet smoke test
+- scripts/smoke.ts has three commands: status, pass and settle. It rebuilds both contracts from public/game.chipnet.json and checks the rebuilt addresses match before sending anything.
+- Real pass() on chipnet: passCount 0 to 1 at price 100, pot 1000 to 1100 (txid 13855b26...c8a6).
+- A settle attempted right after the pass was rejected by the network: "BIP68 sequence lock not satisfied". The age rule is enforced by consensus rules, which the local mock cannot show.
+- Settle after the timeout: (The pot went to the holder and a trophy NFT was minted. Run token-balance.ts to see the PUSD return)

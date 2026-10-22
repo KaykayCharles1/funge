@@ -2,12 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>funge</title>
+    <title>Funge</title>
   </head>
   <body>
-    <div id="app"></div>
+    <main id="app">
+      <h1>Funge</h1>
+      <p>Last-holder-wins hot potato on Bitcoin Cash. Test mode (chipnet).</p>
+      <dl>
+        <dt>Pass number</dt><dd id="passCount">…</dd>
+        <dt>Holder</dt><dd id="holder">…</dd>
+        <dt>Pot</dt><dd id="pot">…</dd>
+        <dt>Next price</dt><dd id="price">…</dd>
+      </dl>
+      <p id="status">Loading…</p>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
