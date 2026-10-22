@@ -25,3 +25,18 @@ export function decodeCommitment(commitmentHex: string) {
   const raw = new DataView(bytes.buffer, bytes.byteOffset).getUint32(0, true);
   return { passCount: raw & 0x7fffffff, holderPkh: binToHex(bytes.slice(4, 24)) };
 }
+
+
+// Retry flaky network reads (Electrum connections sometimes drop on first attempt)
+export async function retry<T>(fn: () => Promise<T>, tries = 3, delayMs = 2000): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw last;
+}

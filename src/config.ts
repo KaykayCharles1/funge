@@ -14,6 +14,7 @@ export const CONFIG = {
   // Amounts are integer base units of the token
   basePrice: 100n,
   priceStep: 10n,
+  seedPot: 1_000n, // starting PUSD in the pot (base units), from the creator's own tokens
 
   // Blocks. Keep short for the live demo round.
   timeoutBlocks: 3,

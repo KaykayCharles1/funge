@@ -22,3 +22,10 @@
 - A token category is the txid of a genesis input at output index 0, so the script makes a spare vout-0 output first, then spends it to create the fungible category.
 - Test PUSD category on chipnet: 8af14ba0...49eb (1,000,000 units).
 - First run failed with a WebSocket 1006 error (transient Electrum connection drop); a plain retry worked.
+
+
+## Step 3b: chipnet deploy
+- scripts/deploy.ts does two transactions: a prep transaction whose output 0 becomes the game NFT genesis (its txid is the game category), then an init transaction that puts the mutable NFT directly into the FungeState contract and the seed PUSD into FungePot, so the creator never holds the mutable NFT.
+- Writes public/game.chipnet.json (addresses, categories, params) for the front end to read.
+- Game category: 29c5d721...a473f. State UTXO decoded as passCount 0 with the creator as initial holder.
+- Needed three attempts: Electrum connection drops and a possible race on spending an unconfirmed output. Plan: wait for the previous tx to be visible and retry connection errors.
