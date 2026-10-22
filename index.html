@@ -5,17 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Funge</title>
   </head>
-  <body>
-    <main id="app">
-      <h1>Funge</h1>
-      <p>Last-holder-wins hot potato on Bitcoin Cash. Test mode (chipnet).</p>
-      <dl>
-        <dt>Pass number</dt><dd id="passCount">…</dd>
-        <dt>Holder</dt><dd id="holder">…</dd>
-        <dt>Pot</dt><dd id="pot">…</dd>
-        <dt>Next price</dt><dd id="price">…</dd>
+  <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+    <main id="app" class="mx-auto flex min-h-screen max-w-md flex-col gap-6 px-5 py-10">
+      <header>
+        <h1 class="text-4xl font-extrabold tracking-tight text-amber-400">Funge</h1>
+        <p class="mt-2 text-slate-300">Grab the potato. Last holder wins the pot.</p>
+        <p class="mt-1 text-xs uppercase tracking-wide text-slate-500">Test mode · chipnet</p>
+      </header>
+
+      <dl class="grid grid-cols-2 gap-3">
+        <div class="col-span-2 rounded-2xl bg-slate-900 p-5 ring-1 ring-amber-500/40">
+          <dt class="text-xs uppercase tracking-wide text-slate-400">Pot</dt>
+          <dd id="pot" class="mt-1 text-4xl font-extrabold text-amber-400">…</dd>
+        </div>
+        <div class="rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+          <dt class="text-xs uppercase tracking-wide text-slate-400">Pass number</dt>
+          <dd id="passCount" class="mt-1 text-2xl font-bold">…</dd>
+        </div>
+        <div class="rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+          <dt class="text-xs uppercase tracking-wide text-slate-400">Next price</dt>
+          <dd id="price" class="mt-1 text-2xl font-bold">…</dd>
+        </div>
+        <div class="col-span-2 rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+          <dt class="text-xs uppercase tracking-wide text-slate-400">Holder</dt>
+          <dd id="holder" class="mt-1 break-all font-mono text-sm">…</dd>
+        </div>
       </dl>
-      <p id="status">Loading…</p>
+
+      <p id="status" class="text-sm text-slate-400">Loading…</p>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

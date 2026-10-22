@@ -36,3 +36,11 @@
 - Real pass() on chipnet: passCount 0 to 1 at price 100, pot 1000 to 1100 (txid 13855b26...c8a6).
 - A settle attempted right after the pass was rejected by the network: "BIP68 sequence lock not satisfied". The age rule is enforced by consensus rules, which the local mock cannot show.
 - Settle after the timeout: (The pot went to the holder and a trophy NFT was minted. Run token-balance.ts to see the PUSD return)
+
+
+## Step 4a: read-only game view
+- Browser page loads public/game.chipnet.json, reads the state and pot UTXOs by contract address with CashScript's Electrum provider, decodes the commitment and refreshes every 25 seconds.
+- The commitment codec moved to src/lib/commitment.ts so the scripts and the page share one copy.
+- Production build passes (CashScript bundles fine for the browser).
+- Added Tailwind v4 through its Vite plugin (pinned 4.3.3); no config file needed.
+

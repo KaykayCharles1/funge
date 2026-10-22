@@ -1,3 +1,4 @@
+import "./style.css";
 import { ElectrumNetworkProvider } from "cashscript";
 import { CONFIG } from "./config.ts";
 import { decodeCommitment } from "./lib/commitment.ts";
