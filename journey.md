@@ -44,3 +44,8 @@
 - Production build passes (CashScript bundles fine for the browser).
 - Added Tailwind v4 through its Vite plugin (pinned 4.3.3); no config file needed.
 
+
+## Step 4b: blocks until settle
+- A settle is accepted once the state UTXO's transaction has at least timeoutBlocks confirmations, so blocks to go = timeoutBlocks minus confirmations. This matches the ~40 minute wait seen with timeoutBlocks 3.
+- CashScript UTXOs carry no confirmation height, so the page asks the Electrum server directly (blockchain.transaction.get, verbose) through the provider's performRequest.
+- The page shows "N more blocks until settle", "Waiting for the latest grab to confirm", or a highlighted "Ready to settle".
