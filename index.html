@@ -32,9 +32,37 @@
         </div>
       </dl>
 
+      <section id="wallet" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+        <div id="walletIdle">
+          <button id="connectBtn" class="w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 hover:bg-amber-300">Connect wallet</button>
+          <p class="mt-2 text-xs text-slate-400">Works with WizardConnect wallets.</p>
+        </div>
+        <div id="walletWaiting" class="hidden">
+          <p id="walletWaitingText" class="text-sm text-slate-300"></p>
+          <img id="qr" alt="WizardConnect QR code" class="mx-auto mt-3 hidden w-56 rounded-lg bg-white p-2" />
+          <div class="mt-3 flex gap-2">
+            <button id="copyUri" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Copy link</button>
+            <button id="cancelBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Cancel</button>
+            <a id="openWallet" href="#" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Open in wallet app</a>
+          </div>
+        </div>
+        <div id="walletConnected" class="hidden">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Connected wallet</p>
+          <p id="walletName" class="mt-1 text-lg font-bold"></p>
+          <p id="walletKey" class="mt-1 break-all font-mono text-sm text-slate-300"></p>
+          <button id="disconnectBtn" class="mt-3 rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Disconnect</button>
+        </div>
+        <p id="walletError" class="mt-2 text-sm text-red-400"></p>
+      </section>
+
       <section id="countdown" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
         <p id="countdownTitle" class="text-lg font-bold">…</p>
         <p id="countdownDetail" class="mt-1 text-sm text-slate-400"></p>
+      </section>
+
+      <section id="actions" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+        <button id="grabBtn" disabled class="w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 enabled:hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40">Grab the potato</button>
+        <p id="grabMsg" class="mt-2 text-sm text-slate-300">Connect a wallet to play.</p>
       </section>
 
       <p id="status" class="text-sm text-slate-400">Loading…</p>

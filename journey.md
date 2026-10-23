@@ -49,3 +49,20 @@
 - A settle is accepted once the state UTXO's transaction has at least timeoutBlocks confirmations, so blocks to go = timeoutBlocks minus confirmations. This matches the ~40 minute wait seen with timeoutBlocks 3.
 - CashScript UTXOs carry no confirmation height, so the page asks the Electrum server directly (blockchain.transaction.get, verbose) through the provider's performRequest.
 - The page shows "N more blocks until settle", "Waiting for the latest grab to confirm", or a highlighted "Ready to settle".
+
+
+## Step 5a: wallet connection (WizardConnect)
+- WizardConnect pairs the page with a wallet through a relay; the wallet shares xpubs and the page derives its public keys, so signing later only needs inputPaths for wallet-owned inputs.
+- Pinned @wizardconnect/dapp 0.2.2 and @wizardconnect/core 0.2.5. The packages ship no README, so the type definitions were the reference.
+- Paired successfully with Cashonize by copy-pasting the link. A QR code cannot be scanned from the same PC, so the page offers both a QR and a copy link.
+
+
+## Step 5b: funding the wallet
+- scripts/send-test-pusd.ts sends test PUSD plus 20,000 sats from the creator wallet to the connected wallet's token address (one output, so the wallet can pay its own fees).
+- Cashonize shows the unnamed test token (no metadata) and the 20,000 sats.
+
+## Step 5c: building the pass request in the browser (dry run)
+- The page scans the wallet's receive and change addresses (derived from the xpubs shared at pairing), picks a PUSD coin, and builds the pass transaction with CashScript using placeholder unlockers for the wallet's inputs.
+- WizardConnect sends plain JSON, so the request is converted by hand: the transaction as hex (libauth encodeTransaction), byte arrays as hex, bigints as "<bigint: Xn>". The library's own helpers are not exported.
+- Bug found and fixed: libauth's lockingBytecodeToCashAddress returns an object rather than a plain string, so the address helper now reads the address from the result.
+- Dry run result: price 1.40 PUSD, one wallet coin found at receive #0, network fee about 1,658 sats. Nothing is sent to the wallet yet.

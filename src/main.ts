@@ -3,14 +3,49 @@ import { ElectrumNetworkProvider } from "cashscript";
 import { CONFIG } from "./config.ts";
 import { decodeCommitment } from "./lib/commitment.ts";
 import { blocksToSettle } from "./lib/timing.ts";
+import { qrDataUrl } from "./lib/qr.ts";
+import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
+import type { WalletState } from "./bch_wallet.ts";
+import type { Game } from "./lib/game.ts";
+import { buildPassRequest } from "./pass.ts";
 
-type Game = {
-  state: { address: string };
-  pot: { address: string };
-  params: { basePrice: string; priceStep: string; timeoutBlocks: number };
-};
 
 const POLL_MS = 25_000;
+let highestPass = -1; // never show an older state than one we've already seen
+let holderPkh: string | null = null;
+let lastQr: string | null = null;
+const shortKey = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
+const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
+
+function renderHolder() {
+  if (!holderPkh) return;
+  const mine = getWalletState().pkhHex === holderPkh;
+  $("holder").textContent = mine ? `${shortKey(holderPkh)} (you)` : shortKey(holderPkh);
+}
+
+function renderWallet(s: WalletState) {
+  ($("grabBtn") as HTMLButtonElement).disabled = s.status !== "connected";
+  show("walletIdle", s.status === "idle");
+  show("walletWaiting", s.status === "waiting");
+  show("walletConnected", s.status === "connected");
+  $("walletError").textContent = s.error ?? "";
+  if (s.status === "waiting") {
+    $("walletWaitingText").textContent = s.qrUri
+      ? "Scan this code with your wallet, or copy the link into it."
+      : "Reconnecting to your wallet…";
+    show("qr", !!s.qrUri);
+    ($("openWallet") as HTMLAnchorElement).href = s.uri ?? "#";
+    if (s.qrUri && s.qrUri !== lastQr) {
+      lastQr = s.qrUri;
+      ($("qr") as HTMLImageElement).src = qrDataUrl(s.qrUri);
+    }
+  }
+  if (s.status === "connected") {
+    $("walletName").textContent = s.walletName ?? "Wallet";
+    $("walletKey").textContent = s.pkhHex ? `Key ${shortKey(s.pkhHex)}` : "";
+  }
+  renderHolder();
+}
 const $ = (id: string) => document.getElementById(id)!;
 
 const CARD = "rounded-2xl p-5 ring-1";
@@ -78,9 +113,15 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
     return;
   }
   const c = decodeCommitment(s.token.nft.commitment);
+  if (c.passCount < highestPass) {
+    $("status").textContent = "Server is catching up…";
+    return;
+  }
+  highestPass = c.passCount;
   const price = BigInt(game.params.basePrice) + BigInt(game.params.priceStep) * BigInt(c.passCount);
   $("passCount").textContent = String(c.passCount);
-  $("holder").textContent = `${c.holderPkh.slice(0, 8)}…${c.holderPkh.slice(-6)}`;
+  holderPkh = c.holderPkh;
+  renderHolder();
   $("pot").textContent = formatUnits(p.token.amount, CONFIG.pusdDecimals);
   $("price").textContent = formatUnits(price, CONFIG.pusdDecimals);
 
@@ -94,14 +135,53 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
 
 async function main() {
   const game = await loadGame();
+  $("connectBtn").addEventListener("click", () => startConnection(true));
+  $("cancelBtn").addEventListener("click", () => void disconnectWallet());
+  $("disconnectBtn").addEventListener("click", () => void disconnectWallet());
+  $("copyUri").addEventListener("click", () => {
+    const uri = getWalletState().uri;
+    if (uri) void navigator.clipboard.writeText(uri);
+  });
+  subscribe(renderWallet);
+  resumeIfStored();
   const provider = new ElectrumNetworkProvider(CONFIG.network);
-  const tick = () =>
-    refresh(game, provider).catch((e) => {
+    $("grabBtn").addEventListener("click", async () => {
+    const w = getWalletState();
+    if (w.status !== "connected" || !w.pkhHex) return;
+    $("grabMsg").textContent = "Preparing transaction…";
+    try {
+      const plan = await buildPassRequest(game, provider, w.pkhHex);
+      console.log("Pass request (dry run, not signed)", plan);
+      console.log("Request size (bytes):", new TextEncoder().encode(JSON.stringify(plan.request)).length);
+      const where = plan.walletInputs.map((c) => `${c.path} #${c.index}`).join(", ");
+      $("grabMsg").textContent =
+        `Dry run OK: pay ${formatUnits(plan.price, CONFIG.pusdDecimals)} PUSD using ${plan.inputCount} wallet coin(s) (${where}), ` +
+        `network fee about ${plan.feeSats} sats. Signing comes next.`;
+    } catch (e) {
       console.error(e);
-      $("status").textContent = "Could not reach the network. Retrying…";
-    });
-  await tick();
-  setInterval(tick, POLL_MS);
+      $("grabMsg").textContent = e instanceof Error ? e.message : String(e);
+    }
+  });
+  let lastOk: Date | null = null;
+  let failures = 0;
+
+  const tick = async () => {
+    let delay = POLL_MS;
+    try {
+      await refresh(game, provider);
+      lastOk = new Date();
+      failures = 0;
+    } catch (e) {
+      console.error(e);
+      failures++;
+      $("status").textContent = lastOk
+        ? `Network hiccup. Showing data from ${lastOk.toLocaleTimeString()}. Retrying…`
+        : "Connecting to the network…";
+      delay = Math.min(3_000 * failures, POLL_MS);
+    }
+    setTimeout(tick, delay);
+  };
+  void tick();
 }
 
 main().catch((e) => {
