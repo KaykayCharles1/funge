@@ -8,7 +8,8 @@ import { blocksToSettle } from "./lib/timing.ts";
 import { PassError, buildPassRequest, friendlyError, signAndBroadcast } from "./pass.ts";
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
-import { formatUnits } from "./lib/format.ts";
+import { formatDuration, formatUnits } from "./lib/format.ts";
+
 
 const POLL_MS = 25_000;
 const SIGN_TIMEOUT_MS = 180_000;
@@ -98,7 +99,7 @@ function updateAgo() {
     return;
   }
   const secs = Math.max(0, Math.floor(Date.now() / 1000 - lastBlockTime));
-  el.textContent = `Last grab confirmed ${Math.floor(secs / 60)}m ${String(secs % 60).padStart(2, "0")}s ago`;
+    el.textContent = `Last grab confirmed ${formatDuration(secs)} ago`;
 }
 
 function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
@@ -118,12 +119,13 @@ function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
     $("countdownDetail").textContent = "Nobody grabbed in time. The holder can claim the pot now.";
   } else if (info.confirmations === 0) {
     section.className = CARD_NORMAL;
-    $("countdownTitle").textContent = "Waiting for the latest grab to confirm";
+    $("countdownTitle").textContent = `Waiting for the latest grab to confirm (0 of ${timeoutBlocks} blocks)`;
     $("countdownDetail").textContent =
-      `Then ${timeoutBlocks} blocks must pass with no new grab, about ${timeoutBlocks * AVG_BLOCK_MIN} minutes in total. Every grab restarts the countdown.`;
+      `Settle opens after ${timeoutBlocks} blocks with no new grab. The block that confirms this grab counts as the first, so the whole wait is about ${timeoutBlocks * AVG_BLOCK_MIN} minutes from the grab. Every grab restarts it.`;
   } else {
     section.className = CARD_NORMAL;
-    $("countdownTitle").textContent = `About ${togo * AVG_BLOCK_MIN} minutes until settle`;
+    $("countdownTitle").textContent =
+      `About ${togo * AVG_BLOCK_MIN} minutes until settle (${info.confirmations} of ${timeoutBlocks} blocks)`;
     $("countdownDetail").textContent =
       `${togo} more block${togo === 1 ? "" : "s"} needed. Blocks average ${AVG_BLOCK_MIN} minutes but vary a lot, so this is an estimate. Anyone can still grab until then.`;
   }
