@@ -72,3 +72,11 @@
 - The Grab button rebuilds the pass transaction from the live state, asks the wallet to sign only its own input (inputPaths), then broadcasts the signed transaction itself.
 - A Cancel button and a 3-minute timeout abort a pending signing request; the page maps rejection and stale-state errors to plain messages.
 - First real grab: pass 4 to 5 for 1.40 test PUSD, with the connected wallet as the new holder.
+
+
+## Step 5e: error handling and countdown estimate
+- Tested on purpose: wallet rejection, cancel from the page, wallet disconnect mid-request, stale state (someone else grabbed while the wallet prompt was open), and insufficient PUSD.
+- A broadcast that fails with a conflict or missing inputs is treated as "someone grabbed first": the page refreshes with the new price.
+- Network failures during broadcast are reported without claiming the grab was or was not sent, because we cannot know.
+- Known limit: the grab uses a single PUSD coin; if the PUSD is split across several small coins the page says so.
+- Block arrivals are random, so the page shows an estimate in minutes (blocks left times about 10) plus a live "last grab confirmed … ago" line, instead of a clock that ticks to zero.

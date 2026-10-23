@@ -5,9 +5,10 @@ import { decodeCommitment } from "./lib/commitment.ts";
 import type { Game } from "./lib/game.ts";
 import { qrDataUrl } from "./lib/qr.ts";
 import { blocksToSettle } from "./lib/timing.ts";
-import { buildPassRequest, friendlyError, signAndBroadcast } from "./pass.ts";
+import { PassError, buildPassRequest, friendlyError, signAndBroadcast } from "./pass.ts";
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
+import { formatUnits } from "./lib/format.ts";
 
 const POLL_MS = 25_000;
 const SIGN_TIMEOUT_MS = 180_000;
@@ -17,6 +18,8 @@ let highestPass = -1; // never show an older state than one we've already seen
 let holderPkh: string | null = null;
 let lastQr: string | null = null;
 let activeGrab: AbortController | null = null;
+const AVG_BLOCK_MIN = 10; // BCH blocks average about 10 minutes
+let lastBlockTime: number | null = null; // unix seconds of the block that confirmed the latest grab
 
 const shortKey = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
@@ -25,12 +28,6 @@ const CARD = "rounded-2xl p-5 ring-1";
 const CARD_NORMAL = `${CARD} bg-slate-900 ring-slate-800`;
 const CARD_READY = `${CARD} bg-amber-500/10 ring-amber-400`;
 
-function formatUnits(amount: bigint, decimals: number): string {
-  if (decimals === 0) return amount.toString();
-  const s = amount.toString().padStart(decimals + 1, "0");
-  return `${s.slice(0, -decimals)}.${s.slice(-decimals)}`;
-}
-
 function renderHolder() {
   if (!holderPkh) return;
   const mine = getWalletState().pkhHex === holderPkh;
@@ -38,6 +35,7 @@ function renderHolder() {
 }
 
 function renderWallet(s: WalletState) {
+  if (s.status === "idle") activeGrab?.abort(new Error("Wallet disconnected"));
   ($("grabBtn") as HTMLButtonElement).disabled = s.status !== "connected" || activeGrab !== null;
   show("walletIdle", s.status === "idle");
   show("walletWaiting", s.status === "waiting");
@@ -59,7 +57,11 @@ function renderWallet(s: WalletState) {
     $("walletName").textContent = s.walletName ?? "Wallet";
     $("walletKey").textContent = s.pkhHex ? `Key ${shortKey(s.pkhHex)}` : "";
   }
-  if (s.status !== "connected") $("grabMsg").textContent = "Connect a wallet to play.";
+    if (s.status !== "connected") {
+    $("grabMsg").textContent = "Connect a wallet to play.";
+  } else if ($("grabMsg").textContent === "Connect a wallet to play.") {
+    $("grabMsg").textContent = "Ready. Tap the button to grab the potato.";
+  }
   renderHolder();
 }
 
@@ -70,39 +72,60 @@ async function loadGame(): Promise<Game> {
 }
 
 // Confirmations of a transaction, or null if the server answers in an unexpected shape
-async function getConfirmations(provider: ElectrumNetworkProvider, txid: string): Promise<number | null> {
+type ConfirmationInfo = { confirmations: number; blocktime: number | null };
+
+// Confirmations (and the block time, if the server gives it) of a transaction; null if the shape is unexpected
+async function getConfirmationInfo(provider: ElectrumNetworkProvider, txid: string): Promise<ConfirmationInfo | null> {
   const res: unknown = await provider.performRequest("blockchain.transaction.get", txid, true);
   if (res instanceof Error) throw res;
   if (res && typeof res === "object") {
-    const n = (res as { confirmations?: unknown }).confirmations;
-    if (n === undefined) return 0; // mempool transactions have no confirmations field
-    const num = Number(n);
-    if (Number.isFinite(num)) return num;
+    const r = res as { confirmations?: unknown; blocktime?: unknown };
+    if (r.confirmations === undefined) return { confirmations: 0, blocktime: null }; // still in the mempool
+    const confirmations = Number(r.confirmations);
+    if (Number.isFinite(confirmations)) {
+      const bt = Number(r.blocktime);
+      return { confirmations, blocktime: Number.isFinite(bt) && bt > 0 ? bt : null };
+    }
   }
   console.warn("Unexpected blockchain.transaction.get response", res);
   return null;
 }
 
-function renderCountdown(timeoutBlocks: number, confirmations: number | null) {
+function updateAgo() {
+  const el = $("countdownAgo");
+  if (lastBlockTime === null) {
+    el.textContent = "";
+    return;
+  }
+  const secs = Math.max(0, Math.floor(Date.now() / 1000 - lastBlockTime));
+  el.textContent = `Last grab confirmed ${Math.floor(secs / 60)}m ${String(secs % 60).padStart(2, "0")}s ago`;
+}
+
+function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
   const section = $("countdown");
-  if (confirmations === null) {
+  lastBlockTime = info?.blocktime ?? null;
+  updateAgo();
+  if (info === null) {
     section.className = CARD_NORMAL;
     $("countdownTitle").textContent = "Countdown unavailable";
     $("countdownDetail").textContent = "Could not read the confirmation count from the network server.";
     return;
   }
-  const togo = blocksToSettle(timeoutBlocks, confirmations);
+  const togo = blocksToSettle(timeoutBlocks, info.confirmations);
   if (togo === 0) {
     section.className = CARD_READY;
     $("countdownTitle").textContent = "Ready to settle";
     $("countdownDetail").textContent = "Nobody grabbed in time. The holder can claim the pot now.";
+  } else if (info.confirmations === 0) {
+    section.className = CARD_NORMAL;
+    $("countdownTitle").textContent = "Waiting for the latest grab to confirm";
+    $("countdownDetail").textContent =
+      `Then ${timeoutBlocks} blocks must pass with no new grab, about ${timeoutBlocks * AVG_BLOCK_MIN} minutes in total. Every grab restarts the countdown.`;
   } else {
     section.className = CARD_NORMAL;
-    $("countdownTitle").textContent = `${togo} more block${togo === 1 ? "" : "s"} until settle`;
+    $("countdownTitle").textContent = `About ${togo * AVG_BLOCK_MIN} minutes until settle`;
     $("countdownDetail").textContent =
-      confirmations === 0
-        ? "Waiting for the latest grab to confirm. The countdown restarts at every grab."
-        : `${confirmations} of ${timeoutBlocks} blocks passed since the last grab. Anyone can still grab until then.`;
+      `${togo} more block${togo === 1 ? "" : "s"} needed. Blocks average ${AVG_BLOCK_MIN} minutes but vary a lot, so this is an estimate. Anyone can still grab until then.`;
   }
 }
 
@@ -130,11 +153,11 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   $("pot").textContent = formatUnits(p.token.amount, CONFIG.pusdDecimals);
   $("price").textContent = formatUnits(price, CONFIG.pusdDecimals);
 
-  const confirmations = await getConfirmations(provider, s.txid).catch((e) => {
+    const info = await getConfirmationInfo(provider, s.txid).catch((e) => {
     console.error(e);
     return null;
   });
-  renderCountdown(game.params.timeoutBlocks, confirmations);
+  renderCountdown(game.params.timeoutBlocks, info);
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
@@ -163,6 +186,9 @@ async function grab(game: Game, provider: ElectrumNetworkProvider) {
     }
   } catch (e) {
     console.error(e);
+    if (e instanceof PassError && e.code === "stale") {
+      for (const delay of [0, 4_000]) setTimeout(() => void refresh(game, provider).catch(console.error), delay);
+    }
     $("grabMsg").textContent = friendlyError(e);
   } finally {
     clearTimeout(timer);
@@ -185,6 +211,7 @@ async function main() {
   $("grabBtn").addEventListener("click", () => void grab(game, provider));
   $("cancelGrabBtn").addEventListener("click", () => activeGrab?.abort(new Error("Cancelled by you")));
   subscribe(renderWallet);
+  setInterval(updateAgo, 1000);
   resumeIfStored();
 
   let lastOk: Date | null = null;

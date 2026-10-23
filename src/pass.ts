@@ -10,11 +10,13 @@ import { toRelaySafe } from "./lib/relay.ts";
 import { retry } from "./lib/retry.ts";
 import { findWalletCoins } from "./lib/walletCoins.ts";
 import { manager } from "./bch_wallet.ts";
+import { CONFIG } from "./config.ts";
+import { formatUnits } from "./lib/format.ts";
 
 const FEE_RATE = 2;
 
 export class PassError extends Error {
-  code: "no-round" | "no-funds" | "mismatch" | "rejected";
+  code: "no-round" | "no-funds" | "mismatch" | "rejected" | "stale" | "network";
   constructor(code: PassError["code"], message: string) {
     super(message);
     this.name = "PassError";
@@ -53,7 +55,18 @@ export async function buildPassRequest(game: Game, provider: ElectrumNetworkProv
   const pusdCoin = coins
     .filter((c) => c.utxo.token && c.utxo.token.category === game.pusdCategory && !c.utxo.token.nft && c.utxo.token.amount >= price)
     .sort((a, b) => (a.utxo.token!.amount < b.utxo.token!.amount ? 1 : -1))[0];
-  if (!pusdCoin) throw new PassError("no-funds", "Your wallet needs a PUSD coin large enough for the next price.");
+    if (!pusdCoin) {
+    const total = coins
+      .filter((c) => c.utxo.token && c.utxo.token.category === game.pusdCategory && !c.utxo.token.nft)
+      .reduce((sum, c) => sum + c.utxo.token!.amount, 0n);
+    const fmt = (n: bigint) => formatUnits(n, CONFIG.pusdDecimals);
+    throw new PassError(
+      "no-funds",
+      total >= price
+        ? `Your PUSD is split across several small coins. Combine them into one in your wallet, then try again (next grab: ${fmt(price)} PUSD).`
+        : `Not enough PUSD. The next grab costs ${fmt(price)} PUSD and this wallet has ${fmt(total)}.`,
+    );
+  }
   const bchCoin =
     pusdCoin.utxo.satoshis >= 6_000n
       ? undefined
@@ -116,22 +129,43 @@ export async function signAndBroadcast(
 ): Promise<string> {
   const request = plan.request as unknown as Parameters<typeof manager.signTransaction>[0];
   const response = await manager.signTransaction(request, { signal });
-  if (response.error) throw new PassError("rejected", response.error);
-  if (!response.signedTransaction) {
-    throw new PassError("rejected", "The wallet did not return a signed transaction.");
+  if (response.error) {
+    throw new PassError("rejected", `The request was not approved in your wallet (${response.error}). Nothing was sent.`);
   }
-  return provider.sendRawTransaction(response.signedTransaction);
+  if (!response.signedTransaction) {
+    throw new PassError("rejected", "The wallet did not return a signed transaction. Nothing was sent.");
+  }
+  try {
+    return await provider.sendRawTransaction(response.signedTransaction);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/conflict|missing|spent/i.test(msg)) {
+      throw new PassError(
+        "stale",
+        "Someone else grabbed the potato first. The page was refreshed with the new price, so you can try again.",
+      );
+    }
+    if (/websocket|establish connection|timed? ?out|closed/i.test(msg)) {
+      throw new PassError(
+        "network",
+        "We could not confirm that the network received your grab. Wait a moment and check the pass number before trying again.",
+      );
+    }
+    throw e;
+  }
 }
 
 export function friendlyError(e: unknown): string {
   if (e instanceof PassError) return e.message;
   if (e instanceof DOMException && e.name === "AbortError") {
-    return e.message.includes("Timed out")
-      ? "Timed out waiting for your wallet. Nothing was sent."
-      : "Cancelled. Nothing was sent.";
+    if (e.message.includes("Timed out")) return "Timed out waiting for your wallet. Nothing was sent.";
+    if (e.message.includes("disconnected")) return "Your wallet disconnected. Nothing was sent.";
+    return "Cancelled. Nothing was sent.";
   }
   const msg = e instanceof Error ? e.message : String(e);
   if (/reject|denied|declin|cancel/i.test(msg)) return "The request was rejected in your wallet. Nothing was sent.";
-  if (/conflict|missing|spent/i.test(msg)) return "Someone else grabbed the potato first, or the state changed. Please try again.";
+  if (/websocket|establish connection|timed? ?out/i.test(msg)) {
+    return "Network hiccup while preparing your grab. Nothing was sent. Please try again.";
+  }
   return `Something went wrong: ${msg.split("\n")[0]}`;
 }
