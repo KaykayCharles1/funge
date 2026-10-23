@@ -66,3 +66,9 @@
 - WizardConnect sends plain JSON, so the request is converted by hand: the transaction as hex (libauth encodeTransaction), byte arrays as hex, bigints as "<bigint: Xn>". The library's own helpers are not exported.
 - Bug found and fixed: libauth's lockingBytecodeToCashAddress returns an object rather than a plain string, so the address helper now reads the address from the result.
 - Dry run result: price 1.40 PUSD, one wallet coin found at receive #0, network fee about 1,658 sats. Nothing is sent to the wallet yet.
+
+
+## Step 5d: signing and broadcasting
+- The Grab button rebuilds the pass transaction from the live state, asks the wallet to sign only its own input (inputPaths), then broadcasts the signed transaction itself.
+- A Cancel button and a 3-minute timeout abort a pending signing request; the page maps rejection and stale-state errors to plain messages.
+- First real grab: pass 4 to 5 for 1.40 test PUSD, with the connected wallet as the new holder.

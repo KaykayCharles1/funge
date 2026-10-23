@@ -9,11 +9,12 @@ import type { Game } from "./lib/game.ts";
 import { toRelaySafe } from "./lib/relay.ts";
 import { retry } from "./lib/retry.ts";
 import { findWalletCoins } from "./lib/walletCoins.ts";
+import { manager } from "./bch_wallet.ts";
 
 const FEE_RATE = 2;
 
 export class PassError extends Error {
-  code: "no-round" | "no-funds" | "mismatch";
+  code: "no-round" | "no-funds" | "mismatch" | "rejected";
   constructor(code: PassError["code"], message: string) {
     super(message);
     this.name = "PassError";
@@ -102,4 +103,35 @@ export async function buildPassRequest(game: Game, provider: ElectrumNetworkProv
   };
 
   return { passCount, price, inputCount: walletInputs.length, feeSats, walletInputs, request };
+}
+
+
+export type PassPlan = Awaited<ReturnType<typeof buildPassRequest>>;
+
+// Ask the wallet to sign (it signs only the inputs listed in inputPaths), then broadcast ourselves
+export async function signAndBroadcast(
+  plan: PassPlan,
+  provider: ElectrumNetworkProvider,
+  signal: AbortSignal,
+): Promise<string> {
+  const request = plan.request as unknown as Parameters<typeof manager.signTransaction>[0];
+  const response = await manager.signTransaction(request, { signal });
+  if (response.error) throw new PassError("rejected", response.error);
+  if (!response.signedTransaction) {
+    throw new PassError("rejected", "The wallet did not return a signed transaction.");
+  }
+  return provider.sendRawTransaction(response.signedTransaction);
+}
+
+export function friendlyError(e: unknown): string {
+  if (e instanceof PassError) return e.message;
+  if (e instanceof DOMException && e.name === "AbortError") {
+    return e.message.includes("Timed out")
+      ? "Timed out waiting for your wallet. Nothing was sent."
+      : "Cancelled. Nothing was sent.";
+  }
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/reject|denied|declin|cancel/i.test(msg)) return "The request was rejected in your wallet. Nothing was sent.";
+  if (/conflict|missing|spent/i.test(msg)) return "Someone else grabbed the potato first, or the state changed. Please try again.";
+  return `Something went wrong: ${msg.split("\n")[0]}`;
 }
