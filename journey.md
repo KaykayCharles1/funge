@@ -100,3 +100,9 @@
 - Mutation per pass: skin heat (tan to red), dilating eyes and a smile that turns into a frown, steam, cracks, one new mark per pass (the newest tinted by the holder), holder-tinted background and aura, and frame-specific sparkles.
 - The recent-frames strip is built from the state contract's history: every grab transaction carries the new state (pass, holder) and pot, so the frames are verifiable on chain.
 - "Share frame" renders the SVG to a canvas and exports a PNG with the pass number and pot; phones use the share sheet, desktops download.
+
+
+## Network resilience
+- CashScript 0.14.0 hardcodes chipnet.bch.ninja as its chipnet Electrum server. When that server's TLS handshake failed, the page and scripts stopped working.
+- Added a FailoverProvider (a subclass of ElectrumNetworkProvider overriding performRequest) that tries a configurable list of servers and sticks with the one that answers. Only connection errors cause a switch; a broadcast is retried elsewhere only if the connection never opened, so a transaction cannot be sent twice.
+- Considered QuickNode, but it offers Bitcoin-style JSON-RPC rather than the Electrum protocol the app uses, and an API key would be exposed in a static front end.

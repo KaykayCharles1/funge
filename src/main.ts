@@ -17,6 +17,7 @@ import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
 import { frameSvg, shareOrDownload, svgToDataUrl, svgToPngBlob } from "./lib/art.ts";
 import { loadRecentFrames } from "./lib/history.ts";
 import type { Frame } from "./lib/history.ts";
+import { makeProvider } from "./lib/provider.ts";
 
 
 const POLL_MS = 25_000;
@@ -329,7 +330,7 @@ async function main() {
   const game = await loadGame();
   activeGame = game;
   $("shareBtn").addEventListener("click", () => void shareFrame(game));
-  const provider = new ElectrumNetworkProvider(CONFIG.network);
+  const provider = makeProvider();
 
   $("connectBtn").addEventListener("click", () => startConnection(true));
   $("cancelBtn").addEventListener("click", () => void disconnectWallet());
@@ -358,7 +359,9 @@ async function main() {
       failures++;
       $("status").textContent = lastOk
         ? `Network hiccup. Showing data from ${lastOk.toLocaleTimeString()}. Retrying…`
-        : "Connecting to the network…";
+        : failures >= 3
+          ? "The network servers are not responding. Check your connection. Retrying…"
+          : "Connecting to the network…";
       delay = Math.min(3_000 * failures, POLL_MS);
     }
     setTimeout(tick, delay);

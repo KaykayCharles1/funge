@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ElectrumNetworkProvider, SignatureTemplate } from "cashscript";
+import { SignatureTemplate } from "cashscript";
 import { TestNetWallet } from "mainnet-js";
 import { binToHex } from "@bitauth/libauth";
 import { CONFIG } from "../src/config.ts";
 import { p2pkhLock, pkhOf } from "./helpers.ts";
+import { makeProvider } from "../src/lib/provider.ts";
 
 export async function loadEnv() {
   assert.equal(CONFIG.network, "chipnet", "These scripts are chipnet-only for now");
@@ -21,6 +22,6 @@ export async function loadEnv() {
     lockHex: binToHex(lock),
     address: wallet.getDepositAddress(),
     tokenAddress: wallet.getTokenDepositAddress(),
-    provider: new ElectrumNetworkProvider("chipnet"),
+    provider: makeProvider(),
   };
 }
