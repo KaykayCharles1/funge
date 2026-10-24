@@ -86,3 +86,10 @@
 - Settling needs no signature on either contract input, so the page builds and broadcasts it directly: no wallet is required. Anyone can press Settle.
 - The fee is paid from the contracts' own BCH; the leftover BCH goes to the holder as change.
 - The state is re-read right before building. A premature press is rejected by the network (BIP68) and the page says so plainly.
+
+
+## Step 6b: end screen
+- When the state and pot UTXOs are gone, the page reads the state contract's transaction history from the Electrum server. If the last transaction does not recreate the state contract, it is the settlement.
+- The settlement transaction is decoded in the browser: payout address (winner), payout token amount (pot paid), trophy NFT commitment (number of passes), and the transaction id. A visitor who never saw the live round gets the same screen.
+- First full round on chipnet: 10 passes, 24.50 test PUSD paid out to the last holder, matching the seed plus every grab price.
+- Typing fix: copy the bytes into a fresh Uint8Array before passing them to crypto.subtle.digest.

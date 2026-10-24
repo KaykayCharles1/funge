@@ -10,6 +10,10 @@ import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subs
 import type { WalletState } from "./bch_wallet.ts";
 import { formatDuration, formatUnits } from "./lib/format.ts";
 import { friendlySettleError, settleRound } from "./settle.ts";
+import { hexToBin } from "@bitauth/libauth";
+import { findEndedRound } from "./ended.ts";
+import type { EndedRound } from "./ended.ts";
+import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
 
 
 const POLL_MS = 25_000;
@@ -21,6 +25,7 @@ let holderPkh: string | null = null;
 let lastQr: string | null = null;
 let activeGrab: AbortController | null = null;
 let settling = false;
+let lastEnded: EndedRound | null = null;
 const AVG_BLOCK_MIN = 10; // BCH blocks average about 10 minutes
 let lastBlockTime: number | null = null; // unix seconds of the block that confirmed the latest grab
 
@@ -35,6 +40,20 @@ function renderHolder() {
   if (!holderPkh) return;
   const mine = getWalletState().pkhHex === holderPkh;
   $("holder").textContent = mine ? `${shortKey(holderPkh)} (you)` : shortKey(holderPkh);
+}
+
+function renderEnded(r: EndedRound) {
+  lastEnded = r;
+  show("live", false);
+  show("ended", true);
+  const mine = getWalletState().pkhHex === r.winnerPkh;
+  const winner = lockToAddress(p2pkhLock(hexToBin(r.winnerPkh)), false);
+  $("endedTitle").textContent = mine ? "You won the pot!" : "The potato has a winner";
+  $("endedWinner").textContent = mine ? `${winner} (you)` : winner;
+  $("endedPot").textContent = `${formatUnits(r.potPaid, CONFIG.pusdDecimals)} PUSD`;
+  $("endedPasses").textContent = String(r.passes);
+  $("endedTx").textContent = `Settlement transaction: ${r.settleTxid}${r.confirmed ? "" : " (waiting for confirmation)"}`;
+  $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
 function renderWallet(s: WalletState) {
@@ -66,6 +85,7 @@ function renderWallet(s: WalletState) {
     $("grabMsg").textContent = "Ready. Tap the button to grab the potato.";
   }
   renderHolder();
+  if (lastEnded) renderEnded(lastEnded);
 }
 
 async function loadGame(): Promise<Game> {
@@ -142,11 +162,19 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   ]);
   const s = stateUtxos[0];
   const p = potUtxos[0];
-  if (!s?.token?.nft || !p?.token) {
-    $("status").textContent = "No live round found (it may have been settled, or the server is catching up).";
+    if (!s?.token?.nft || !p?.token) {
     show("settleBtn", false);
+    const ended = await findEndedRound(game, provider);
+    if (ended) {
+      renderEnded(ended);
+      return;
+    }
+    $("status").textContent = "No live round found (the server may be catching up).";
     return;
   }
+  lastEnded = null;
+  show("ended", false);
+  show("live", true);
   const c = decodeCommitment(s.token.nft.commitment);
   if (c.passCount < highestPass) {
     $("status").textContent = "Server is catching up…";
