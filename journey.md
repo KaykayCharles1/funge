@@ -80,3 +80,9 @@
 - Network failures during broadcast are reported without claiming the grab was or was not sent, because we cannot know.
 - Known limit: the grab uses a single PUSD coin; if the PUSD is split across several small coins the page says so.
 - Block arrivals are random, so the page shows an estimate in minutes (blocks left times about 10) plus a live "last grab confirmed … ago" line, instead of a clock that ticks to zero.
+
+
+## Step 6a: settle button
+- Settling needs no signature on either contract input, so the page builds and broadcasts it directly: no wallet is required. Anyone can press Settle.
+- The fee is paid from the contracts' own BCH; the leftover BCH goes to the holder as change.
+- The state is re-read right before building. A premature press is rejected by the network (BIP68) and the page says so plainly.

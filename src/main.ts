@@ -9,6 +9,7 @@ import { PassError, buildPassRequest, friendlyError, signAndBroadcast } from "./
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { formatDuration, formatUnits } from "./lib/format.ts";
+import { friendlySettleError, settleRound } from "./settle.ts";
 
 
 const POLL_MS = 25_000;
@@ -19,6 +20,7 @@ let highestPass = -1; // never show an older state than one we've already seen
 let holderPkh: string | null = null;
 let lastQr: string | null = null;
 let activeGrab: AbortController | null = null;
+let settling = false;
 const AVG_BLOCK_MIN = 10; // BCH blocks average about 10 minutes
 let lastBlockTime: number | null = null; // unix seconds of the block that confirmed the latest grab
 
@@ -106,6 +108,7 @@ function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
   const section = $("countdown");
   lastBlockTime = info?.blocktime ?? null;
   updateAgo();
+  show("settleBtn", false);
   if (info === null) {
     section.className = CARD_NORMAL;
     $("countdownTitle").textContent = "Countdown unavailable";
@@ -114,6 +117,7 @@ function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
   }
   const togo = blocksToSettle(timeoutBlocks, info.confirmations);
   if (togo === 0) {
+    show("settleBtn", true);
     section.className = CARD_READY;
     $("countdownTitle").textContent = "Ready to settle";
     $("countdownDetail").textContent = "Nobody grabbed in time. The holder can claim the pot now.";
@@ -140,6 +144,7 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   const p = potUtxos[0];
   if (!s?.token?.nft || !p?.token) {
     $("status").textContent = "No live round found (it may have been settled, or the server is catching up).";
+    show("settleBtn", false);
     return;
   }
   const c = decodeCommitment(s.token.nft.commitment);
@@ -199,6 +204,28 @@ async function grab(game: Game, provider: ElectrumNetworkProvider) {
   }
 }
 
+async function settle(game: Game, provider: ElectrumNetworkProvider) {
+  if (settling) return;
+  settling = true;
+  const btn = $("settleBtn") as HTMLButtonElement;
+  btn.disabled = true;
+  $("settleMsg").textContent = "Preparing settlement…";
+  try {
+    const txid = await settleRound(game, provider);
+    console.log("Settle broadcast, txid:", txid);
+    $("settleMsg").textContent = `Settled (${txid.slice(0, 12)}…). The pot is on its way to the holder.`;
+  } catch (e) {
+    console.error(e);
+    $("settleMsg").textContent = friendlySettleError(e);
+  } finally {
+    settling = false;
+    btn.disabled = false;
+    for (const delay of [2_000, 6_000, 12_000]) {
+      setTimeout(() => void refresh(game, provider).catch(console.error), delay);
+    }
+  }
+}
+
 async function main() {
   const game = await loadGame();
   const provider = new ElectrumNetworkProvider(CONFIG.network);
@@ -212,6 +239,7 @@ async function main() {
   });
   $("grabBtn").addEventListener("click", () => void grab(game, provider));
   $("cancelGrabBtn").addEventListener("click", () => activeGrab?.abort(new Error("Cancelled by you")));
+  $("settleBtn").addEventListener("click", () => void settle(game, provider));
   subscribe(renderWallet);
   setInterval(updateAgo, 1000);
   resumeIfStored();
