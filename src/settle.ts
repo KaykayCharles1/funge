@@ -48,7 +48,7 @@ export function friendlySettleError(e: unknown): string {
   if (/conflict|missing|spent|No live round/i.test(msg)) {
     return "The round just changed (someone grabbed, or it was already settled). The page is refreshing.";
   }
-  if (/websocket|establish connection|timed? ?out|closed/i.test(msg)) {
+  if (/websocket|establish connection|failed to connect|timed? ?out|closed|socket/i.test(msg)) {
     return "Network hiccup. Wait a moment and check the page before trying again.";
   }
   return `Something went wrong: ${msg.split("\n")[0]}`;

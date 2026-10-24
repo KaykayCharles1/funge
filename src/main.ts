@@ -14,6 +14,9 @@ import { hexToBin } from "@bitauth/libauth";
 import { findEndedRound } from "./ended.ts";
 import type { EndedRound } from "./ended.ts";
 import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
+import { frameSvg, shareOrDownload, svgToDataUrl, svgToPngBlob } from "./lib/art.ts";
+import { loadRecentFrames } from "./lib/history.ts";
+import type { Frame } from "./lib/history.ts";
 
 
 const POLL_MS = 25_000;
@@ -26,6 +29,12 @@ let lastQr: string | null = null;
 let activeGrab: AbortController | null = null;
 let settling = false;
 let lastEnded: EndedRound | null = null;
+type ArtFrame = { passCount: number; holderPkh: string; pot: bigint };
+let activeGame: Game | null = null;
+let liveFrame: ArtFrame | null = null;
+let shownFrame: ArtFrame | null = null;
+let frames: Frame[] = [];
+let stripKey = "";
 const AVG_BLOCK_MIN = 10; // BCH blocks average about 10 minutes
 let lastBlockTime: number | null = null; // unix seconds of the block that confirmed the latest grab
 
@@ -46,6 +55,11 @@ function renderEnded(r: EndedRound) {
   lastEnded = r;
   show("live", false);
   show("ended", true);
+  if (activeGame) {
+    ($("endedArt") as HTMLImageElement).src = svgToDataUrl(
+      frameSvg({ passCount: r.passes, holderPkh: r.winnerPkh, gameCategory: activeGame.gameCategory }),
+    );
+  }
   const mine = getWalletState().pkhHex === r.winnerPkh;
   const winner = lockToAddress(p2pkhLock(hexToBin(r.winnerPkh)), false);
   $("endedTitle").textContent = mine ? "You won the pot!" : "The potato has a winner";
@@ -54,6 +68,59 @@ function renderEnded(r: EndedRound) {
   $("endedPasses").textContent = String(r.passes);
   $("endedTx").textContent = `Settlement transaction: ${r.settleTxid}${r.confirmed ? "" : " (waiting for confirmation)"}`;
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+}
+
+function showFrame(game: Game, f: ArtFrame) {
+  shownFrame = f;
+  const svg = frameSvg({ passCount: f.passCount, holderPkh: f.holderPkh, gameCategory: game.gameCategory });
+  ($("art") as HTMLImageElement).src = svgToDataUrl(svg);
+  $("artCaption").textContent =
+    `Pass ${f.passCount} · pot ${formatUnits(f.pot, CONFIG.pusdDecimals)} PUSD` +
+    (liveFrame && f.passCount !== liveFrame.passCount ? " (earlier frame)" : "");
+}
+
+function renderFrameStrip(game: Game) {
+  const key = frames.map((f) => f.txid).join(",");
+  if (key === stripKey) return;
+  stripKey = key;
+  $("frames").replaceChildren(
+    ...frames.map((f) => {
+      const button = document.createElement("button");
+      button.className = "shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-700 hover:ring-amber-400";
+      button.title = `Pass ${f.passCount}`;
+      const img = document.createElement("img");
+      img.width = 64;
+      img.height = 64;
+      img.alt = `Pass ${f.passCount}`;
+      img.src = svgToDataUrl(frameSvg({ passCount: f.passCount, holderPkh: f.holderPkh, gameCategory: game.gameCategory }));
+      button.append(img);
+      button.addEventListener("click", () => showFrame(game, f));
+      return button;
+    }),
+  );
+}
+
+async function updateFrames(game: Game, provider: ElectrumNetworkProvider) {
+  frames = await loadRecentFrames(game, provider);
+  renderFrameStrip(game);
+}
+
+async function shareFrame(game: Game) {
+  const f = shownFrame;
+  if (!f) return;
+  $("shareMsg").textContent = "Preparing image…";
+  try {
+    const pot = formatUnits(f.pot, CONFIG.pusdDecimals);
+    const svg = frameSvg(
+      { passCount: f.passCount, holderPkh: f.holderPkh, gameCategory: game.gameCategory },
+      { line1: `FUNGE · PASS ${f.passCount}`, line2: `Pot ${pot} PUSD` },
+    );
+    const how = await shareOrDownload(await svgToPngBlob(svg), `funge-pass-${f.passCount}.png`, `Funge pass ${f.passCount}: pot ${pot} PUSD`);
+    $("shareMsg").textContent = how === "downloaded" ? "Saved as a PNG in your downloads." : "";
+  } catch (e) {
+    console.error(e);
+    $("shareMsg").textContent = "Could not create the image. Please try again.";
+  }
 }
 
 function renderWallet(s: WalletState) {
@@ -187,8 +254,12 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   renderHolder();
   $("pot").textContent = formatUnits(p.token.amount, CONFIG.pusdDecimals);
   $("price").textContent = formatUnits(price, CONFIG.pusdDecimals);
+  const previous = liveFrame;
+  liveFrame = { passCount: c.passCount, holderPkh: c.holderPkh, pot: p.token.amount };
+  if (!previous || previous.passCount !== c.passCount || !shownFrame) showFrame(game, liveFrame);
+  void updateFrames(game, provider).catch(console.error);
 
-    const info = await getConfirmationInfo(provider, s.txid).catch((e) => {
+  const info = await getConfirmationInfo(provider, s.txid).catch((e) => {
     console.error(e);
     return null;
   });
@@ -256,6 +327,8 @@ async function settle(game: Game, provider: ElectrumNetworkProvider) {
 
 async function main() {
   const game = await loadGame();
+  activeGame = game;
+  $("shareBtn").addEventListener("click", () => void shareFrame(game));
   const provider = new ElectrumNetworkProvider(CONFIG.network);
 
   $("connectBtn").addEventListener("click", () => startConnection(true));

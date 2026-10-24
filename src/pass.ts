@@ -145,7 +145,7 @@ export async function signAndBroadcast(
         "Someone else grabbed the potato first. The page was refreshed with the new price, so you can try again.",
       );
     }
-    if (/websocket|establish connection|timed? ?out|closed/i.test(msg)) {
+    if (/websocket|establish connection|failed to connect|timed? ?out|closed|socket/i.test(msg)) {
       throw new PassError(
         "network",
         "We could not confirm that the network received your grab. Wait a moment and check the pass number before trying again.",
@@ -164,7 +164,7 @@ export function friendlyError(e: unknown): string {
   }
   const msg = e instanceof Error ? e.message : String(e);
   if (/reject|denied|declin|cancel/i.test(msg)) return "The request was rejected in your wallet. Nothing was sent.";
-  if (/websocket|establish connection|timed? ?out/i.test(msg)) {
+  if (/websocket|establish connection|failed to connect|timed? ?out|socket/i.test(msg)) {
     return "Network hiccup while preparing your grab. Nothing was sent. Please try again.";
   }
   return `Something went wrong: ${msg.split("\n")[0]}`;

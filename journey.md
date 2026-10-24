@@ -93,3 +93,10 @@
 - The settlement transaction is decoded in the browser: payout address (winner), payout token amount (pot paid), trophy NFT commitment (number of passes), and the transaction id. A visitor who never saw the live round gets the same screen.
 - First full round on chipnet: 10 passes, 24.50 test PUSD paid out to the last holder, matching the seed plus every grab price.
 - Typing fix: copy the bytes into a fresh Uint8Array before passing them to crypto.subtle.digest.
+
+
+## Step 7: generative art
+- Each frame is an SVG drawn in code from the game category, pass count and holder key: same input, same picture. A seeded random number generator (mulberry32 over an FNV-1a hash) makes it deterministic with no libraries.
+- Mutation per pass: skin heat (tan to red), dilating eyes and a smile that turns into a frown, steam, cracks, one new mark per pass (the newest tinted by the holder), holder-tinted background and aura, and frame-specific sparkles.
+- The recent-frames strip is built from the state contract's history: every grab transaction carries the new state (pass, holder) and pot, so the frames are verifiable on chain.
+- "Share frame" renders the SVG to a canvas and exports a PNG with the pass number and pot; phones use the share sheet, desktops download.

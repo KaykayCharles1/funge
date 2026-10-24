@@ -3,6 +3,7 @@ import type { ElectrumNetworkProvider } from "cashscript";
 import { decodeCommitment } from "./lib/commitment.ts";
 import type { Game } from "./lib/game.ts";
 import { retry } from "./lib/retry.ts";
+import { scriptHash } from "./lib/chain.ts";
 
 export type EndedRound = {
   settleTxid: string;
@@ -11,13 +12,6 @@ export type EndedRound = {
   passes: number;
   confirmed: boolean;
 };
-
-// Electrum identifies a script by the reversed SHA-256 of its locking bytecode
-async function scriptHash(lockingBytecodeHex: string): Promise<string> {
-  const bytes = new Uint8Array(hexToBin(lockingBytecodeHex)); // copy into a plain ArrayBuffer for WebCrypto
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return binToHex(new Uint8Array(digest).reverse());
-}
 
 // Returns the settled round's details, or null if the last transaction is not a settlement
 export async function findEndedRound(game: Game, provider: ElectrumNetworkProvider): Promise<EndedRound | null> {

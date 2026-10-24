@@ -16,6 +16,7 @@
       <section id="ended" class="hidden rounded-2xl bg-slate-900 p-6 ring-1 ring-amber-400">
         <p class="text-xs uppercase tracking-wide text-amber-400">Round over</p>
         <h2 id="endedTitle" class="mt-1 text-2xl font-extrabold">…</h2>
+        <img id="endedArt" alt="Final frame" class="mx-auto mt-4 w-full max-w-xs rounded-xl" />
         <dl class="mt-4 grid gap-4">
           <div>
             <dt class="text-xs uppercase tracking-wide text-slate-400">Pot paid out</dt>
@@ -39,6 +40,15 @@
       </section>
 
       <div id="live" class="flex flex-col gap-6">
+        <section id="artCard" class="rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+          <img id="art" alt="Funge potato art for the current pass" class="mx-auto w-full max-w-sm rounded-xl" />
+          <div class="mt-3 flex items-center justify-between gap-3">
+            <p id="artCaption" class="text-xs text-slate-400"></p>
+            <button id="shareBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Share frame</button>
+          </div>
+          <p id="shareMsg" class="mt-1 text-xs text-slate-400"></p>
+          <div id="frames" class="mt-3 flex gap-2 overflow-x-auto pb-1"></div>
+        </section>
         <dl class="grid grid-cols-2 gap-3">
           <div class="col-span-2 rounded-2xl bg-slate-900 p-5 ring-1 ring-amber-500/40">
             <dt class="text-xs uppercase tracking-wide text-slate-400">Pot</dt>

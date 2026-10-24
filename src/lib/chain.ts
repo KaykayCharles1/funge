@@ -1,4 +1,4 @@
-import { lockingBytecodeToCashAddress, swapEndianness } from "@bitauth/libauth";
+import { binToHex, hexToBin, lockingBytecodeToCashAddress, swapEndianness } from "@bitauth/libauth";
 import { CONFIG } from "../config.ts";
 
 export const p2pkhLock = (pkh: Uint8Array) => Uint8Array.from([0x76, 0xa9, 0x14, ...pkh, 0x88, 0xac]);
@@ -16,4 +16,12 @@ export function lockToAddress(bytecode: Uint8Array, tokenSupport: boolean): stri
     );
   }
   return address;
+}
+
+
+// Electrum identifies a script by the reversed SHA-256 of its locking bytecode
+export async function scriptHash(lockingBytecodeHex: string): Promise<string> {
+  const bytes = new Uint8Array(hexToBin(lockingBytecodeHex)); // copy into a plain ArrayBuffer for WebCrypto typing
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return binToHex(new Uint8Array(digest).reverse());
 }
