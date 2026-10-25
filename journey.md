@@ -106,3 +106,9 @@
 - CashScript 0.14.0 hardcodes chipnet.bch.ninja as its chipnet Electrum server. When that server's TLS handshake failed, the page and scripts stopped working.
 - Added a FailoverProvider (a subclass of ElectrumNetworkProvider overriding performRequest) that tries a configurable list of servers and sticks with the one that answers. Only connection errors cause a switch; a broadcast is retried elsewhere only if the connection never opened, so a transaction cannot be sent twice.
 - Considered QuickNode, but it offers Bitcoin-style JSON-RPC rather than the Electrum protocol the app uses, and an API key would be exposed in a static front end.
+
+
+## Built-in wallet, step 1: wallet core
+- Decided to build the browser wallet on libauth and CashScript instead of mainnet-js: one network layer (our failover provider), a smaller bundle, and everything needed (seed to key to address, signing a P2PKH input, balances) was already in use.
+- A seed phrase (BIP39) derives the first address on the standard BCH path m/44'/145'/0'/0/0. The module exposes a signing capability and balances, never the key.
+- Tested in Node: create and restore give the same address, messy spacing and capitals are normalized, different phrases differ, and the balance read works. The seed phrase is never printed.
