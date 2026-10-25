@@ -18,7 +18,7 @@ import { frameSvg, shareOrDownload, svgToDataUrl, svgToPngBlob } from "./lib/art
 import { loadRecentFrames } from "./lib/history.ts";
 import type { Frame } from "./lib/history.ts";
 import { makeProvider } from "./lib/provider.ts";
-
+import { initLocalWallet, refreshBalances } from "./walletUI.ts";
 
 const POLL_MS = 25_000;
 const SIGN_TIMEOUT_MS = 180_000;
@@ -331,6 +331,7 @@ async function main() {
   activeGame = game;
   $("shareBtn").addEventListener("click", () => void shareFrame(game));
   const provider = makeProvider();
+  void initLocalWallet(provider);
 
   $("connectBtn").addEventListener("click", () => startConnection(true));
   $("cancelBtn").addEventListener("click", () => void disconnectWallet());
@@ -352,6 +353,7 @@ async function main() {
     let delay = POLL_MS;
     try {
       await refresh(game, provider);
+      void refreshBalances(provider);
       lastOk = new Date();
       failures = 0;
     } catch (e) {

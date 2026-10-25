@@ -4,6 +4,7 @@ import {
   generateBip39Mnemonic,
   hash160,
   binToHex,
+  decodeBip39Mnemonic,
 } from "@bitauth/libauth";
 import { SignatureTemplate } from "cashscript";
 import type { ElectrumNetworkProvider } from "cashscript";
@@ -13,6 +14,12 @@ import { retry } from "../lib/retry.ts";
 
 // The path most BCH wallets use for their first receiving address (BIP44, coin type 145)
 const FIRST_ADDRESS_PATH = "m/44'/145'/0'/0/0";
+export const normalizeMnemonic = (mnemonic: string) => mnemonic.trim().toLowerCase().split(/\s+/).join(" ");
+
+// Checks the words and the built-in checksum, which catches typos in an imported phrase
+export function isValidMnemonic(mnemonic: string): boolean {
+  return typeof decodeBip39Mnemonic(normalizeMnemonic(mnemonic)) !== "string";
+}
 
 export type Balances = {
   sats: bigint; // all BCH on this address, including the small amounts attached to token coins
@@ -34,7 +41,7 @@ export function newMnemonic(): string {
 }
 
 export function walletFromMnemonic(mnemonic: string): LocalWallet {
-  const phrase = mnemonic.trim().toLowerCase().split(/\s+/).join(" ");
+  const phrase = normalizeMnemonic(mnemonic);
   const root = deriveHdPrivateNodeFromBip39Mnemonic(phrase);
   if (typeof root === "string") throw new Error("Could not derive a key from this seed phrase.");
   const node = deriveHdPath(root, FIRST_ADDRESS_PATH);

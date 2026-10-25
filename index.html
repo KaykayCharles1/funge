@@ -67,6 +67,56 @@
             <dd id="holder" class="mt-1 break-all font-mono text-sm">…</dd>
           </div>
         </dl>
+        
+        <section id="localWallet" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Game wallet</p>
+
+          <div id="lwNone" class="hidden">
+            <p class="mt-2 text-sm text-slate-300">One click creates a wallet that lives in this browser. Keep only what you play with in it.</p>
+            <details class="mt-3 text-sm text-slate-300">
+              <summary class="cursor-pointer">Add a password (recommended)</summary>
+              <input id="lwPassword" type="password" autocomplete="new-password" placeholder="Password (8+ characters)" class="mt-2 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none ring-1 ring-slate-700 focus:ring-amber-400" />
+              <input id="lwPassword2" type="password" autocomplete="new-password" placeholder="Repeat password" class="mt-2 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none ring-1 ring-slate-700 focus:ring-amber-400" />
+              <p class="mt-2 text-xs text-slate-400">Without a password, anyone who can use this browser profile can spend the funds. There is no password recovery, so keep your seed phrase safe.</p>
+            </details>
+            <details class="mt-2 text-sm text-slate-300">
+              <summary class="cursor-pointer">I already have a seed phrase</summary>
+              <textarea id="lwImport" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter your 12 or 24 words" class="mt-2 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none ring-1 ring-slate-700 focus:ring-amber-400"></textarea>
+              <p class="mt-2 text-xs text-slate-400">Only import a seed that holds test coins or a small play balance.</p>
+            </details>
+            <button id="lwCreateBtn" class="mt-4 w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 hover:bg-amber-300 disabled:opacity-40">Create game wallet</button>
+          </div>
+
+          <div id="lwLocked" class="hidden">
+            <p class="mt-2 text-sm text-slate-300">Your wallet is locked.</p>
+            <input id="lwUnlockPassword" type="password" autocomplete="current-password" placeholder="Password" class="mt-2 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none ring-1 ring-slate-700 focus:ring-amber-400" />
+            <button id="lwUnlockBtn" class="mt-3 w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 hover:bg-amber-300 disabled:opacity-40">Unlock</button>
+          </div>
+
+          <div id="lwUnlocked" class="hidden">
+            <p id="lwAddress" class="mt-2 break-all font-mono text-xs text-slate-300"></p>
+            <div class="mt-3 flex gap-8">
+              <div><p class="text-xs text-slate-400">BCH</p><p id="lwBch" class="font-bold">—</p></div>
+              <div><p class="text-xs text-slate-400">PUSD</p><p id="lwPusd" class="font-bold">—</p></div>
+            </div>
+            <p class="mt-3 text-xs text-slate-400">On chipnet, send some test BCH and test PUSD to this address to play.</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button id="lwCopyBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Copy address</button>
+              <button id="lwBackupBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Back up seed phrase</button>
+              <button id="lwLockBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Lock</button>
+              <button id="lwDeleteBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm text-red-300 hover:bg-slate-700">Delete wallet</button>
+            </div>
+          </div>
+
+          <div id="lwSeedBox" class="mt-4 hidden rounded-xl bg-slate-950 p-4 ring-1 ring-amber-400">
+            <p class="text-sm font-bold text-amber-400">Your seed phrase</p>
+            <p class="mt-1 text-xs text-slate-300">Write these words on paper, in order. Anyone who sees them can take your funds, and without them a lost browser means lost money. They hide themselves after 60 seconds.</p>
+            <p id="lwSeed" class="mt-3 select-all break-words font-mono text-sm"></p>
+            <button id="lwSeedDoneBtn" class="mt-3 rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">I have written it down</button>
+          </div>
+
+          <p id="lwMsg" class="mt-2 text-sm text-red-400"></p>
+        </section>
 
         <section id="wallet" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
           <div id="walletIdle">

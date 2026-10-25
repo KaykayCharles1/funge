@@ -112,3 +112,14 @@
 - Decided to build the browser wallet on libauth and CashScript instead of mainnet-js: one network layer (our failover provider), a smaller bundle, and everything needed (seed to key to address, signing a P2PKH input, balances) was already in use.
 - A seed phrase (BIP39) derives the first address on the standard BCH path m/44'/145'/0'/0/0. The module exposes a signing capability and balances, never the key.
 - Tested in Node: create and restore give the same address, messy spacing and capitals are normalized, different phrases differ, and the balance read works. The seed phrase is never printed.
+
+
+## Built-in wallet, step 2: encrypted vault
+- The seed phrase is stored in IndexedDB, encrypted with AES-GCM. With a password, the key comes from PBKDF2-SHA256 (600,000 iterations, random salt). Without one ("device mode"), a random non-extractable key kept by the browser is used, which opens automatically and is honestly weaker.
+- States are none, locked and unlocked; the decrypted phrase lives only in memory and is dropped on lock, wipe or page close. Creating refuses to overwrite an existing wallet, rejects invalid phrases (checksum validated) and passwords shorter than 8 characters.
+- The storage sits behind a small interface, so the logic is tested in Node with an in-memory stand-in (create, reload, wrong password, unlock, lock, wipe) and the real IndexedDB path was checked from the browser console.
+
+
+## Built-in wallet, step 3 (plain version): game wallet panel
+- A plain working panel: create (optional password typed twice, or import a validated seed phrase), a backup box that hides itself after 60 seconds, unlock and lock, copy address, balances through the failover provider, and delete with confirmation.
+- The seed field turns off spellcheck so browsers cannot send it to an outside service. The deposit QR, Withdraw and the final side-panel layout are deferred to the designed UI.
