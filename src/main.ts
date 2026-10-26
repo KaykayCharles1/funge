@@ -1,54 +1,71 @@
 import "./style.css";
-import { ElectrumNetworkProvider } from "cashscript";
-import { CONFIG } from "./config.ts";
-import { decodeCommitment } from "./lib/commitment.ts";
-import type { Game } from "./lib/game.ts";
-import { qrDataUrl } from "./lib/qr.ts";
-import { blocksToSettle } from "./lib/timing.ts";
-import { PassError, buildPassRequest, friendlyError, signAndBroadcast } from "./pass.ts";
-import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
-import type { WalletState } from "./bch_wallet.ts";
-import { formatDuration, formatUnits } from "./lib/format.ts";
-import { friendlySettleError, settleRound } from "./settle.ts";
 import { hexToBin } from "@bitauth/libauth";
+import type { ElectrumNetworkProvider } from "cashscript";
+import { CONFIG } from "./config.ts";
 import { findEndedRound } from "./ended.ts";
 import type { EndedRound } from "./ended.ts";
-import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
 import { frameSvg, shareOrDownload, svgToDataUrl, svgToPngBlob } from "./lib/art.ts";
+import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
+import { decodeCommitment } from "./lib/commitment.ts";
+import { formatDuration, formatUnits } from "./lib/format.ts";
+import type { Game } from "./lib/game.ts";
 import { loadRecentFrames } from "./lib/history.ts";
 import type { Frame } from "./lib/history.ts";
 import { makeProvider } from "./lib/provider.ts";
-import { initLocalWallet, refreshBalances } from "./walletUI.ts";
+import { qrDataUrl } from "./lib/qr.ts";
+import { blocksToSettle } from "./lib/timing.ts";
+import { PassError, buildPassRequest, friendlyError, signAndBroadcast } from "./pass.ts";
+import { friendlySettleError, settleRound } from "./settle.ts";
+import { stealWithLocalWallet } from "./steal.ts";
+import { vault } from "./wallet/vault.ts";
+import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
+import type { WalletState } from "./bch_wallet.ts";
+import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 
 const POLL_MS = 25_000;
 const SIGN_TIMEOUT_MS = 180_000;
-const $ = (id: string) => document.getElementById(id)!;
-
-let highestPass = -1; // never show an older state than one we've already seen
-let holderPkh: string | null = null;
-let lastQr: string | null = null;
-let activeGrab: AbortController | null = null;
-let settling = false;
-let lastEnded: EndedRound | null = null;
-type ArtFrame = { passCount: number; holderPkh: string; pot: bigint };
-let activeGame: Game | null = null;
-let liveFrame: ArtFrame | null = null;
-let shownFrame: ArtFrame | null = null;
-let frames: Frame[] = [];
-let stripKey = "";
 const AVG_BLOCK_MIN = 10; // BCH blocks average about 10 minutes
-let lastBlockTime: number | null = null; // unix seconds of the block that confirmed the latest grab
+const PLACEHOLDER_MESSAGES = [
+  "",
+  "Connect a wallet to play.",
+  "Create a game wallet to play.",
+  "Unlock your game wallet to play.",
+  "Ready. Tap the button to grab the potato.",
+];
 
-const shortKey = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
+const $ = (id: string) => document.getElementById(id)!;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
+const shortKey = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 
 const CARD = "rounded-2xl p-5 ring-1";
 const CARD_NORMAL = `${CARD} bg-slate-900 ring-slate-800`;
 const CARD_READY = `${CARD} bg-amber-500/10 ring-amber-400`;
 
+type ArtFrame = { passCount: number; holderPkh: string; pot: bigint };
+type ConfirmationInfo = { confirmations: number; blocktime: number | null };
+
+let highestPass = -1; // never show an older state than one we've already seen
+let holderPkh: string | null = null;
+let currentPrice: bigint | null = null;
+let lastQr: string | null = null;
+let activeGrab: AbortController | null = null;
+let activeGrabMode: "walletconnect" | "local" | null = null;
+let settling = false;
+let lastEnded: EndedRound | null = null;
+let activeGame: Game | null = null;
+let liveFrame: ArtFrame | null = null;
+let shownFrame: ArtFrame | null = null;
+let frames: Frame[] = [];
+let stripKey = "";
+let lastBlockTime: number | null = null; // unix seconds of the block that confirmed the latest grab
+
+// The keys that count as "you": the game wallet and/or a connected external wallet
+const myPkhs = () =>
+  [getLocalWallet()?.pkhHex, getWalletState().pkhHex].filter((k): k is string => !!k);
+
 function renderHolder() {
   if (!holderPkh) return;
-  const mine = getWalletState().pkhHex === holderPkh;
+  const mine = myPkhs().includes(holderPkh);
   $("holder").textContent = mine ? `${shortKey(holderPkh)} (you)` : shortKey(holderPkh);
 }
 
@@ -61,7 +78,7 @@ function renderEnded(r: EndedRound) {
       frameSvg({ passCount: r.passes, holderPkh: r.winnerPkh, gameCategory: activeGame.gameCategory }),
     );
   }
-  const mine = getWalletState().pkhHex === r.winnerPkh;
+  const mine = myPkhs().includes(r.winnerPkh);
   const winner = lockToAddress(p2pkhLock(hexToBin(r.winnerPkh)), false);
   $("endedTitle").textContent = mine ? "You won the pot!" : "The potato has a winner";
   $("endedWinner").textContent = mine ? `${winner} (you)` : winner;
@@ -116,7 +133,11 @@ async function shareFrame(game: Game) {
       { passCount: f.passCount, holderPkh: f.holderPkh, gameCategory: game.gameCategory },
       { line1: `FUNGE · PASS ${f.passCount}`, line2: `Pot ${pot} PUSD` },
     );
-    const how = await shareOrDownload(await svgToPngBlob(svg), `funge-pass-${f.passCount}.png`, `Funge pass ${f.passCount}: pot ${pot} PUSD`);
+    const how = await shareOrDownload(
+      await svgToPngBlob(svg),
+      `funge-pass-${f.passCount}.png`,
+      `Funge pass ${f.passCount}: pot ${pot} PUSD`,
+    );
     $("shareMsg").textContent = how === "downloaded" ? "Saved as a PNG in your downloads." : "";
   } catch (e) {
     console.error(e);
@@ -124,9 +145,9 @@ async function shareFrame(game: Game) {
   }
 }
 
+// External wallet (WizardConnect) card
 function renderWallet(s: WalletState) {
-  if (s.status === "idle") activeGrab?.abort(new Error("Wallet disconnected"));
-  ($("grabBtn") as HTMLButtonElement).disabled = s.status !== "connected" || activeGrab !== null;
+  if (s.status === "idle" && activeGrabMode === "walletconnect") activeGrab?.abort(new Error("Wallet disconnected"));
   show("walletIdle", s.status === "idle");
   show("walletWaiting", s.status === "waiting");
   show("walletConnected", s.status === "connected");
@@ -147,13 +168,9 @@ function renderWallet(s: WalletState) {
     $("walletName").textContent = s.walletName ?? "Wallet";
     $("walletKey").textContent = s.pkhHex ? `Key ${shortKey(s.pkhHex)}` : "";
   }
-    if (s.status !== "connected") {
-    $("grabMsg").textContent = "Connect a wallet to play.";
-  } else if ($("grabMsg").textContent === "Connect a wallet to play.") {
-    $("grabMsg").textContent = "Ready. Tap the button to grab the potato.";
-  }
   renderHolder();
   if (lastEnded) renderEnded(lastEnded);
+  updateGrabButton();
 }
 
 async function loadGame(): Promise<Game> {
@@ -161,9 +178,6 @@ async function loadGame(): Promise<Game> {
   if (!res.ok) throw new Error(`Cannot load game.${CONFIG.network}.json (${res.status})`);
   return res.json();
 }
-
-// Confirmations of a transaction, or null if the server answers in an unexpected shape
-type ConfirmationInfo = { confirmations: number; blocktime: number | null };
 
 // Confirmations (and the block time, if the server gives it) of a transaction; null if the shape is unexpected
 async function getConfirmationInfo(provider: ElectrumNetworkProvider, txid: string): Promise<ConfirmationInfo | null> {
@@ -189,7 +203,7 @@ function updateAgo() {
     return;
   }
   const secs = Math.max(0, Math.floor(Date.now() / 1000 - lastBlockTime));
-    el.textContent = `Last grab confirmed ${formatDuration(secs)} ago`;
+  el.textContent = `Last grab confirmed ${formatDuration(secs)} ago`;
 }
 
 function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
@@ -205,8 +219,8 @@ function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
   }
   const togo = blocksToSettle(timeoutBlocks, info.confirmations);
   if (togo === 0) {
-    show("settleBtn", true);
     section.className = CARD_READY;
+    show("settleBtn", true);
     $("countdownTitle").textContent = "Ready to settle";
     $("countdownDetail").textContent = "Nobody grabbed in time. The holder can claim the pot now.";
   } else if (info.confirmations === 0) {
@@ -230,10 +244,12 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   ]);
   const s = stateUtxos[0];
   const p = potUtxos[0];
-    if (!s?.token?.nft || !p?.token) {
+  if (!s?.token?.nft || !p?.token) {
     show("settleBtn", false);
     const ended = await findEndedRound(game, provider);
     if (ended) {
+      currentPrice = null;
+      updateGrabButton();
       renderEnded(ended);
       return;
     }
@@ -243,6 +259,7 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   lastEnded = null;
   show("ended", false);
   show("live", true);
+
   const c = decodeCommitment(s.token.nft.commitment);
   if (c.passCount < highestPass) {
     $("status").textContent = "Server is catching up…";
@@ -250,15 +267,18 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   }
   highestPass = c.passCount;
   const price = BigInt(game.params.basePrice) + BigInt(game.params.priceStep) * BigInt(c.passCount);
+  currentPrice = price;
   $("passCount").textContent = String(c.passCount);
   holderPkh = c.holderPkh;
   renderHolder();
   $("pot").textContent = formatUnits(p.token.amount, CONFIG.pusdDecimals);
   $("price").textContent = formatUnits(price, CONFIG.pusdDecimals);
+
   const previous = liveFrame;
   liveFrame = { passCount: c.passCount, holderPkh: c.holderPkh, pot: p.token.amount };
   if (!previous || previous.passCount !== c.passCount || !shownFrame) showFrame(game, liveFrame);
   void updateFrames(game, provider).catch(console.error);
+  updateGrabButton();
 
   const info = await getConfirmationInfo(provider, s.txid).catch((e) => {
     console.error(e);
@@ -268,18 +288,84 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
-function setGrabbing(on: boolean) {
-  ($("grabBtn") as HTMLButtonElement).disabled = on || getWalletState().status !== "connected";
-  show("cancelGrabBtn", on);
+// Show the result of our own steal straight away, before the network catches up
+function applyOptimistic(game: Game, passCount: number, holder: string, pot: bigint) {
+  highestPass = passCount;
+  holderPkh = holder;
+  currentPrice = BigInt(game.params.basePrice) + BigInt(game.params.priceStep) * BigInt(passCount);
+  $("passCount").textContent = String(passCount);
+  $("pot").textContent = formatUnits(pot, CONFIG.pusdDecimals);
+  $("price").textContent = formatUnits(currentPrice, CONFIG.pusdDecimals);
+  renderHolder();
+  liveFrame = { passCount, holderPkh: holder, pot };
+  showFrame(game, liveFrame);
+  renderCountdown(game.params.timeoutBlocks, { confirmations: 0, blocktime: null });
+  updateGrabButton();
 }
 
-async function grab(game: Game, provider: ElectrumNetworkProvider) {
+function updateGrabButton() {
+  const btn = $("grabBtn") as HTMLButtonElement;
+  const local = getLocalWallet();
+  const external = getWalletState().status === "connected";
+  const busy = activeGrab !== null;
+  btn.disabled = busy || currentPrice === null || (!local && !external);
+  btn.textContent =
+    currentPrice !== null
+      ? `Grab the potato · ${formatUnits(currentPrice, CONFIG.pusdDecimals)} PUSD`
+      : "Grab the potato";
+  show("cancelGrabBtn", busy && activeGrabMode === "walletconnect");
+  const msg = $("grabMsg");
+  if (!busy && PLACEHOLDER_MESSAGES.includes(msg.textContent ?? "")) {
+    msg.textContent =
+      local || external ? "" : vault.state() === "locked" ? "Unlock your game wallet to play." : "Create a game wallet to play.";
+  }
+}
+
+function refreshSoon(game: Game, provider: ElectrumNetworkProvider, delays: number[]) {
+  for (const delay of delays) setTimeout(() => void refresh(game, provider).catch(console.error), delay);
+}
+
+// Instant path: the game wallet signs locally and broadcasts, with no popup
+async function stealLocal(game: Game, provider: ElectrumNetworkProvider) {
+  const wallet = getLocalWallet();
+  if (!wallet) {
+    $("grabMsg").textContent =
+      vault.state() === "locked" ? "Your wallet is locked. Unlock it to play." : "Create a game wallet to play.";
+    return;
+  }
+  if (currentPrice === null || activeGrab) return;
+  activeGrab = new AbortController(); // only used as a "busy" marker here
+  activeGrabMode = "local";
+  updateGrabButton();
+  try {
+    $("grabMsg").textContent = "Sending…";
+    const result = await stealWithLocalWallet(game, provider, wallet, currentPrice);
+    applyOptimistic(game, result.passCount, wallet.pkhHex, result.pot);
+    $("grabMsg").textContent = `Done! You hold the potato (${result.txid.slice(0, 12)}…).`;
+    void refreshBalances(provider);
+    refreshSoon(game, provider, [2_000, 6_000, 12_000]);
+  } catch (e) {
+    console.error(e);
+    $("grabMsg").textContent = friendlyError(e);
+    if (e instanceof PassError && (e.code === "stale" || e.code === "price-changed")) {
+      refreshSoon(game, provider, [0, 4_000]);
+    }
+  } finally {
+    activeGrab = null;
+    activeGrabMode = null;
+    updateGrabButton();
+  }
+}
+
+// Fallback path: ask an external wallet (WizardConnect) to sign
+async function grabWithExternalWallet(game: Game, provider: ElectrumNetworkProvider) {
   const w = getWalletState();
   if (w.status !== "connected" || !w.pkhHex || activeGrab) return;
   const controller = new AbortController();
   activeGrab = controller;
+  activeGrabMode = "walletconnect";
   const timer = setTimeout(() => controller.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS);
-  setGrabbing(true);
+  updateGrabButton();
   try {
     $("grabMsg").textContent = "Preparing transaction…";
     const plan = await buildPassRequest(game, provider, w.pkhHex);
@@ -288,20 +374,22 @@ async function grab(game: Game, provider: ElectrumNetworkProvider) {
     const txid = await signAndBroadcast(plan, provider, controller.signal);
     console.log("Pass broadcast, txid:", txid);
     $("grabMsg").textContent = `Sent (${txid.slice(0, 12)}…). The page updates as soon as the network shows it.`;
-    for (const delay of [2_000, 6_000, 12_000]) {
-      setTimeout(() => void refresh(game, provider).catch(console.error), delay);
-    }
+    refreshSoon(game, provider, [2_000, 6_000, 12_000]);
   } catch (e) {
     console.error(e);
-    if (e instanceof PassError && e.code === "stale") {
-      for (const delay of [0, 4_000]) setTimeout(() => void refresh(game, provider).catch(console.error), delay);
-    }
     $("grabMsg").textContent = friendlyError(e);
+    if (e instanceof PassError && e.code === "stale") refreshSoon(game, provider, [0, 4_000]);
   } finally {
     clearTimeout(timer);
     activeGrab = null;
-    setGrabbing(false);
+    activeGrabMode = null;
+    updateGrabButton();
   }
+}
+
+function onGrabClick(game: Game, provider: ElectrumNetworkProvider) {
+  if (getLocalWallet()) void stealLocal(game, provider);
+  else void grabWithExternalWallet(game, provider);
 }
 
 async function settle(game: Game, provider: ElectrumNetworkProvider) {
@@ -320,18 +408,14 @@ async function settle(game: Game, provider: ElectrumNetworkProvider) {
   } finally {
     settling = false;
     btn.disabled = false;
-    for (const delay of [2_000, 6_000, 12_000]) {
-      setTimeout(() => void refresh(game, provider).catch(console.error), delay);
-    }
+    refreshSoon(game, provider, [2_000, 6_000, 12_000]);
   }
 }
 
 async function main() {
   const game = await loadGame();
   activeGame = game;
-  $("shareBtn").addEventListener("click", () => void shareFrame(game));
   const provider = makeProvider();
-  void initLocalWallet(provider);
 
   $("connectBtn").addEventListener("click", () => startConnection(true));
   $("cancelBtn").addEventListener("click", () => void disconnectWallet());
@@ -340,12 +424,20 @@ async function main() {
     const uri = getWalletState().uri;
     if (uri) void navigator.clipboard.writeText(uri);
   });
-  $("grabBtn").addEventListener("click", () => void grab(game, provider));
+  $("grabBtn").addEventListener("click", () => onGrabClick(game, provider));
   $("cancelGrabBtn").addEventListener("click", () => activeGrab?.abort(new Error("Cancelled by you")));
   $("settleBtn").addEventListener("click", () => void settle(game, provider));
+  $("shareBtn").addEventListener("click", () => void shareFrame(game));
+
   subscribe(renderWallet);
-  setInterval(updateAgo, 1000);
+  onLocalWalletChange(() => {
+    renderHolder();
+    if (lastEnded) renderEnded(lastEnded);
+    updateGrabButton();
+  });
   resumeIfStored();
+  void initLocalWallet(provider);
+  setInterval(updateAgo, 1000);
 
   let lastOk: Date | null = null;
   let failures = 0;

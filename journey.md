@@ -123,3 +123,9 @@
 ## Built-in wallet, step 3 (plain version): game wallet panel
 - A plain working panel: create (optional password typed twice, or import a validated seed phrase), a backup box that hides itself after 60 seconds, unlock and lock, copy address, balances through the failover provider, and delete with confirmation.
 - The seed field turns off spellcheck so browsers cannot send it to an outside service. The deposit QR, Withdraw and the final side-panel layout are deferred to the designed UI.
+
+
+## Built-in wallet, step 4: instant steals
+- With the game wallet unlocked, the button signs locally with CashScript and broadcasts through the failover provider: no popup, no pairing, no relay. The SDK evaluates the transaction against the contracts locally before broadcasting.
+- The button shows the price the player is agreeing to. If the on-chain price differs when the click is processed, nothing is sent: the page explains the price change, refreshes, and waits for a new click, because an automatic retry would silently spend more than the player saw.
+- The page updates optimistically right after the broadcast (pass, pot, price, holder, art, countdown), protected by the "never show an older state" check. The external-wallet (WizardConnect) path stays as a fallback.

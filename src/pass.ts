@@ -16,7 +16,7 @@ import { formatUnits } from "./lib/format.ts";
 const FEE_RATE = 2;
 
 export class PassError extends Error {
-  code: "no-round" | "no-funds" | "mismatch" | "rejected" | "stale" | "network";
+  code: "no-round" | "no-funds" | "mismatch" | "rejected" | "stale" | "network" | "price-changed";
   constructor(code: PassError["code"], message: string) {
     super(message);
     this.name = "PassError";
