@@ -32,3 +32,4 @@ dist-ssr/
 # *.json
 # !package.json
 # !tsconfig.json
+docs/decisions.md

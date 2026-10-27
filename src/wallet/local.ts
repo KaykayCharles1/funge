@@ -24,6 +24,7 @@ export function isValidMnemonic(mnemonic: string): boolean {
 export type Balances = {
   sats: bigint; // all BCH on this address, including the small amounts attached to token coins
   pusd: bigint; // units of the PUSD token, by the category in config.ts
+  nfts: number; // number of NFT coins on this address, e.g. a trophy
 };
 
 export type LocalWallet = {
@@ -62,11 +63,13 @@ export function walletFromMnemonic(mnemonic: string): LocalWallet {
       const category = pusdCategory();
       let sats = 0n;
       let pusd = 0n;
+      let nfts = 0;
       for (const u of utxos) {
         sats += u.satoshis;
         if (u.token && u.token.category === category && !u.token.nft) pusd += u.token.amount;
+        if (u.token?.nft) nfts += 1;
       }
-      return { sats, pusd };
+      return { sats, pusd, nfts };
     },
   };
 }

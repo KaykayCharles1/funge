@@ -1,0 +1,24 @@
+{
+  "network": "chipnet",
+  "gameCategory": "7db9f7034b5f449c8b05536485866756f72abc3ee2d849fab2c3326b0c2ff6db",
+  "pusdCategory": "8af14ba0e3e6db4d2e6f7290ec7421d3a76d387cf00ea35e9fec1218434549eb",
+  "state": {
+    "address": "bchtest:pdjk6qcrtxupe4hfmuhvdstlkyhk0y7f064zuhwxuetam0c7nlymj0tflj07n",
+    "tokenAddress": "bchtest:rdjk6qcrtxupe4hfmuhvdstlkyhk0y7f064zuhwxuetam0c7nlymjac47tw8c",
+    "lockingBytecode": "aa20656d030359b81cd6e9df2ec6c17fb12f6793c97eaa2e5dc6e657ddbf1e9fc9b987"
+  },
+  "pot": {
+    "address": "bchtest:pd9n4ezfqhjqmfv8qj9sfq2gc876awlc3zhsg9qq92wv5xapaukx2le07jakg",
+    "tokenAddress": "bchtest:rd9n4ezfqhjqmfv8qj9sfq2gc876awlc3zhsg9qq92wv5xapaukx2d2nltu0r",
+    "lockingBytecode": "aa204b3ae44905e40da587048b048148c1fdaebbf888af0414002a9cca1ba1ef2c6587"
+  },
+  "params": {
+    "basePrice": "100",
+    "priceStep": "10",
+    "timeoutBlocks": 3,
+    "seedPot": "1000"
+  },
+  "creatorPkh": "53478d4c3763bfc04cf433a148c8ac14435233f7",
+  "prepTxid": "7db9f7034b5f449c8b05536485866756f72abc3ee2d849fab2c3326b0c2ff6db",
+  "initTxid": "01674ab8738b2b6e826bc52b1ba94c61b6c7add8137f7af3083727854d1e47de"
+}

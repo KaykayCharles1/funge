@@ -46,6 +46,7 @@ function render() {
     hideSeed();
     $("lwBch").textContent = "—";
     $("lwPusd").textContent = "—";
+    show("lwNftsBox", false);
   }
 }
 
@@ -53,9 +54,11 @@ export async function refreshBalances(provider: ElectrumNetworkProvider) {
   const wallet = vault.wallet();
   if (!wallet) return;
   try {
-    const { sats, pusd } = await wallet.getBalances(provider);
+    const { sats, pusd, nfts } = await wallet.getBalances(provider);
     $("lwBch").textContent = `${formatUnits(sats, 8)} BCH`;
     $("lwPusd").textContent = `${formatUnits(pusd, CONFIG.pusdDecimals)} PUSD`;
+    $("lwNfts").textContent = String(nfts);
+    show("lwNftsBox", nfts > 0);
   } catch (e) {
     console.error(e);
   }

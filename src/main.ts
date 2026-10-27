@@ -84,6 +84,12 @@ function renderEnded(r: EndedRound) {
   $("endedWinner").textContent = mine ? `${winner} (you)` : winner;
   $("endedPot").textContent = `${formatUnits(r.potPaid, CONFIG.pusdDecimals)} PUSD`;
   $("endedPasses").textContent = String(r.passes);
+  $("endedTrophy").textContent =
+  getLocalWallet()?.pkhHex === r.winnerPkh
+    ? "An immutable trophy NFT is in your game wallet. To see it in another wallet, restore your seed phrase there."
+    : mine
+      ? "An immutable trophy NFT was sent to your wallet."
+      : "An immutable trophy NFT was sent to the winner.";
   $("endedTx").textContent = `Settlement transaction: ${r.settleTxid}${r.confirmed ? "" : " (waiting for confirmation)"}`;
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
@@ -221,6 +227,8 @@ function renderCountdown(timeoutBlocks: number, info: ConfirmationInfo | null) {
   if (togo === 0) {
     section.className = CARD_READY;
     show("settleBtn", true);
+    $("settleBtn").textContent =
+      holderPkh && myPkhs().includes(holderPkh) ? "Claim your pot" : "Settle: pay the pot to the holder";
     $("countdownTitle").textContent = "Ready to settle";
     $("countdownDetail").textContent = "Nobody grabbed in time. The holder can claim the pot now.";
   } else if (info.confirmations === 0) {
@@ -401,13 +409,17 @@ async function settle(game: Game, provider: ElectrumNetworkProvider) {
   try {
     const txid = await settleRound(game, provider);
     console.log("Settle broadcast, txid:", txid);
-    $("settleMsg").textContent = `Settled (${txid.slice(0, 12)}…). The pot is on its way to the holder.`;
+    const mine = holderPkh !== null && myPkhs().includes(holderPkh);
+    $("settleMsg").textContent = mine
+      ? `Claimed (${txid.slice(0, 12)}…). The pot is on its way to your wallet.`
+      : `Settled (${txid.slice(0, 12)}…). The pot is on its way to the holder.`;
   } catch (e) {
     console.error(e);
     $("settleMsg").textContent = friendlySettleError(e);
   } finally {
     settling = false;
     btn.disabled = false;
+    void refreshBalances(provider);
     refreshSoon(game, provider, [2_000, 6_000, 12_000]);
   }
 }

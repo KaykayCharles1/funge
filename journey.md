@@ -129,3 +129,9 @@
 - With the game wallet unlocked, the button signs locally with CashScript and broadcasts through the failover provider: no popup, no pairing, no relay. The SDK evaluates the transaction against the contracts locally before broadcasting.
 - The button shows the price the player is agreeing to. If the on-chain price differs when the click is processed, nothing is sent: the page explains the price change, refreshes, and waits for a new click, because an automatic retry would silently spend more than the player saw.
 - The page updates optimistically right after the broadcast (pass, pot, price, holder, art, countdown), protected by the "never show an older state" check. The external-wallet (WizardConnect) path stays as a fallback.
+
+
+## Built-in wallet, step 5: winner and settle with the game wallet
+- A full chipnet round with the game wallet as the last holder: the pot and a trophy NFT were paid to its address, the end screen recognised the game wallet as "you", and the page showed the NFT count.
+- Settling stays wallet-free: it was pressed from a window with no wallet and the winner in another window received the payout.
+- The claim button is labelled for the holder ("Claim your pot"); the end screen explains that the trophy sits in the game wallet and can be seen elsewhere by restoring the seed phrase.
