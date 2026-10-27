@@ -65,6 +65,7 @@ export async function refreshBalances(provider: ElectrumNetworkProvider) {
 }
 
 export async function initLocalWallet(provider: ElectrumNetworkProvider) {
+  show("lwStakes", CONFIG.network === "mainnet");
   try {
     await vault.init();
   } catch (e) {

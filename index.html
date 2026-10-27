@@ -10,7 +10,7 @@
       <header>
         <h1 class="text-4xl font-extrabold tracking-tight text-amber-400">Funge</h1>
         <p class="mt-2 text-slate-300">Grab the potato. Last holder wins the pot.</p>
-        <p class="mt-1 text-xs uppercase tracking-wide text-slate-500">Test mode · chipnet</p>
+        <p id="networkTag" class="mt-1 text-xs uppercase tracking-wide text-slate-500">Test mode · chipnet</p>
       </header>
 
       <section id="ended" class="hidden rounded-2xl bg-slate-900 p-6 ring-1 ring-amber-400">
@@ -70,6 +70,7 @@
         
         <section id="localWallet" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
           <p class="text-xs uppercase tracking-wide text-slate-400">Game wallet</p>
+          <p id="lwStakes" class="mt-2 hidden rounded-lg bg-amber-500/10 p-3 text-xs text-amber-200 ring-1 ring-amber-400/40">Mainnet: this wallet lives in your browser and holds real money. Keep only what you play with, and back up your seed phrase.</p>
 
           <div id="lwNone" class="hidden">
             <p class="mt-2 text-sm text-slate-300">One click creates a wallet that lives in this browser. Keep only what you play with in it.</p>

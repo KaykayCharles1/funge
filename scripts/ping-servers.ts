@@ -1,32 +1,27 @@
 import { ElectrumNetworkProvider } from "cashscript";
+import { CONFIG } from "../src/config.ts";
 
-const CANDIDATES: (string | undefined)[] = [
-  undefined, // the library's own default
-  "chipnet.imaginary.cash",
-  "chipnet.bch.ninja",
-  "chipnet.c3-soft.com",
-  "cbch.loping.net",
-];
+const TIMEOUT_MS = 20_000;
 
-async function tryServer(hostname?: string) {
-  const label = hostname ?? "(library default)";
+async function tryServer(hostname: string) {
   const started = Date.now();
   try {
-    const provider = hostname
-      ? new ElectrumNetworkProvider("chipnet", { hostname })
-      : new ElectrumNetworkProvider("chipnet");
+    const provider = new ElectrumNetworkProvider("chipnet", { hostname });
     const height = await Promise.race([
       provider.getBlockHeight(),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timed out after 10s")), 10_000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`no answer after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS),
+      ),
     ]);
-    console.log(`OK    ${label}: block ${height} in ${Date.now() - started} ms`);
+    return `OK    ${hostname}: block ${height} in ${Date.now() - started} ms`;
   } catch (e) {
-    console.log(`FAIL  ${label}: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`);
+    return `FAIL  ${hostname}: ${e instanceof Error ? e.message.split("\n")[0] : String(e)} (${Date.now() - started} ms)`;
   }
 }
 
 async function main() {
-  for (const h of CANDIDATES) await tryServer(h);
+  const lines = await Promise.all(CONFIG.chipnetServers.map(tryServer));
+  console.log(lines.join("\n"));
 }
 
 main().then(() => process.exit(0));

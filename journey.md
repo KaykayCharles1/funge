@@ -146,3 +146,12 @@
 ## Built-in wallet, step 7: external wallet is optional
 - The game wallet is the default. WizardConnect moved behind a small "Use my own wallet instead" link, with the opt-in remembered; an old pairing is only resumed if the player opted in. An explicitly connected external wallet takes over playing; hiding the option disconnects it and returns to the game wallet.
 - The old QR and reconnect glitches were not fixed (the suspected cause, the pairing library dropping its connection in background tabs, is unconfirmed). They are recorded in docs/KNOWN_ISSUES.md and a hint is shown under the QR.
+
+
+## Built-in wallet, step 8: hardening and docs
+- A Content-Security-Policy is injected into the production build from a single list of allowed connection sources (src/connections.ts): Electrum servers, the wallet pairing relays, and the site itself. Anything not listed is blocked by the browser, and adding a server later is a one-line change. Dev mode has no policy, so the policy is tested with a production build and preview.
+- Secrets audit: .gitignore covers wallet, seed and key files; git was checked for any file ever added with those names.
+- A mainnet small-stakes banner appears in the game wallet, and the network tag in the header switches between test mode and mainnet.
+- README added. The repo is tagged v1-grab as the demo-safe version.
+- The first production preview test caught a missing allowed address (the Cauldron relay used by the pairing library): the browser blocked it and the console said exactly which address to add. After adding it, the policy shows no violations.
+- Testing also showed that only one public chipnet Electrum server answers on the default secure WebSocket port, so the failover list has little to fail over to; finding more working servers is the next resilience task.

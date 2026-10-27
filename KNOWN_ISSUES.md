@@ -5,3 +5,4 @@
 - **Game wallet limits.** There is no Withdraw button yet, and trophy NFTs cannot be sent out of the game wallet. Funds and trophies can be reached by restoring the seed phrase in another wallet.
 - **The countdown is an estimate.** The contract counts blocks, and blocks arrive at random (about 10 minutes on average), so "about N minutes" can be off by a lot.
 - **Public Electrum servers can be slow or down.** The app tries several servers and remembers the one that answered, but a total outage shows a "network servers are not responding" message.
+- **Few public chipnet servers answer.** Only one chipnet Electrum server currently answers on the default secure WebSocket port, and its response time varies from a couple of seconds to ten. A first visit with an empty cache can therefore take several seconds on a slow moment. Returning visitors see the last known state instantly.

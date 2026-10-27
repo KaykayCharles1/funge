@@ -63,6 +63,7 @@ export class FailoverProvider extends ElectrumNetworkProvider {
   private markPreferred(index: number) {
     if (this.preferred === index) return;
     this.preferred = index;
+    console.info(`Electrum: now using ${this.hostnames[index]}`);
     savePreferred(this.hostnames[index]);
   }
 

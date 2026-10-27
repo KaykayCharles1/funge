@@ -477,6 +477,7 @@ async function settle(game: Game, provider: ElectrumNetworkProvider) {
 }
 
 async function main() {
+  $("networkTag").textContent = CONFIG.network === "mainnet" ? "Mainnet · real money" : "Test mode · chipnet";
   const game = await loadGame();
   activeGame = game;
   const cachedEnded = loadCachedEnded(game.gameCategory);
