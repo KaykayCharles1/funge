@@ -135,3 +135,9 @@
 - A full chipnet round with the game wallet as the last holder: the pot and a trophy NFT were paid to its address, the end screen recognised the game wallet as "you", and the page showed the NFT count.
 - Settling stays wallet-free: it was pressed from a window with no wallet and the winner in another window received the payout.
 - The claim button is labelled for the holder ("Claim your pot"); the end screen explains that the trophy sits in the game wallet and can be seen elsewhere by restoring the seed phrase.
+
+
+## Built-in wallet, step 6: speed
+- The page shows the last known state straight away from a small browser cache (public chain data only: pass, holder, pot, recent frames, and a settled round's result), then replaces it with live data. The Grab button stays disabled until live data arrives, so a stale price can never be clicked.
+- Reads are "hedged" across Electrum servers: the preferred server is asked first, and if it has not answered after 1.5 seconds the next one is asked too, first answer wins. The server that answered is remembered. Broadcasts go to one server at a time so a transaction can never be sent twice.
+- The page refreshes immediately when the player returns to the tab. The provider has no push subscriptions, so polling stays.

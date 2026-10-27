@@ -21,6 +21,9 @@ import { vault } from "./wallet/vault.ts";
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
+import { loadCachedEnded, loadCachedState, saveEnded, saveState } from "./lib/cache.ts";
+import type { CachedState } from "./lib/cache.ts";
+
 
 const POLL_MS = 25_000;
 const SIGN_TIMEOUT_MS = 180_000;
@@ -256,6 +259,7 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
     show("settleBtn", false);
     const ended = await findEndedRound(game, provider);
     if (ended) {
+      saveEnded(game.gameCategory, ended);
       currentPrice = null;
       updateGrabButton();
       renderEnded(ended);
@@ -293,6 +297,7 @@ async function refresh(game: Game, provider: ElectrumNetworkProvider) {
     return null;
   });
   renderCountdown(game.params.timeoutBlocks, info);
+  saveState(game.gameCategory, { passCount: c.passCount, holderPkh: c.holderPkh, pot: p.token.amount, blocktime: info?.blocktime ?? null });
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
@@ -309,6 +314,24 @@ function applyOptimistic(game: Game, passCount: number, holder: string, pot: big
   showFrame(game, liveFrame);
   renderCountdown(game.params.timeoutBlocks, { confirmations: 0, blocktime: null });
   updateGrabButton();
+}
+
+// Show the last known state straight away while the first network answer is on its way
+function renderCached(game: Game, c: CachedState) {
+  highestPass = c.passCount;
+  holderPkh = c.holderPkh;
+  const price = BigInt(game.params.basePrice) + BigInt(game.params.priceStep) * BigInt(c.passCount);
+  $("passCount").textContent = String(c.passCount);
+  $("pot").textContent = formatUnits(c.pot, CONFIG.pusdDecimals);
+  $("price").textContent = formatUnits(price, CONFIG.pusdDecimals);
+  renderHolder();
+  liveFrame = { passCount: c.passCount, holderPkh: c.holderPkh, pot: c.pot };
+  showFrame(game, liveFrame);
+  lastBlockTime = c.blocktime;
+  updateAgo();
+  $("countdownTitle").textContent = "Checking the countdown…";
+  $("countdownDetail").textContent = "Showing the last known state while we connect.";
+  $("status").textContent = "Showing the last known state. Updating…";
 }
 
 function updateGrabButton() {
@@ -427,6 +450,13 @@ async function settle(game: Game, provider: ElectrumNetworkProvider) {
 async function main() {
   const game = await loadGame();
   activeGame = game;
+  const cachedEnded = loadCachedEnded(game.gameCategory);
+  if (cachedEnded) {
+    renderEnded(cachedEnded);
+  } else {
+    const cached = loadCachedState(game.gameCategory);
+    if (cached) renderCached(game, cached);
+  }
   const provider = makeProvider();
 
   $("connectBtn").addEventListener("click", () => startConnection(true));
@@ -453,7 +483,12 @@ async function main() {
 
   let lastOk: Date | null = null;
   let failures = 0;
+  let running = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const tick = async () => {
+    if (running) return;
+    running = true;
+    clearTimeout(timer);
     let delay = POLL_MS;
     try {
       await refresh(game, provider);
@@ -469,9 +504,15 @@ async function main() {
           ? "The network servers are not responding. Check your connection. Retrying…"
           : "Connecting to the network…";
       delay = Math.min(3_000 * failures, POLL_MS);
+    } finally {
+      running = false;
     }
-    setTimeout(tick, delay);
+    timer = setTimeout(tick, delay);
   };
+  // Refresh as soon as the player comes back to the tab
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void tick();
+  });
   void tick();
 }
 
