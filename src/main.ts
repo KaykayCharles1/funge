@@ -34,11 +34,34 @@ const PLACEHOLDER_MESSAGES = [
   "Create a game wallet to play.",
   "Unlock your game wallet to play.",
   "Ready. Tap the button to grab the potato.",
+  "Playing with your connected wallet. You approve each grab in it.",
 ];
 
 const $ = (id: string) => document.getElementById(id)!;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
 const shortKey = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
+const EXTERNAL_FLAG = "funge:external";
+const externalWanted = () => {
+  try {
+    return localStorage.getItem(EXTERNAL_FLAG) === "1";
+  } catch {
+    return false;
+  }
+};
+const setExternalFlag = (on: boolean) => {
+  try {
+    if (on) localStorage.setItem(EXTERNAL_FLAG, "1");
+    else localStorage.removeItem(EXTERNAL_FLAG);
+  } catch {
+    // optional
+  }
+};
+function setExternalVisible(visible: boolean) {
+  show("wallet", visible);
+  $("useOwnWalletBtn").textContent = visible
+    ? "Hide the external wallet options"
+    : "Use my own wallet instead (WizardConnect)";
+}
 
 const CARD = "rounded-2xl p-5 ring-1";
 const CARD_NORMAL = `${CARD} bg-slate-900 ring-slate-800`;
@@ -347,8 +370,13 @@ function updateGrabButton() {
   show("cancelGrabBtn", busy && activeGrabMode === "walletconnect");
   const msg = $("grabMsg");
   if (!busy && PLACEHOLDER_MESSAGES.includes(msg.textContent ?? "")) {
-    msg.textContent =
-      local || external ? "" : vault.state() === "locked" ? "Unlock your game wallet to play." : "Create a game wallet to play.";
+    msg.textContent = external
+      ? "Playing with your connected wallet. You approve each grab in it."
+      : local
+        ? ""
+        : vault.state() === "locked"
+          ? "Unlock your game wallet to play."
+          : "Create a game wallet to play.";
   }
 }
 
@@ -419,8 +447,9 @@ async function grabWithExternalWallet(game: Game, provider: ElectrumNetworkProvi
 }
 
 function onGrabClick(game: Game, provider: ElectrumNetworkProvider) {
-  if (getLocalWallet()) void stealLocal(game, provider);
-  else void grabWithExternalWallet(game, provider);
+  // A wallet the player explicitly connected wins; otherwise the game wallet plays instantly
+  if (getWalletState().status === "connected") void grabWithExternalWallet(game, provider);
+  else if (getLocalWallet()) void stealLocal(game, provider);
 }
 
 async function settle(game: Game, provider: ElectrumNetworkProvider) {
@@ -470,6 +499,15 @@ async function main() {
   $("cancelGrabBtn").addEventListener("click", () => activeGrab?.abort(new Error("Cancelled by you")));
   $("settleBtn").addEventListener("click", () => void settle(game, provider));
   $("shareBtn").addEventListener("click", () => void shareFrame(game));
+  
+  setExternalVisible(externalWanted());
+  $("useOwnWalletBtn").addEventListener("click", () => {
+    const opening = $("wallet").classList.contains("hidden");
+    setExternalVisible(opening);
+    setExternalFlag(opening);
+    // Hiding the option also disconnects it, so the game wallet is the active one again
+    if (!opening && getWalletState().status !== "idle") void disconnectWallet();
+  });
 
   subscribe(renderWallet);
   onLocalWalletChange(() => {
@@ -477,7 +515,7 @@ async function main() {
     if (lastEnded) renderEnded(lastEnded);
     updateGrabButton();
   });
-  resumeIfStored();
+  if (externalWanted()) resumeIfStored(); // only reconnect an old pairing if the player opted in
   void initLocalWallet(provider);
   setInterval(updateAgo, 1000);
 

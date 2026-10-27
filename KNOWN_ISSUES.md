@@ -1,0 +1,7 @@
+# Known issues
+
+- **External wallet pairing (WizardConnect).** After pasting the link into a wallet, the page may keep showing the QR code until you reload it, and after a reload "Reconnecting to your wallet" may only finish once you switch to the wallet tab and back. We suspect the pairing library drops its relay connection while the tab is in the background and ignores older messages after reconnecting; this is unconfirmed. The built-in game wallet is the default path and does not use pairing.
+- **One PUSD coin per grab.** A grab spends a single PUSD coin that covers the price. If a wallet's PUSD is split across several small coins, the page asks the player to combine them first.
+- **Game wallet limits.** There is no Withdraw button yet, and trophy NFTs cannot be sent out of the game wallet. Funds and trophies can be reached by restoring the seed phrase in another wallet.
+- **The countdown is an estimate.** The contract counts blocks, and blocks arrive at random (about 10 minutes on average), so "about N minutes" can be off by a lot.
+- **Public Electrum servers can be slow or down.** The app tries several servers and remembers the one that answered, but a total outage shows a "network servers are not responding" message.

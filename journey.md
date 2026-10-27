@@ -141,3 +141,8 @@
 - The page shows the last known state straight away from a small browser cache (public chain data only: pass, holder, pot, recent frames, and a settled round's result), then replaces it with live data. The Grab button stays disabled until live data arrives, so a stale price can never be clicked.
 - Reads are "hedged" across Electrum servers: the preferred server is asked first, and if it has not answered after 1.5 seconds the next one is asked too, first answer wins. The server that answered is remembered. Broadcasts go to one server at a time so a transaction can never be sent twice.
 - The page refreshes immediately when the player returns to the tab. The provider has no push subscriptions, so polling stays.
+
+
+## Built-in wallet, step 7: external wallet is optional
+- The game wallet is the default. WizardConnect moved behind a small "Use my own wallet instead" link, with the opt-in remembered; an old pairing is only resumed if the player opted in. An explicitly connected external wallet takes over playing; hiding the option disconnects it and returns to the game wallet.
+- The old QR and reconnect glitches were not fixed (the suspected cause, the pairing library dropping its connection in background tabs, is unconfirmed). They are recorded in docs/KNOWN_ISSUES.md and a hint is shown under the QR.

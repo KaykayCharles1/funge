@@ -116,10 +116,13 @@
             <button id="lwSeedDoneBtn" class="mt-3 rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">I have written it down</button>
           </div>
 
+
+          <button id="useOwnWalletBtn" class="mt-4 text-xs text-slate-400 underline hover:text-slate-200">Use my own wallet instead (WizardConnect)</button>
           <p id="lwMsg" class="mt-2 text-sm text-red-400"></p>
         </section>
 
-        <section id="wallet" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+        <section id="wallet" class="hidden rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+          <p class="mb-3 text-xs uppercase tracking-wide text-slate-400">Your own wallet (WizardConnect)</p>
           <div id="walletIdle">
             <button id="connectBtn" class="w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 hover:bg-amber-300">Connect wallet</button>
             <p class="mt-2 text-xs text-slate-400">Works with WizardConnect wallets.</p>
@@ -127,6 +130,7 @@
           <div id="walletWaiting" class="hidden">
             <p id="walletWaitingText" class="text-sm text-slate-300"></p>
             <img id="qr" alt="WizardConnect QR code" class="mx-auto mt-3 hidden w-56 rounded-lg bg-white p-2" />
+            <p class="mt-3 text-xs text-slate-400">Known issue: if this screen does not change after you approve in your wallet, reload this page, then switch to your wallet tab and back.</p>
             <div class="mt-3 flex gap-2">
               <button id="copyUri" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Copy link</button>
               <a id="openWallet" href="#" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Open in wallet app</a>
