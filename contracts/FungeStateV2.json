@@ -1,0 +1,83 @@
+{
+  "contractName": "FungeStateV2",
+  "constructorInputs": [
+    { "name": "potLockingBytecode", "type": "bytes" },
+    { "name": "pusdCategory", "type": "bytes32" },
+    { "name": "basePrice", "type": "int" },
+    { "name": "priceStep", "type": "int" },
+    { "name": "refereePubkey", "type": "pubkey" },
+    { "name": "fallbackBlocks", "type": "int" },
+    { "name": "waitingFallbackBlocks", "type": "int" }
+  ],
+  "abi": [
+    {
+      "name": "pass",
+      "inputs": [
+        { "name": "newHolder", "type": "bytes20" },
+        { "name": "refereeSig", "type": "sig" }
+      ]
+    },
+    {
+      "name": "settle",
+      "inputs": [
+        { "name": "refereeSig", "type": "sig" }
+      ]
+    },
+    { "name": "settleFallback", "inputs": [] }
+  ],
+  "bytecode": "OP_7 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_8 OP_ROLL OP_SIZE 14 OP_EQUALVERIFY OP_9 OP_ROLL OP_6 OP_ROLL OP_CHECKSIGVERIFY OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOBYTECODE OP_2 OP_PICK OP_EQUALVERIFY OP_1 OP_UTXOTOKENCATEGORY OP_3 OP_PICK OP_EQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_4 OP_SPLIT OP_DROP OP_BIN2NUM OP_4 OP_ROLL OP_OVER OP_6 OP_ROLL OP_MUL OP_ADD OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENAMOUNT OP_0 OP_UTXOTOKENAMOUNT OP_NUMEQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_ROT OP_1ADD OP_4 OP_NUM2BIN OP_3 OP_ROLL OP_CAT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTBYTECODE OP_ROT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_ROT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENAMOUNT OP_1 OP_UTXOTOKENAMOUNT OP_ROT OP_ADD OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTVALUE OP_1 OP_UTXOVALUE OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_NIP OP_ELSE OP_7 OP_PICK OP_1 OP_NUMEQUAL OP_IF OP_8 OP_ROLL OP_5 OP_ROLL OP_CHECKSIGVERIFY OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_1 OP_UTXOBYTECODE OP_EQUALVERIFY OP_1 OP_UTXOTOKENCATEGORY OP_OVER OP_EQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_4 OP_SPLIT OP_NIP 76a914 OP_SWAP OP_CAT 88ac OP_CAT OP_0 OP_OUTPUTBYTECODE OP_OVER OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_ROT OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENAMOUNT OP_1 OP_UTXOTOKENAMOUNT OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_1 OP_OUTPUTBYTECODE OP_ROT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENAMOUNT OP_0 OP_NUMEQUALVERIFY OP_2DROP OP_2DROP OP_DROP OP_1 OP_ELSE OP_7 OP_ROLL OP_2 OP_NUMEQUALVERIFY OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_4 OP_SPLIT OP_DROP OP_BIN2NUM OP_6 OP_ROLL OP_SWAP OP_0 OP_NUMEQUAL OP_IF OP_6 OP_PICK OP_NIP OP_ENDIF OP_CHECKSEQUENCEVERIFY OP_DROP OP_1 OP_UTXOBYTECODE OP_EQUALVERIFY OP_1 OP_UTXOTOKENCATEGORY OP_OVER OP_EQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_4 OP_SPLIT OP_NIP 76a914 OP_SWAP OP_CAT 88ac OP_CAT OP_0 OP_OUTPUTBYTECODE OP_OVER OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_ROT OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENAMOUNT OP_1 OP_UTXOTOKENAMOUNT OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_1 OP_OUTPUTBYTECODE OP_ROT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCOMMITMENT OP_0 OP_UTXOTOKENCOMMITMENT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENAMOUNT OP_0 OP_NUMEQUALVERIFY OP_2DROP OP_2DROP OP_1 OP_ENDIF OP_ENDIF",
+  "source": "pragma cashscript ^0.14.0;\r\n\r\n// State commitment (24 bytes) = passCount (4 bytes, script number) + holderPkh (20 bytes)\r\n//\r\n// V2: the referee must co-sign pass() and settle(). The referee only decides TIMING; every money rule is\r\n// enforced here. If the referee is unavailable, settleFallback() lets anyone settle after a number of blocks\r\n// with no action (a longer wait while nobody has stolen yet).\r\ncontract FungeStateV2(\r\n    bytes potLockingBytecode,\r\n    bytes32 pusdCategory,\r\n    int basePrice,\r\n    int priceStep,\r\n    pubkey refereePubkey,\r\n    int fallbackBlocks,\r\n    int waitingFallbackBlocks\r\n) {\r\n    function pass(bytes20 newHolder, sig refereeSig) {\r\n        require(checkSig(refereeSig, refereePubkey), \"Referee signature missing or wrong\");\r\n        require(this.activeInputIndex == 0, \"State must be input 0\");\r\n        require(tx.inputs[1].lockingBytecode == potLockingBytecode, \"Input 1 must be the pot\");\r\n        require(tx.inputs[1].tokenCategory == pusdCategory, \"Pot must hold PUSD\");\r\n\r\n        int passCount = int(tx.inputs[0].nftCommitment.split(4)[0]);\r\n        int price = basePrice + passCount * priceStep;\r\n\r\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode, \"Output 0 must be the state contract\");\r\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory, \"State NFT must be kept\");\r\n        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount, \"State token amount changed\");\r\n        require(tx.outputs[0].nftCommitment == toPaddedBytes(passCount + 1, 4) + newHolder, \"Bad new commitment\");\r\n        require(tx.outputs[0].value >= tx.inputs[0].value, \"State BCH shrank\");\r\n\r\n        require(tx.outputs[1].lockingBytecode == potLockingBytecode, \"Output 1 must be the pot\");\r\n        require(tx.outputs[1].tokenCategory == pusdCategory, \"Pot output must hold PUSD\");\r\n        require(tx.outputs[1].tokenAmount >= tx.inputs[1].tokenAmount + price, \"Price not paid\");\r\n        require(tx.outputs[1].value >= tx.inputs[1].value, \"Pot BCH shrank\");\r\n    }\r\n\r\n    // The referee decides when. At pass count 0 this cancels a round nobody has stolen in:\r\n    // the seed goes back to the creator, the recorded holder.\r\n    function settle(sig refereeSig) {\r\n        require(checkSig(refereeSig, refereePubkey), \"Referee signature missing or wrong\");\r\n        require(this.activeInputIndex == 0, \"State must be input 0\");\r\n        require(tx.inputs[1].lockingBytecode == potLockingBytecode, \"Input 1 must be the pot\");\r\n        require(tx.inputs[1].tokenCategory == pusdCategory, \"Pot must hold PUSD\");\r\n\r\n        bytes holderPkh = tx.inputs[0].nftCommitment.split(4)[1];\r\n        bytes holderLock = 0x76a914 + holderPkh + 0x88ac;\r\n\r\n        require(tx.outputs[0].lockingBytecode == holderLock, \"Pot must go to the holder\");\r\n        require(tx.outputs[0].tokenCategory == pusdCategory, \"Payout must be PUSD\");\r\n        require(tx.outputs[0].tokenAmount == tx.inputs[1].tokenAmount, \"Whole pot must be paid\");\r\n\r\n        bytes gameCategory = tx.inputs[0].tokenCategory.split(32)[0];\r\n        require(tx.outputs[1].lockingBytecode == holderLock, \"Trophy must go to the holder\");\r\n        require(tx.outputs[1].tokenCategory == gameCategory, \"Trophy must be immutable\");\r\n        require(tx.outputs[1].nftCommitment == tx.inputs[0].nftCommitment, \"Trophy commitment changed\");\r\n        require(tx.outputs[1].tokenAmount == 0, \"Trophy must carry no tokens\");\r\n    }\r\n\r\n    // No referee needed: anyone can settle once enough blocks have passed with no action.\r\n    function settleFallback() {\r\n        require(this.activeInputIndex == 0, \"State must be input 0\");\r\n\r\n        int passCount = int(tx.inputs[0].nftCommitment.split(4)[0]);\r\n        int limit = fallbackBlocks;\r\n        if (passCount == 0) {\r\n            limit = waitingFallbackBlocks;\r\n        }\r\n        require(this.age >= limit);\r\n\r\n        require(tx.inputs[1].lockingBytecode == potLockingBytecode, \"Input 1 must be the pot\");\r\n        require(tx.inputs[1].tokenCategory == pusdCategory, \"Pot must hold PUSD\");\r\n\r\n        bytes holderPkh = tx.inputs[0].nftCommitment.split(4)[1];\r\n        bytes holderLock = 0x76a914 + holderPkh + 0x88ac;\r\n\r\n        require(tx.outputs[0].lockingBytecode == holderLock, \"Pot must go to the holder\");\r\n        require(tx.outputs[0].tokenCategory == pusdCategory, \"Payout must be PUSD\");\r\n        require(tx.outputs[0].tokenAmount == tx.inputs[1].tokenAmount, \"Whole pot must be paid\");\r\n\r\n        bytes gameCategory = tx.inputs[0].tokenCategory.split(32)[0];\r\n        require(tx.outputs[1].lockingBytecode == holderLock, \"Trophy must go to the holder\");\r\n        require(tx.outputs[1].tokenCategory == gameCategory, \"Trophy must be immutable\");\r\n        require(tx.outputs[1].nftCommitment == tx.inputs[0].nftCommitment, \"Trophy commitment changed\");\r\n        require(tx.outputs[1].tokenAmount == 0, \"Trophy must carry no tokens\");\r\n    }\r\n}",
+  "fingerprint": "d40fb6948cff52e9ea0a060a78546ba233d39642ddb53a93022ed904781874b4",
+  "debug": {
+    "bytecode": "5779009c63587a82011488597a567aadc0009d51c752798851ce53798800cf547f7581547a78567a959300cd00c78800d100ce8800d300d09d00d27b8b5480537a7e8800cc00c6a26951cd7b8851d17b8851d351d07b93a26951cc51c6a2777777675779519c63587a557aadc0009d51c78851ce788800cf547f770376a9147c7e0288ac7e00cd788800d17b8800d351d09d00ce01207f7551cd7b8851d18851d200cf8851d3009d6d6d755167577a529dc0009d00cf547f7581567a7c009c6356797768b27551c78851ce788800cf547f770376a9147c7e0288ac7e00cd788800d17b8800d351d09d00ce01207f7551cd7b8851d18851d200cf8851d3009d6d6d516868",
+    "sourceMap": "17:4:36:5;;;;;:18:17:35;;;;;18:25:18;;:37::50;;:8::91:1;19:16:19:37:0;:41::42;:8::69:1;20:26:20:27:0;:16::44:1;:48::66:0;;:8::95:1;21:26:21:27:0;:16::42:1;:46::58:0;;:8::82:1;23:38:23:39:0;:28::54:1;:61::62:0;:28::63:1;:::66;:24::67;24:20:24:29:0;;:32::41;:44::53;;:32:::1;:20;26:27:26:28:0;:16::45:1;:59::60:0;:49::77:1;:8::118;27:27:27:28:0;:16::43:1;:57::58:0;:47::73:1;:8::101;28:27:28:28:0;:16::41:1;:55::56:0;:45::69:1;:8::101;29:27:29:28:0;:16::43:1;:61::70:0;:::74:1;:76::77:0;:47::78:1;:81::90:0;;:47:::1;:8::114;30:27:30:28:0;:16::35:1;:49::50:0;:39::57:1;:16;:8::79;32:27:32:28:0;:16::45:1;:49::67:0;:8::97:1;33:27:33:28:0;:16::43:1;:47::59:0;:8::90:1;34:27:34:28:0;:16::41:1;:55::56:0;:45::69:1;:72::77:0;:45:::1;:16;:8::97;35:27:35:28:0;:16::35:1;:49::50:0;:39::57:1;:8::77;17:53:36:5;;;:4;40::58::0;;;;;41:25:41:35;;:37::50;;:8::91:1;42:16:42:37:0;:41::42;:8::69:1;43:26:43:27:0;:16::44:1;:8::95;44:26:44:27:0;:16::42:1;:46::58:0;:8::82:1;46:36:46:37:0;:26::52:1;:59::60:0;:26::61:1;:::64;47:27:47:35:0;:38::47;:27:::1;:50::56:0;:27:::1;49::49:28:0;:16::45:1;:49::59:0;:8::90:1;50:27:50:28:0;:16::43:1;:47::59:0;:8::84:1;51:27:51:28:0;:16::41:1;:55::56:0;:45::69:1;:8::97;53:39:53:40:0;:29::55:1;:62::64:0;:29::65:1;:::68;54:27:54:28:0;:16::45:1;:49::59:0;:8::93:1;55:27:55:28:0;:16::43:1;:8::89;56:27:56:28:0;:16::43:1;:57::58:0;:47::73:1;:8::104;57:27:57:28:0;:16::41:1;:45::46:0;:8::79:1;40:36:58:5;;;;:4;61::86::0;;;;62:16:62:37;:41::42;:8::69:1;64:38:64:39:0;:28::54:1;:61::62:0;:28::63:1;:::66;:24::67;65:20:65:34:0;;66:12:66:21;:25::26;:12:::1;:28:68:9:0;67:20:67:41;;:12::42:1;66:28:68:9;69:8:69:35;;71:26:71:27:0;:16::44:1;:8::95;72:26:72:27:0;:16::42:1;:46::58:0;:8::82:1;74:36:74:37:0;:26::52:1;:59::60:0;:26::61:1;:::64;75:27:75:35:0;:38::47;:27:::1;:50::56:0;:27:::1;77::77:28:0;:16::45:1;:49::59:0;:8::90:1;78:27:78:28:0;:16::43:1;:47::59:0;:8::84:1;79:27:79:28:0;:16::41:1;:55::56:0;:45::69:1;:8::97;81:39:81:40:0;:29::55:1;:62::64:0;:29::65:1;:::68;82:27:82:28:0;:16::45:1;:49::59:0;:8::93:1;83:27:83:28:0;:16::43:1;:8::89;84:27:84:28:0;:16::43:1;:57::58:0;:47::73:1;:8::104;85:27:85:28:0;:16::41:1;:45::46:0;:8::79:1;61:30:86:5;;;8:0:87:1;",
+    "logs": [],
+    "requires": [
+      { "ip": 21, "line": 18, "message": "Referee signature missing or wrong" },
+      { "ip": 24, "line": 19, "message": "State must be input 0" },
+      { "ip": 29, "line": 20, "message": "Input 1 must be the pot" },
+      { "ip": 34, "line": 21, "message": "Pot must hold PUSD" },
+      { "ip": 52, "line": 26, "message": "Output 0 must be the state contract" },
+      { "ip": 57, "line": 27, "message": "State NFT must be kept" },
+      { "ip": 62, "line": 28, "message": "State token amount changed" },
+      { "ip": 72, "line": 29, "message": "Bad new commitment" },
+      { "ip": 78, "line": 30, "message": "State BCH shrank" },
+      { "ip": 82, "line": 32, "message": "Output 1 must be the pot" },
+      { "ip": 86, "line": 33, "message": "Pot output must hold PUSD" },
+      { "ip": 94, "line": 34, "message": "Price not paid" },
+      { "ip": 100, "line": 35, "message": "Pot BCH shrank" },
+      { "ip": 113, "line": 41, "message": "Referee signature missing or wrong" },
+      { "ip": 116, "line": 42, "message": "State must be input 0" },
+      { "ip": 119, "line": 43, "message": "Input 1 must be the pot" },
+      { "ip": 123, "line": 44, "message": "Pot must hold PUSD" },
+      { "ip": 137, "line": 49, "message": "Pot must go to the holder" },
+      { "ip": 141, "line": 50, "message": "Payout must be PUSD" },
+      { "ip": 146, "line": 51, "message": "Whole pot must be paid" },
+      { "ip": 155, "line": 54, "message": "Trophy must go to the holder" },
+      { "ip": 158, "line": 55, "message": "Trophy must be immutable" },
+      { "ip": 163, "line": 56, "message": "Trophy commitment changed" },
+      { "ip": 167, "line": 57, "message": "Trophy must carry no tokens" },
+      { "ip": 179, "line": 62, "message": "State must be input 0" },
+      { "ip": 196, "line": 69 },
+      { "ip": 200, "line": 71, "message": "Input 1 must be the pot" },
+      { "ip": 204, "line": 72, "message": "Pot must hold PUSD" },
+      { "ip": 218, "line": 77, "message": "Pot must go to the holder" },
+      { "ip": 222, "line": 78, "message": "Payout must be PUSD" },
+      { "ip": 227, "line": 79, "message": "Whole pot must be paid" },
+      { "ip": 236, "line": 82, "message": "Trophy must go to the holder" },
+      { "ip": 239, "line": 83, "message": "Trophy must be immutable" },
+      { "ip": 244, "line": 84, "message": "Trophy commitment changed" },
+      { "ip": 248, "line": 85, "message": "Trophy must carry no tokens" }
+    ],
+    "sourceTags": "5:9:pv;93:95:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.14.0",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-10-28T08:34:53.337Z"
+}

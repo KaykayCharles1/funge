@@ -38,6 +38,7 @@ mnemonic*.txt
 *.pem
 .env
 .env.*
+.referee.*
 
 
 # Private notes

@@ -20,6 +20,10 @@ export const CONFIG = {
 
   // Blocks. Keep short for the live demo round.
   timeoutBlocks: 3,
+  
+    // Referee design (V2 contract). Deploy-time contract settings.
+  fallbackBlocks: 12, // anyone can settle without the referee after this many blocks with no action
+  waitingFallbackBlocks: 144, // the same, for a round nobody has stolen in yet (about a day)
 
   // Minimum BCH (sats) on the state and pot outputs
   minSats: 1000n,
