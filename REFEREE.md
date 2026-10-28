@@ -144,3 +144,13 @@ deadline is pushed out by the length of the pause and an event with reason `paus
 
 ## Open points for the owner
 1. **Where the server runs** is decided in Step 10.
+## Restart and downtime
+
+
+## Server protection
+- The server saves a heartbeat timestamp to its state file every few seconds (HEARTBEAT_SECONDS).
+- On start it compares now with the last heartbeat. For every round that is open and not paused, the
+downtime is treated as a pause: the deadline is pushed out by the downtime, so the players keep exactly the time they had left when the server went away. A "clock resumed after restart" event (type
+clock_resumed, reason restart, with the downtime) is published for each such round. Rounds that were
+paused stay paused. Rounds already marked over or settled are not touched.
+- The chain stays the source of truth for the king, the pass count and the state coin. The state file only holds what the chain cannot tell: deadline, status, pause info, recent events and the heartbeat. Every event carries a per-round sequence number, so a reconnecting client asks for events after its last number, or reloads the whole round if the history no longer reaches back that far.
