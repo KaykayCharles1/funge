@@ -12,4 +12,6 @@ export const CONNECT_SOURCES: string[] = [
   `wss://bch.imaginary.cash:${ELECTRUM_WSS_PORT}`, // mainnet default
    "wss://relay.riften.net",
    "wss://relay.cauldron.quest",
+    new URL(CONFIG.referee.url).origin, // the referee server (http/https)
+    new URL(CONFIG.referee.url).origin.replace(/^http/, "ws"), // and its WebSocket
 ];

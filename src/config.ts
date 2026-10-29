@@ -21,9 +21,13 @@ export const CONFIG = {
   // Blocks. Keep short for the live demo round.
   timeoutBlocks: 3,
   
-    // Referee design (V2 contract). Deploy-time contract settings.
+  // Referee design (V2 contract). Deploy-time contract settings.
   fallbackBlocks: 12, // anyone can settle without the referee after this many blocks with no action
   waitingFallbackBlocks: 144, // the same, for a round nobody has stolen in yet (about a day)
+
+  // Referee timer (V2). Off: the page runs the original block-based game. On: it uses the V2 game file
+  // and the Funge referee server below.
+  referee: { enabled: false, url: "http://127.0.0.1:8787" },
 
   // Minimum BCH (sats) on the state and pot outputs
   minSats: 1000n,
