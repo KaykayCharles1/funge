@@ -21,8 +21,18 @@ export const COPY = {
     offline: "Reconnecting to the game server…",
     stale: "Waiting for the network…",
   },
-  preview: {
-    grabsSoon: "Preview of the new game clock. Grabbing through the game server is the next build step.",
+    grab: {
+    sending: "Sending your grab…",
+    done: "Done! You hold the potato.",
+    noWallet: "Create a game wallet to play.",
+    locked: "Unlock your game wallet to play.",
+    mismatch: "The contracts do not match the game file. Reload the page.",
+    noRound: "No live round found. It may have just ended.",
+    needsBch: "Your wallet needs a little BCH to pay the network fee.",
+    buildFailed: "Could not prepare the transaction. Nothing was sent.",
+    behind: "The network is still catching up. Try again in a moment.",
+    roundOver: "Round over",
+    cooling: "Checking whether your last grab went through…",
   },
   errors: {
     invalid: "The network did not accept that grab. Nothing was sent. Please try again.",
@@ -48,3 +58,10 @@ export function pauseText(reason: string): string {
   if (reason === "network_busy") return "Clock paused: the network is busy";
   return COPY.clock.paused;
 }
+
+export const priceChangedText = (price: string) =>
+  `The price changed to ${price} PUSD. Press the button again to grab at the new price.`;
+export const notEnoughText = (price: string, have: string) =>
+  `Not enough PUSD. The next grab costs ${price} PUSD and this wallet has ${have}.`;
+export const splitCoinsText = (price: string) =>
+  `Your PUSD is split across several small coins. Combine them into one, then try again (next grab: ${price} PUSD).`;

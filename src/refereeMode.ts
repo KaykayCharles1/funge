@@ -11,6 +11,9 @@ import { getRound, watchRound } from "./referee/api.ts";
 import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts";
 import { serverNow, syncClock } from "./referee/clock.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
+import { grabViaReferee } from "./referee/grab.ts";
+import { vault } from "./wallet/vault.ts";
+
 
 const $ = (id: string) => document.getElementById(id)!;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
@@ -35,6 +38,9 @@ let endedShown = false;
 let endedBusy = false;
 let failures = 0;
 let running = false;
+let grabbing = false;
+let coolUntil = 0; // after "outcome unknown", wait before allowing another grab
+let note: { text: string; expires: number | null; pass: number | null } | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 const priceFor = (pass: number) => BigInt(game.params.basePrice) + BigInt(game.params.priceStep) * BigInt(pass);
@@ -63,10 +69,7 @@ function renderStats() {
     );
     $("artCaption").textContent = `Pass ${s.passCount} · pot ${s.pot === null ? "…" : formatUnits(BigInt(s.pot), dec)} PUSD`;
   }
-  const btn = $("grabBtn") as HTMLButtonElement;
-  btn.disabled = true; // grabs through the game server arrive in the next build step
-  btn.textContent = s.price === null ? "Grab the potato" : `Grab the potato · ${formatUnits(BigInt(s.price), dec)} PUSD`;
-  $("grabMsg").textContent = COPY.preview.grabsSoon;
+  renderGrab();
 }
 
 function renderClock() {
@@ -118,18 +121,77 @@ function renderClock() {
   show("netNotice", notice !== "");
 }
 
+function grabState(): { enabled: boolean; label: string; hint: string } {
+  const price = shown?.price ?? null;
+  const base = price === null ? "Grab the potato" : `Grab the potato · ${formatUnits(BigInt(price), CONFIG.pusdDecimals)} PUSD`;
+  const r = round;
+  const rem = remainingMs();
+  const timeUp =
+    !!r && (r.status === "over" || r.status === "settled" || (r.status === "open" && !r.paused && rem !== null && rem <= 0));
+  if (grabbing) return { enabled: false, label: base, hint: COPY.grab.sending };
+  if (endedShown || timeUp) return { enabled: false, label: COPY.grab.roundOver, hint: "" };
+  if (!r || net === "offline") return { enabled: false, label: base, hint: COPY.network.offline };
+  if (r.paused) return { enabled: false, label: base, hint: pauseText(r.paused.reason) };
+  if (!getLocalWallet()) {
+    return { enabled: false, label: base, hint: vault.state() === "locked" ? COPY.grab.locked : COPY.grab.noWallet };
+  }
+  if (Date.now() < coolUntil) return { enabled: false, label: base, hint: COPY.grab.cooling };
+  return { enabled: price !== null, label: base, hint: "" };
+}
+
+function renderGrab() {
+  const g = grabState();
+  const btn = $("grabBtn") as HTMLButtonElement;
+  btn.disabled = !g.enabled;
+  btn.textContent = g.label;
+  const noteVisible =
+    note !== null &&
+    (note.expires === null || Date.now() < note.expires) &&
+    (note.pass === null || (shown?.passCount ?? 0) <= note.pass);
+  $("grabMsg").textContent = grabbing ? COPY.grab.sending : noteVisible && note ? note.text : g.hint;
+}
+
+async function onGrab() {
+  const wallet = getLocalWallet();
+  if (grabbing || !wallet || !shown || shown.price === null || !grabState().enabled) return;
+  grabbing = true; // set before anything is awaited, so a double click cannot send twice
+  note = null;
+  renderGrab();
+  try {
+    const out = await grabViaReferee(game, provider, wallet, BigInt(shown.price));
+    if (out.ok) {
+      note = { text: COPY.grab.done, expires: null, pass: out.passCount };
+      setTimeout(() => void refreshBalances(provider), 2_000);
+      setTimeout(() => void refreshBalances(provider), 8_000);
+    } else {
+      note = { text: out.text, expires: Date.now() + 10_000, pass: null };
+      if (out.code === "outcome_unknown") coolUntil = Date.now() + 8_000;
+    }
+  } catch (e) {
+    console.error(e);
+    note = { text: errorText("internal"), expires: Date.now() + 10_000, pass: null };
+  } finally {
+    grabbing = false;
+    renderGrab();
+    kick();
+  }
+}
+
 async function loadEnded() {
   if (endedBusy || endedShown) return;
   endedBusy = true;
   try {
     for (let i = 0; i < 6 && !endedShown; i++) {
-      const r = await findEndedRound(game, provider).catch(() => null);
-      if (r) {
-        endedShown = true;
-        renderEndedRound(r, game.gameCategory, myKeys(), getLocalWallet()?.pkhHex ?? null);
-        $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-        break;
-      }
+      const r = await findEndedRound(game, provider).catch((e) => {
+        console.error(e);
+        return null;
+      })
+        if (r) {
+            renderEndedRound(r, game.gameCategory, myKeys(), getLocalWallet()?.pkhHex ?? null);
+            endedShown = true;
+            $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+            break;
+        }
       await sleep(3000); // the settlement may not be visible on the network yet
     }
   } finally {
@@ -240,13 +302,18 @@ export async function startRefereeMode() {
 
   await Promise.race([syncClock(), sleep(2000)]); // the countdown must follow the server's clock
   setInterval(() => void syncClock(3), 60_000);
-  setInterval(renderClock, 250);
+  setInterval(() => {
+    renderClock();
+    renderGrab();
+  }, 250);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       void syncClock(3);
       kick();
     }
   });
+  $("grabBtn").addEventListener("click", () => void onGrab());
   renderClock();
+  renderGrab();
   void tick();
 }
