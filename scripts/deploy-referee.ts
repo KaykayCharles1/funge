@@ -9,6 +9,18 @@ import { decodeCommitment, encodeCommitment, loadArtifact, retry, toVmCategory }
 const FEE_RATE = 2;
 const OUT = `public/game.${CONFIG.network}.v2.json`;
 
+// A test game can use a short fallback so the escape hatch can be tried on chipnet. Never on mainnet.
+const envBlocks = (name: string, fallback: number) => {
+  const v = process.env[name];
+  if (v === undefined) return fallback;
+  assert.ok(CONFIG.network !== "mainnet", `${name} cannot be used on mainnet.`);
+  const n = Number(v);
+  assert.ok(Number.isInteger(n) && n >= 1 && n <= 1000, `${name} must be a whole number from 1 to 1000.`);
+  return n;
+};
+const FALLBACK_BLOCKS = envBlocks("FUNGE_FALLBACK_BLOCKS", CONFIG.fallbackBlocks);
+const WAITING_FALLBACK_BLOCKS = envBlocks("FUNGE_WAITING_FALLBACK_BLOCKS", CONFIG.waitingFallbackBlocks);
+
 async function main() {
   assert.ok(!existsSync(OUT), `${OUT} already exists. Delete it first if you really want a new game.`);
   const refereeHex = (process.argv[2] ?? process.env.REFEREE_PUBKEY ?? "").toLowerCase();
@@ -48,8 +60,8 @@ async function main() {
       CONFIG.basePrice,
       CONFIG.priceStep,
       hexToBin(refereeHex),
-      BigInt(CONFIG.fallbackBlocks),
-      BigInt(CONFIG.waitingFallbackBlocks),
+      BigInt(FALLBACK_BLOCKS),
+      BigInt(WAITING_FALLBACK_BLOCKS),
     ],
     { provider },
   );
@@ -92,8 +104,8 @@ async function main() {
       basePrice: CONFIG.basePrice.toString(),
       priceStep: CONFIG.priceStep.toString(),
       seedPot: CONFIG.seedPot.toString(),
-      fallbackBlocks: CONFIG.fallbackBlocks,
-      waitingFallbackBlocks: CONFIG.waitingFallbackBlocks,
+      fallbackBlocks: FALLBACK_BLOCKS,
+      waitingFallbackBlocks: WAITING_FALLBACK_BLOCKS,
     },
     creatorPkh: env.pkhHex,
     prepTxid: prep.txid,
