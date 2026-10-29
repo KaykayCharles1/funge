@@ -7,7 +7,7 @@ import { frameSvg, svgToDataUrl } from "./lib/art.ts";
 import { formatDuration, formatUnits } from "./lib/format.ts";
 import type { GameV2 } from "./lib/game.ts";
 import { makeProvider } from "./lib/provider.ts";
-import { getRound, watchRound } from "./referee/api.ts";
+import { claim, getRound, watchRound } from "./referee/api.ts";
 import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts";
 import { serverNow, syncClock } from "./referee/clock.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
@@ -40,6 +40,8 @@ let failures = 0;
 let running = false;
 let grabbing = false;
 let coolUntil = 0; // after "outcome unknown", wait before allowing another grab
+let claiming = false;
+let claimNote = "";
 let note: { text: string; expires: number | null; pass: number | null } | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -73,7 +75,10 @@ function renderStats() {
 }
 
 function renderClock() {
-  if (endedShown) return;
+  if (endedShown) {
+    show("overModal", false);
+    return;
+  }
   const section = $("countdown");
   const time = $("countdownTime");
   show("countdownTime", true);
@@ -119,6 +124,49 @@ function renderClock() {
   const notice = net === "offline" ? COPY.network.offline : r?.chainStale ? COPY.network.stale : "";
   $("netNotice").textContent = notice;
   show("netNotice", notice !== "");
+  renderOver();
+}
+
+// The window everyone sees once the server says time is up. Only the winner gets the Claim button.
+function renderOver() {
+  const open = !!round && round.status === "over" && !endedShown;
+  show("overModal", open);
+  if (!open) return;
+  const king = shown?.king ?? null;
+  const wallet = getLocalWallet();
+  const iAmKing = !!wallet && king !== null && wallet.pkhHex === king;
+  const pot = shown?.pot == null ? "…" : formatUnits(BigInt(shown.pot), CONFIG.pusdDecimals);
+  $("overTitle").textContent = COPY.over.title;
+  $("overText").textContent = iAmKing
+    ? COPY.over.youWin(pot)
+    : `${COPY.over.someoneWins(pot, king ? shortKey(king) : "the last holder")} ${COPY.over.auto}`;
+  show("claimBtn", iAmKing);
+  const btn = $("claimBtn") as HTMLButtonElement;
+  btn.disabled = claiming;
+  btn.textContent = claiming ? COPY.claim.working : COPY.claim.button;
+  const locked = !wallet && vault.state() === "locked";
+  $("claimMsg").textContent = claimNote !== "" ? claimNote : !iAmKing && locked ? COPY.over.unlockHint : "";
+}
+
+async function onClaim() {
+  if (claiming) return;
+  claiming = true; // before anything is awaited, so a double click cannot send twice
+  claimNote = "";
+  renderOver();
+  try {
+    const res = await claim(game.gameCategory);
+    if (res.ok) claimNote = COPY.claim.done;
+    else if (res.error === "round_over" || res.error === "state_changed") claimNote = COPY.claim.already;
+    else if (res.error === "outcome_unknown") claimNote = COPY.claim.unknown;
+    else claimNote = errorText(res.error);
+  } catch (e) {
+    console.error(e);
+    claimNote = errorText("internal");
+  } finally {
+    claiming = false;
+    renderOver();
+    kick();
+  }
 }
 
 function grabState(): { enabled: boolean; label: string; hint: string } {
@@ -313,6 +361,7 @@ export async function startRefereeMode() {
     }
   });
   $("grabBtn").addEventListener("click", () => void onGrab());
+  $("claimBtn").addEventListener("click", () => void onClaim());
   renderClock();
   renderGrab();
   void tick();

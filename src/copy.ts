@@ -34,6 +34,20 @@ export const COPY = {
     roundOver: "Round over",
     cooling: "Checking whether your last grab went through…",
   },
+    over: {
+    title: "Round is over",
+    youWin: (pot: string) => `Time ran out and you hold the potato. The pot of ${pot} PUSD is yours.`,
+    someoneWins: (pot: string, who: string) => `Time ran out. The last holder (${who}) wins the pot of ${pot} PUSD.`,
+    auto: "The pot is paid out automatically in a few minutes at the latest.",
+    unlockHint: "If you are the winner, unlock your game wallet to claim right away.",
+  },
+  claim: {
+    button: "Claim your reward",
+    working: "Settling…",
+    done: "Claimed! Loading the result…",
+    already: "The round has already been settled. Loading the result…",
+    unknown: "We could not confirm that the network received the claim. Wait a moment: the game also pays out automatically.",
+  },
   errors: {
     invalid: "The network did not accept that grab. Nothing was sent. Please try again.",
     state_changed: "Someone grabbed first. Check the new price and try again.",
