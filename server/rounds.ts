@@ -134,4 +134,12 @@ export class RoundManager {
     const resync = first !== undefined && after < first.seq - 1;
     return { resync, lastSeq: r.nextSeq - 1, events: resync ? [] : r.events.filter((e) => e.seq > after) };
   }
+
+    markSettled(gameId: string, txid: string, by: string, data?: EventData): RoundRecord {
+    const r = this.ensure(gameId);
+    if (r.status === "settled") return r;
+    r.status = "settled";
+    this.publish(r, "round_settled", by, { txid, ...(data ?? {}) });
+    return r;
+  }
 }

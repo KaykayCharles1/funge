@@ -4,6 +4,7 @@ import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { ACT_BODY_LIMIT, ACT_RATE, GLOBAL_RATE, GRACE_SECONDS } from "../src/refereeParams.ts";
 import { ActError, executeAct, type Referee } from "./act.ts";
+import { settleRound } from "./keeper.ts";
 import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
@@ -112,6 +113,32 @@ export async function buildApp(deps: AppDeps) {
     },
   );
 
+  // The king's "Claim your reward" button. The contract pays the holder whoever asks, so no login is needed.
+  // The client must send a JSON body such as {}.
+  app.post(
+    "/rounds/:id/claim",
+    { config: { rateLimit: { max: ACT_RATE.max, timeWindow: ACT_RATE.windowMs } } },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const game = byId.get(id);
+      if (!game) return reply.code(404).send({ ok: false, error: "unknown_round", serverNow: clock.now() });
+      try {
+        const result = await settleRound(
+          { manager, chain, clock, referee: deps.referee, locks: deps.locks, unconfirmed: deps.unconfirmed, sleep: deps.sleep },
+          game,
+          "claim",
+        );
+        return { ok: true, ...result };
+      } catch (e) {
+        if (e instanceof ActError) {
+          return reply.code(e.status).send({ ok: false, error: e.code, message: e.message, serverNow: clock.now() });
+        }
+        console.error("claim failed:", e instanceof Error ? e.message : String(e));
+        return reply.code(500).send({ ok: false, error: "internal", message: "Something went wrong.", serverNow: clock.now() });
+      }
+    },
+  );
+  
   app.get("/rounds/:id/ws", { websocket: true }, (socket, request) => {
     // Browsers do not apply CORS to WebSockets, so the origin is checked here
     const origin = request.headers.origin;

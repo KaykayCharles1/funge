@@ -46,6 +46,7 @@ async function setup(opts: { cap?: number } = {}) {
   });
   const chain: ChainReader = { read: async () => view(), refresh: async () => view(), invalidate: () => undefined, last: () => view() };
   const referee: Referee = {
+    settle: () => "00",
     sign: () => Uint8Array.of(1, 2, 3),
     broadcast: async (hex) => {
       if (world.fail) throw world.fail;
@@ -208,5 +209,14 @@ async function fails(p: Promise<unknown>, code: string) {
   await fails(executeAct(s.deps, GAME, steal(s.world)), "chain_unavailable");
   console.log("ok: stale chain view refused");
 }
+
+// 10. nothing is accepted after the round is settled
+{
+  const s = await setup();
+  s.manager.markSettled(GAME.gameId, "t", "claim");
+  await fails(executeAct(s.deps, GAME, steal(s.world)), "round_over");
+  console.log("ok: settled round refuses steals");
+}
+
 console.log("\nAll act tests passed.");
 process.exit(0);

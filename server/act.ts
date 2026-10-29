@@ -12,10 +12,10 @@ import type { Unconfirmed } from "./unconfirmed.ts";
 
 export type ActErrorCode =
   | "invalid" | "state_changed" | "too_late" | "round_over"
-  | "paused" | "network_busy" | "chain_unavailable" | "outcome_unknown";
+  | "paused" | "network_busy" | "chain_unavailable" | "outcome_unknown" | "not_over";
 
 const STATUS: Record<ActErrorCode, number> = {
-  invalid: 400, state_changed: 409, too_late: 409, round_over: 409,
+  invalid: 400, state_changed: 409, too_late: 409, round_over: 409, not_over: 409,
   paused: 503, network_busy: 503, chain_unavailable: 503, outcome_unknown: 503,
 };
 
@@ -38,6 +38,7 @@ export type Referee = {
   // Returns the unlocking bytecode for input 0 (the state coin) with the referee signature inside
   sign: (game: ServerGame, tx: Transaction, sourceOutputs: LibauthOutput[], newHolderPkh: string) => Uint8Array;
   broadcast: (hex: string) => Promise<string>;
+  settle: (game: ServerGame, chain: ChainState) => string;
 };
 
 export type ActDeps = {
@@ -179,11 +180,11 @@ const toLibauth = (
     : undefined,
 });
 
-function mapBroadcastError(e: unknown, deps: ActDeps, id: string): ActError {
+export function mapBroadcastError(e: unknown, deps: ActDeps, id: string, pause = true): ActError {
   const msg = e instanceof Error ? e.message : String(e);
   if (/too-long-mempool-chain|too many unconfirmed|ancestor|descendant/i.test(msg)) {
     deps.unconfirmed.saturate(id);
-    deps.manager.pause(id, "network_busy");
+    if (pause) deps.manager.pause(id, "network_busy");
     return new ActError("network_busy", "The network is busy. The clock is paused until the next block.");
   }
   if (/txn-mempool-conflict|missingorspent|missing inputs|already spent|conflict/i.test(msg)) {
@@ -205,7 +206,8 @@ export async function executeAct(deps: ActDeps, game: ServerGame, raw: unknown):
 
   return deps.locks(id, async () => {
     const { manager, chain, clock } = deps;
-
+    if (manager.get(id).status === "settled") throw new ActError("round_over", "The round is over.");
+    
     // 1. Latest chain view. If it does not yet show our own last steal, wait briefly.
     const behind = (c: ChainState | undefined) => !c || (c.live && c.passCount < (manager.get(id).seenPassCount ?? 0));
     let c: ChainState | undefined;

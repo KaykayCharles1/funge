@@ -12,6 +12,7 @@ import { makeReferee } from "./referee.ts";
 import { RoundManager } from "./rounds.ts";
 import { Store } from "./store.ts";
 import { makeUnconfirmed } from "./unconfirmed.ts";
+import { createKeeper } from "./keeper.ts";
 
 const network = CONFIG.network as Network;
 const port = Number(process.env.FUNGE_PORT ?? 8787);
@@ -41,10 +42,13 @@ try {
 
   const chain = makeChainReader(provider, systemClock);
   const unconfirmed = makeUnconfirmed(UNCONFIRMED_CAP);
+  const locks = makeLocks();
   const app = await buildApp({
     games, manager, chain, clock: systemClock, allowedOrigins,
-    referee, locks: makeLocks(), unconfirmed, sleep,
+    referee, locks, unconfirmed, sleep,
   });
+  const keeper = createKeeper({ manager, chain, clock: systemClock, referee, locks, unconfirmed, sleep }, games);
+  const stopKeeper = keeper.start();
 
   // Keep the chain view fresh (Step 7 replaces this polling with address subscriptions)
   setInterval(() => {
@@ -79,6 +83,7 @@ try {
   }, 5000);
 
   const stop = async () => {
+    stopKeeper();
     manager.heartbeat();
     await manager.flush().catch(() => undefined);
     await app.close();
