@@ -8,8 +8,12 @@ export type ServerGame = {
   refereePubkey: string;
   stateAddress: string;
   potAddress: string;
+  stateLockingBytecode: string;
+  potLockingBytecode: string;
   basePrice: bigint;
   priceStep: bigint;
+  fallbackBlocks: number;
+  waitingFallbackBlocks: number;
 };
 
 const publicFile = (name: string) => new URL(`../public/${name}`, import.meta.url);
@@ -28,8 +32,12 @@ export function loadGames(network: Network): { games: ServerGame[]; chipnetPubke
     refereePubkey: j.refereePubkey,
     stateAddress: j.state.address,
     potAddress: j.pot.address,
+    stateLockingBytecode: j.state.lockingBytecode,
+    potLockingBytecode: j.pot.lockingBytecode,
     basePrice: BigInt(j.params.basePrice),
     priceStep: BigInt(j.params.priceStep),
+    fallbackBlocks: Number(j.params.fallbackBlocks),
+    waitingFallbackBlocks: Number(j.params.waitingFallbackBlocks),
   };
   const chipnetFile = publicFile("game.chipnet.v2.json");
   const chipnetPubkeys = existsSync(chipnetFile)

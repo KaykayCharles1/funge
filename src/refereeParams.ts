@@ -7,3 +7,7 @@ export const EVENT_HISTORY = 200; // events kept per round for client resync
 export const UNCONFIRMED_CAP = 40; // pause near the node's unconfirmed chain limit (Step 4)
 
 export type ActionType = keyof typeof RESET_SECONDS;
+
+export const GLOBAL_RATE = { max: 120, windowMs: 60_000 }; // per IP, all routes
+export const ACT_RATE = { max: 12, windowMs: 60_000 }; // per IP, POST /act
+export const ACT_BODY_LIMIT = 32_768; // bytes

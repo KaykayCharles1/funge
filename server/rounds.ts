@@ -70,8 +70,7 @@ export class RoundManager {
     }
   }
 
-  // The chain decides what exists; this only keeps our timer in step with it.
-  observe(gameId: string, chain: ChainView): RoundRecord {
+    observe(gameId: string, chain: ChainView): RoundRecord {
     const r = this.ensure(gameId);
     const now = this.clock.now();
     if (r.status === "settled") return r;
@@ -80,11 +79,15 @@ export class RoundManager {
       this.publish(r, "round_settled", "chain");
       return r;
     }
-    if (r.status === "waiting" && chain.passCount > 0) {
-      // A steal happened that we did not process (Step 7 refines this)
+    const seen = r.seenPassCount ?? (r.status === "waiting" ? 0 : chain.passCount);
+    if ((r.status === "waiting" || r.status === "open") && chain.passCount > seen) {
+      // A steal the timer has not accounted for (not made through /act): restart the clock from now
       r.status = "open";
       r.deadline = now + RESET_SECONDS.steal * 1000;
+      r.seenPassCount = chain.passCount;
       this.publish(r, "deadline_changed", "observed_on_chain", { deadline: r.deadline });
+    } else if (r.seenPassCount === undefined) {
+      r.seenPassCount = chain.passCount;
     }
     if (r.status === "open" && !r.paused && r.deadline !== null && now >= r.deadline + GRACE_SECONDS * 1000) {
       r.status = "over";
@@ -93,12 +96,18 @@ export class RoundManager {
     return r;
   }
 
-  // Called by the act endpoint (Step 6) after a successful broadcast.
-  applyAction(gameId: string, type: ActionType, reason: string): RoundRecord {
+  // Called by the act endpoint after a successful broadcast.
+  applyAction(
+    gameId: string,
+    type: ActionType,
+    reason: string,
+    opts?: { passCount?: number; data?: EventData },
+  ): RoundRecord {
     const r = this.ensure(gameId);
     r.status = "open";
     r.deadline = this.clock.now() + RESET_SECONDS[type] * 1000;
-    this.publish(r, "deadline_changed", reason, { deadline: r.deadline, action: type });
+    if (opts?.passCount !== undefined) r.seenPassCount = opts.passCount;
+    this.publish(r, "deadline_changed", reason, { deadline: r.deadline, action: type, ...(opts?.data ?? {}) });
     return r;
   }
 

@@ -126,6 +126,20 @@ assert.equal(classifyAction("settle"), null);
   assert.equal(r.events.at(-1)?.reason, "observed_on_chain");
   console.log("ok: chain overrides our record");
 }
+
+// a steal made outside /act still restarts the clock
+{
+  const { mgr, clock } = await setup("unseen");
+  mgr.applyAction("g", "steal", "steal", { passCount: 1 });
+  clock.advance(100_000);
+  mgr.observe("g", { live: true, passCount: 1 });
+  assert.equal(mgr.get("g").events.length, 1); // nothing new
+  mgr.observe("g", { live: true, passCount: 2 });
+  assert.equal(mgr.get("g").deadline, clock.now() + RESET);
+  assert.equal(mgr.get("g").events.at(-1)?.reason, "observed_on_chain");
+  console.log("ok: steals made outside /act restart the clock");
+}
+
 await new Promise((r) => setTimeout(r, 100)); // let the background saves finish
 console.log("\nAll round tests passed.");
 process.exit(0);

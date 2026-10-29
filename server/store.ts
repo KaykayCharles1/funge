@@ -11,6 +11,7 @@ export type RoundRecord = {
   deadline: number | null; // epoch ms
   paused: { since: number; reason: string } | null;
   nextSeq: number;
+  seenPassCount?: number; // the pass count the timer has accounted for
   events: EventRecord[];
 };
 

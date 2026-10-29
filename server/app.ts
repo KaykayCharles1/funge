@@ -1,12 +1,16 @@
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
-import { GRACE_SECONDS } from "../src/refereeParams.ts";
+import { ACT_BODY_LIMIT, ACT_RATE, GLOBAL_RATE, GRACE_SECONDS } from "../src/refereeParams.ts";
+import { ActError, executeAct, type Referee } from "./act.ts";
 import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
+import type { LockRunner } from "./lock.ts";
 import type { RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
+import type { Unconfirmed } from "./unconfirmed.ts";
 
 export type AppDeps = {
   games: ServerGame[];
@@ -14,6 +18,10 @@ export type AppDeps = {
   chain: ChainReader;
   clock: Clock;
   allowedOrigins: string[];
+  referee: Referee;
+  locks: LockRunner;
+  unconfirmed: Unconfirmed;
+  sleep: (ms: number) => Promise<void>;
   logger?: boolean;
 };
 
@@ -46,6 +54,7 @@ export async function buildApp(deps: AppDeps) {
   const { games, manager, chain, clock, allowedOrigins } = deps;
   const app = Fastify({ logger: deps.logger ?? false });
   await app.register(cors, { origin: allowedOrigins, methods: ["GET", "POST"] });
+  await app.register(rateLimit, { global: true, max: GLOBAL_RATE.max, timeWindow: GLOBAL_RATE.windowMs });
   await app.register(websocket);
 
   const byId = new Map(games.map((g) => [g.gameId, g]));
@@ -78,6 +87,30 @@ export async function buildApp(deps: AppDeps) {
     const after = Number((request.query as { after?: string }).after ?? 0);
     return { serverNow: clock.now(), ...manager.eventsAfter(id, Number.isInteger(after) && after >= 0 ? after : 0) };
   });
+
+  app.post(
+    "/rounds/:id/act",
+    { bodyLimit: ACT_BODY_LIMIT, config: { rateLimit: { max: ACT_RATE.max, timeWindow: ACT_RATE.windowMs } } },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const game = byId.get(id);
+      if (!game) return reply.code(404).send({ ok: false, error: "unknown_round", serverNow: clock.now() });
+      try {
+        const result = await executeAct(
+          { manager, chain, clock, referee: deps.referee, locks: deps.locks, unconfirmed: deps.unconfirmed, sleep: deps.sleep },
+          game,
+          request.body,
+        );
+        return { ok: true, ...result };
+      } catch (e) {
+        if (e instanceof ActError) {
+          return reply.code(e.status).send({ ok: false, error: e.code, message: e.message, serverNow: clock.now() });
+        }
+        console.error("act failed:", e instanceof Error ? e.message : String(e));
+        return reply.code(500).send({ ok: false, error: "internal", message: "Something went wrong.", serverNow: clock.now() });
+      }
+    },
+  );
 
   app.get("/rounds/:id/ws", { websocket: true }, (socket, request) => {
     // Browsers do not apply CORS to WebSockets, so the origin is checked here

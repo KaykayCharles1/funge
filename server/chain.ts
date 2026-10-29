@@ -1,4 +1,4 @@
-import type { ElectrumNetworkProvider } from "cashscript";
+import type { ElectrumNetworkProvider, Utxo } from "cashscript";
 import { decodeCommitment } from "../src/lib/commitment.ts";
 import { retry } from "../src/lib/retry.ts";
 import type { Clock } from "./clock.ts";
@@ -11,11 +11,15 @@ export type ChainState = {
   potAmount: bigint | null;
   stateTxid: string | null;
   stateVout: number | null;
+  stateUtxo: Utxo | null;
+  potUtxo: Utxo | null;
   stale: boolean; // true when this is the last good answer because a fresh read failed
 };
 
 export type ChainReader = {
-  read: (game: ServerGame) => Promise<ChainState>;
+  read: (game: ServerGame) => Promise<ChainState>; // cached for a short time
+  refresh: (game: ServerGame) => Promise<ChainState>; // always asks the network
+  invalidate: (gameId: string) => void;
   last: (gameId: string) => ChainState | undefined;
 };
 
@@ -35,6 +39,7 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
     const p = pots.find((u) => u.token && u.token.category === game.pusdCategory);
     const prev = good.get(id);
     if (!s || !s.token?.nft) {
+      // A missing state coin must be seen twice before we believe it (flaky servers)
       const streak = (emptyStreak.get(id) ?? 0) + 1;
       emptyStreak.set(id, streak);
       if (streak < 2) {
@@ -43,7 +48,7 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
       }
       return {
         live: false, passCount: prev?.passCount ?? 0, holderPkh: prev?.holderPkh ?? null,
-        potAmount: null, stateTxid: null, stateVout: null, stale: false,
+        potAmount: null, stateTxid: null, stateVout: null, stateUtxo: null, potUtxo: null, stale: false,
       };
     }
     emptyStreak.set(id, 0);
@@ -51,9 +56,15 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
     return {
       live: true, passCount, holderPkh,
       potAmount: p?.token ? p.token.amount : null,
-      stateTxid: s.txid, stateVout: s.vout, stale: false,
+      stateTxid: s.txid, stateVout: s.vout, stateUtxo: s, potUtxo: p ?? null, stale: false,
     };
   }
+
+  const store = (id: string, v: ChainState) => {
+    good.set(id, v);
+    fetchedAt.set(id, clock.now());
+    return v;
+  };
 
   return {
     async read(game) {
@@ -64,11 +75,7 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
       let p = inflight.get(id);
       if (!p) {
         p = fetchOnce(game)
-          .then((v) => {
-            good.set(id, v);
-            fetchedAt.set(id, clock.now());
-            return v;
-          })
+          .then((v) => store(id, v))
           .finally(() => inflight.delete(id));
         inflight.set(id, p);
       }
@@ -79,6 +86,10 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
         throw e;
       }
     },
+    async refresh(game) {
+      return store(game.gameId, await fetchOnce(game));
+    },
+    invalidate: (gameId) => void fetchedAt.delete(gameId),
     last: (gameId) => good.get(gameId),
   };
 }
