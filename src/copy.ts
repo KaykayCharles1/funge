@@ -20,8 +20,9 @@ export const COPY = {
   network: {
     offline: "Reconnecting to the game server…",
     stale: "Waiting for the network…",
+    unreachable: "The game server cannot be reached",
   },
-    grab: {
+  grab: {
     sending: "Sending your grab…",
     done: "Done! You hold the potato.",
     noWallet: "Create a game wallet to play.",
@@ -34,7 +35,7 @@ export const COPY = {
     roundOver: "Round over",
     cooling: "Checking whether your last grab went through…",
   },
-    over: {
+  over: {
     title: "Round is over",
     youWin: (pot: string) => `Time ran out and you hold the potato. The pot of ${pot} PUSD is yours.`,
     someoneWins: (pot: string, who: string) => `Time ran out. The last holder (${who}) wins the pot of ${pot} PUSD.`,
@@ -47,6 +48,24 @@ export const COPY = {
     done: "Claimed! Loading the result…",
     already: "The round has already been settled. Loading the result…",
     unknown: "We could not confirm that the network received the claim. Wait a moment: the game also pays out automatically.",
+  },
+  outage: {
+    waiting: (have: number, need: number) =>
+      `The game server cannot be reached. If it stays down, anyone can settle this round without it once ${need} blocks have passed with no activity (${have} so far). The pot always goes to the last holder.`,
+    ready:
+      "The game server cannot be reached, and enough blocks have passed. Anyone can now settle this round without it. The pot goes to the last holder.",
+  },
+  fallback: {
+    button: "Settle without the game server",
+    working: "Settling…",
+    done: "Settled! Loading the result…",
+    tooEarly: "Not allowed yet: the network needs one more block. Try again after the next block.",
+    gone: "The round has already been settled. Loading the result…",
+    needsBch: "Your wallet needs a little BCH to pay the network fee.",
+    unknown: "We could not confirm that the network received the settlement. Wait a moment and check the page before trying again.",
+    failed: "The network did not accept the settlement. Nothing was sent. Try again in a moment.",
+    locked: "Unlock your game wallet to settle. It only pays the small network fee.",
+    noWallet: "Create a game wallet to settle. It only pays the small network fee.",
   },
   errors: {
     invalid: "The network did not accept that grab. Nothing was sent. Please try again.",

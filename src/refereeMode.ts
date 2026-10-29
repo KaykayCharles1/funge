@@ -13,6 +13,9 @@ import { serverNow, syncClock } from "./referee/clock.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 import { grabViaReferee } from "./referee/grab.ts";
 import { vault } from "./wallet/vault.ts";
+import { watchChain } from "./referee/chainWatch.ts";
+import type { ChainWatch } from "./referee/chainWatch.ts";
+import { settleWithoutReferee } from "./referee/fallback.ts";
 
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -42,6 +45,11 @@ let grabbing = false;
 let coolUntil = 0; // after "outcome unknown", wait before allowing another grab
 let claiming = false;
 let claimNote = "";
+let chain: ChainWatch | null = null;
+let chainBusy = false;
+let fallbackBusy = false;
+let fallbackNote = "";
+const serverDown = () => failures >= 2 || net === "offline";
 let note: { text: string; expires: number | null; pass: number | null } | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -89,7 +97,7 @@ function renderClock() {
   let ready = false;
   let urgent = false;
   if (!r) {
-    title = "Connecting to the game server…";
+    title = serverDown() ? COPY.network.unreachable : "Connecting to the game server…";
   } else if (r.status === "settled") {
     title = COPY.clock.settled;
     detail = COPY.clock.settling;
@@ -125,6 +133,7 @@ function renderClock() {
   $("netNotice").textContent = notice;
   show("netNotice", notice !== "");
   renderOver();
+  renderOutage();
 }
 
 // The window everyone sees once the server says time is up. Only the winner gets the Claim button.
@@ -166,6 +175,71 @@ async function onClaim() {
     claiming = false;
     renderOver();
     kick();
+  }
+}
+
+// While the server is unreachable, ask the chain directly
+async function pollChain() {
+  if (chainBusy || endedShown) return;
+  chainBusy = true;
+  try {
+    const c = await watchChain(game, provider);
+    chain = c;
+    if (!c.live) {
+      void loadEnded(); // the state coin is gone: the round was settled, show the result from the chain
+    } else if (!shown) {
+      shown = {
+        passCount: c.passCount,
+        king: c.passCount > 0 ? c.holderPkh : null,
+        pot: c.pot === null ? null : c.pot.toString(),
+        price: priceFor(c.passCount).toString(),
+      };
+      renderStats();
+    }
+    renderOutage();
+  } catch (e) {
+    console.error(e);
+  } finally {
+    chainBusy = false;
+  }
+}
+
+function renderOutage() {
+  const c = chain;
+  const visible = serverDown() && !endedShown && c !== null && c.live;
+  show("outageBox", visible);
+  if (!visible || !c) return;
+  const ready = c.confirmations !== null && c.confirmations >= c.limit;
+  $("outageText").textContent = ready ? COPY.outage.ready : COPY.outage.waiting(c.confirmations ?? 0, c.limit);
+  show("fallbackBtn", ready);
+  const btn = $("fallbackBtn") as HTMLButtonElement;
+  const wallet = getLocalWallet();
+  btn.disabled = fallbackBusy || !wallet;
+  btn.textContent = fallbackBusy ? COPY.fallback.working : COPY.fallback.button;
+  $("fallbackMsg").textContent =
+    fallbackNote !== ""
+      ? fallbackNote
+      : ready && !wallet
+        ? vault.state() === "locked" ? COPY.fallback.locked : COPY.fallback.noWallet
+        : "";
+}
+
+async function onFallback() {
+  const wallet = getLocalWallet();
+  if (fallbackBusy || !wallet) return;
+  fallbackBusy = true; // before anything is awaited, so a double click cannot send twice
+  fallbackNote = "";
+  renderOutage();
+  try {
+    const out = await settleWithoutReferee(game, provider, wallet);
+    fallbackNote = out.ok ? COPY.fallback.done : out.text;
+    if (out.ok || out.code === "round_gone") setTimeout(() => void pollChain(), 3_000);
+  } catch (e) {
+    console.error(e);
+    fallbackNote = COPY.fallback.failed;
+  } finally {
+    fallbackBusy = false;
+    renderOutage();
   }
 }
 
@@ -315,8 +389,9 @@ async function tick() {
         });
       }
     } else {
-      failures++;
-      $("status").textContent = res.error === "server_unreachable" ? COPY.network.offline : errorText(res.error);
+        failures++;
+        $("status").textContent = res.error === "server_unreachable" ? COPY.network.offline : errorText(res.error);
+        if (serverDown()) void pollChain();
     }
   } finally {
     running = false;
@@ -362,6 +437,7 @@ export async function startRefereeMode() {
   });
   $("grabBtn").addEventListener("click", () => void onGrab());
   $("claimBtn").addEventListener("click", () => void onClaim());
+  $("fallbackBtn").addEventListener("click", () => void onFallback());
   renderClock();
   renderGrab();
   void tick();
