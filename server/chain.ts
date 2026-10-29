@@ -1,0 +1,84 @@
+import type { ElectrumNetworkProvider } from "cashscript";
+import { decodeCommitment } from "../src/lib/commitment.ts";
+import { retry } from "../src/lib/retry.ts";
+import type { Clock } from "./clock.ts";
+import type { ServerGame } from "./games.ts";
+
+export type ChainState = {
+  live: boolean; // the state coin exists
+  passCount: number;
+  holderPkh: string | null;
+  potAmount: bigint | null;
+  stateTxid: string | null;
+  stateVout: number | null;
+  stale: boolean; // true when this is the last good answer because a fresh read failed
+};
+
+export type ChainReader = {
+  read: (game: ServerGame) => Promise<ChainState>;
+  last: (gameId: string) => ChainState | undefined;
+};
+
+export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock, ttlMs = 2000): ChainReader {
+  const good = new Map<string, ChainState>();
+  const fetchedAt = new Map<string, number>();
+  const inflight = new Map<string, Promise<ChainState>>();
+  const emptyStreak = new Map<string, number>();
+
+  async function fetchOnce(game: ServerGame): Promise<ChainState> {
+    const id = game.gameId;
+    const [states, pots] = await Promise.all([
+      retry(() => provider.getUtxos(game.stateAddress)),
+      retry(() => provider.getUtxos(game.potAddress)),
+    ]);
+    const s = states.find((u) => u.token?.nft && u.token.category === game.gameId);
+    const p = pots.find((u) => u.token && u.token.category === game.pusdCategory);
+    const prev = good.get(id);
+    if (!s || !s.token?.nft) {
+      const streak = (emptyStreak.get(id) ?? 0) + 1;
+      emptyStreak.set(id, streak);
+      if (streak < 2) {
+        if (prev) return { ...prev, stale: true };
+        throw new Error("state coin not found yet, confirming");
+      }
+      return {
+        live: false, passCount: prev?.passCount ?? 0, holderPkh: prev?.holderPkh ?? null,
+        potAmount: null, stateTxid: null, stateVout: null, stale: false,
+      };
+    }
+    emptyStreak.set(id, 0);
+    const { passCount, holderPkh } = decodeCommitment(s.token.nft.commitment);
+    return {
+      live: true, passCount, holderPkh,
+      potAmount: p?.token ? p.token.amount : null,
+      stateTxid: s.txid, stateVout: s.vout, stale: false,
+    };
+  }
+
+  return {
+    async read(game) {
+      const id = game.gameId;
+      const cached = good.get(id);
+      const at = fetchedAt.get(id);
+      if (cached && at !== undefined && clock.now() - at < ttlMs) return cached;
+      let p = inflight.get(id);
+      if (!p) {
+        p = fetchOnce(game)
+          .then((v) => {
+            good.set(id, v);
+            fetchedAt.set(id, clock.now());
+            return v;
+          })
+          .finally(() => inflight.delete(id));
+        inflight.set(id, p);
+      }
+      try {
+        return await p;
+      } catch (e) {
+        if (cached) return { ...cached, stale: true };
+        throw e;
+      }
+    },
+    last: (gameId) => good.get(gameId),
+  };
+}
