@@ -153,6 +153,31 @@ async function fails(p: Promise<unknown>, code: string) {
   console.log("ok: grace accepted, then too_late, then round_over");
 }
 
+// 4b. an in-time request stays in time even when the network checks are slow; a late one is still refused
+{
+  const s = await setup();
+  await executeAct(s.deps, GAME, steal(s.world));
+  const d1 = s.manager.get(GAME.gameId).deadline!;
+  const slowChain: ChainReader = {
+    ...s.deps.chain,
+    refresh: async (g) => {
+      s.clock.set(s.clock.now() + 1500); // the network check takes 1.5 s
+      return s.deps.chain.refresh(g);
+    },
+  };
+  const slow = { ...s.deps, chain: slowChain };
+  s.clock.set(d1 - 300);
+  await executeAct(slow, GAME, steal(s.world)); // arrived 300 ms early, finished 1.2 s after the deadline
+  assert.equal(s.world.broadcasts.length, 2);
+  const r = s.manager.get(GAME.gameId);
+  assert.equal(r.status, "open");
+  assert.equal(r.deadline, d1 + 1200 + RESET);
+  s.clock.set(r.deadline! + GRACE + 10);
+  await fails(executeAct(slow, GAME, steal(s.world)), "too_late"); // arrived late: still refused
+  assert.equal(s.world.broadcasts.length, 2);
+  console.log("ok: arrival time decides, slow checks cannot make an in-time grab late");
+}
+
 // 5. invalid requests
 {
   const s = await setup();

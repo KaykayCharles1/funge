@@ -203,6 +203,7 @@ export async function executeAct(deps: ActDeps, game: ServerGame, raw: unknown):
   const handler = Object.prototype.hasOwnProperty.call(HANDLERS, body.action) ? HANDLERS[body.action] : undefined;
   if (!handler) throw new ActError("invalid", `Unknown action "${body.action}".`);
   const id = game.gameId;
+  const arrivedAt = deps.clock.now(); // timing is judged by when the request arrived, not by how long our network checks take
 
   return deps.locks(id, async () => {
     const { manager, chain, clock } = deps;
@@ -223,9 +224,19 @@ export async function executeAct(deps: ActDeps, game: ServerGame, raw: unknown):
     if (!c || behind(c)) throw new ActError("chain_unavailable", "The chain view is not up to date yet. Try again in a moment.");
 
     // 2. Timer rules
-    const statusBefore = manager.get(id).status;
+    const before = manager.get(id);
+    const statusBefore = before.status;
+    const deadlineBefore = before.deadline;
     const round = manager.observe(id, { live: c.live, passCount: c.passCount });
-    if (round.status === "over") throw new ActError(statusBefore === "over" ? "round_over" : "too_late", statusBefore === "over" ? "The round is over." : "Too late: the deadline has passed.");
+    // In time means: the request arrived before the deadline plus the grace, however long the checks above took
+    const onTime = deadlineBefore !== null && arrivedAt < deadlineBefore + GRACE_SECONDS * 1000;
+    if (round.status === "over" && !onTime) {
+      throw new ActError(
+        statusBefore === "over" ? "round_over" : "too_late",
+        statusBefore === "over" ? "The round is over." : "Too late: the deadline has passed.",
+      );
+    }
+    
     if (!c.live || round.status === "settled") throw new ActError("round_over", "The round is over.");
     if (round.paused) throw new ActError("paused", "The clock is paused. Try again shortly.");
 
