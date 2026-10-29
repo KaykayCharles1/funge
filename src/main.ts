@@ -23,6 +23,7 @@ import type { WalletState } from "./bch_wallet.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 import { loadCachedEnded, loadCachedState, saveEnded, saveState } from "./lib/cache.ts";
 import type { CachedState } from "./lib/cache.ts";
+import { startRefereeMode } from "./refereeMode.ts";
 
 
 const POLL_MS = 25_000;
@@ -478,6 +479,10 @@ async function settle(game: Game, provider: ElectrumNetworkProvider) {
 
 async function main() {
   $("networkTag").textContent = CONFIG.network === "mainnet" ? "Mainnet · real money" : "Test mode · chipnet";
+  if (CONFIG.referee.enabled) {
+    await startRefereeMode(); // the new game clock; the original block-based page is below
+    return;
+  }
   const game = await loadGame();
   activeGame = game;
   const cachedEnded = loadCachedEnded(game.gameCategory);

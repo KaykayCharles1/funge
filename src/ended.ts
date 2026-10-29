@@ -14,7 +14,7 @@ export type EndedRound = {
 };
 
 // Returns the settled round's details, or null if the last transaction is not a settlement
-export async function findEndedRound(game: Game, provider: ElectrumNetworkProvider): Promise<EndedRound | null> {
+export async function findEndedRound(game: Pick<Game, "state">, provider: ElectrumNetworkProvider): Promise<EndedRound | null> {
   const hash = await scriptHash(game.state.lockingBytecode);
   const history: unknown = await retry(() => provider.performRequest("blockchain.scripthash.get_history", hash));
   if (!Array.isArray(history) || history.length === 0) return null;

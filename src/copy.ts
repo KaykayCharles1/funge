@@ -8,14 +8,21 @@ export const COPY = {
     running: "Time left",
     runningDetail: "Every grab restarts the clock.",
     paused: "Clock paused",
+    pausedDetail: "The clock is stopped and will continue shortly.",
     over: "Time is up",
     overDetail: "The last holder wins the pot.",
+    confirming: "Confirming with the game server…",
     settled: "Round settled",
+    settling: "Loading the result…",
   },
-  notice: "The game clock is run by the Funge referee. The referee decides when time runs out, never who gets paid: the contract pays the last holder.",
+  notice:
+    "The game clock is run by the Funge referee. The referee decides when time runs out, never who gets paid: the contract pays the last holder.",
   network: {
     offline: "Reconnecting to the game server…",
     stale: "Waiting for the network…",
+  },
+  preview: {
+    grabsSoon: "Preview of the new game clock. Grabbing through the game server is the next build step.",
   },
   errors: {
     invalid: "The network did not accept that grab. Nothing was sent. Please try again.",
@@ -26,7 +33,8 @@ export const COPY = {
     paused: "The clock is paused for a moment. Try again shortly.",
     network_busy: "The network is busy. The clock is paused until the next block.",
     chain_unavailable: "Could not reach the network. Nothing was sent. Please try again.",
-    outcome_unknown: "We could not confirm that the network received your grab. Wait a moment and check the pass number before trying again.",
+    outcome_unknown:
+      "We could not confirm that the network received your grab. Wait a moment and check the pass number before trying again.",
     unknown_round: "This round does not exist on the game server.",
     internal: "Something went wrong on the game server. Please try again.",
     rate_limited: "Too many tries. Wait a minute and try again.",

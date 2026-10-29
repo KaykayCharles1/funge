@@ -7,3 +7,11 @@ export type Game = {
   params: { basePrice: string; priceStep: string; timeoutBlocks: number; seedPot: string };
   creatorPkh: string;
 };
+
+
+// The V2 game file (referee mode): no block timeout, but a referee key and fallback settings
+export type GameV2 = Omit<Game, "params"> & {
+  contractVersion: 2;
+  refereePubkey: string;
+  params: { basePrice: string; priceStep: string; seedPot: string; fallbackBlocks: number; waitingFallbackBlocks: number };
+};

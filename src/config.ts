@@ -27,7 +27,7 @@ export const CONFIG = {
 
   // Referee timer (V2). Off: the page runs the original block-based game. On: it uses the V2 game file
   // and the Funge referee server below.
-  referee: { enabled: false, url: "http://127.0.0.1:8787" },
+  referee: { enabled: true, url: "http://127.0.0.1:8787" },
 
   // Minimum BCH (sats) on the state and pot outputs
   minSats: 1000n,

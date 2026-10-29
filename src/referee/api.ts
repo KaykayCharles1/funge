@@ -210,7 +210,7 @@ export function watchRound(gameId: string, startSeq: number, h: WatchHandlers) {
   connect();
   return {
     setSeq: (n: number) => {
-      lastSeq = n;
+      if (n > lastSeq) lastSeq = n;
     },
     close: () => {
       closed = true;
