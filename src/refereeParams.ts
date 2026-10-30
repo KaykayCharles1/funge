@@ -10,8 +10,7 @@ export const KEEPER_DELAY_SECONDS = envSeconds("FUNGE_KEEPER_DELAY_SECONDS", 120
 export const GRACE_SECONDS = 1; // lateness grace after the deadline
 export const HEARTBEAT_SECONDS = 5; // how often the server saves a heartbeat
 export const EVENT_HISTORY = 200; // events kept per round for client resync
-export const UNCONFIRMED_CAP = 40; // pause near the node's unconfirmed chain limit (Step 4)
-
+export const UNCONFIRMED_CAP = Math.floor(envSeconds("FUNGE_UNCONFIRMED_CAP", 40)); // pause near the node's unconfirmed chain limit (Step 4). Testing only: FUNGE_UNCONFIRMED_CAP=3
 export type ActionType = keyof typeof RESET_SECONDS;
 
 export const GLOBAL_RATE = { max: 120, windowMs: 60_000 }; // per IP, all routes

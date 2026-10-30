@@ -25,12 +25,11 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 try {
   const { games, chipnetPubkeys } = loadGames(network);
   const keyring = loadKeyring({ network, games, chipnetPubkeys }); // throws if the key is missing or wrong
-  if (network === "mainnet" && (process.env.FUNGE_RESET_SECONDS || process.env.FUNGE_KEEPER_DELAY_SECONDS)) {
+  if (network === "mainnet" && (process.env.FUNGE_RESET_SECONDS || process.env.FUNGE_KEEPER_DELAY_SECONDS || process.env.FUNGE_UNCONFIRMED_CAP)) {
     throw new Error("Refusing to start: timer overrides are for testing only.");
   }
   console.log(`referee key OK for ${games.length} game(s) on ${network}`);
-  console.log(`timers: reset ${RESET_SECONDS.steal}s, grace ${GRACE_SECONDS}s, keeper delay ${KEEPER_DELAY_SECONDS}s`);
-
+  console.log(`timers: reset ${RESET_SECONDS.steal}s, grace ${GRACE_SECONDS}s, keeper delay ${KEEPER_DELAY_SECONDS}s; unconfirmed cap ${UNCONFIRMED_CAP}`);
   const provider = makeProvider();
   const referee = makeReferee(provider, keyring, games); // throws if the contracts do not match the game
 
