@@ -489,11 +489,6 @@ function kick() {
 }
 
 export async function startRefereeMode() {
-  // The original block-based controls do not apply here
-  show("settleBtn", false);
-  show("shareBtn", false);
-  $("settleMsg").textContent = "";
-  $("countdownAgo").textContent = "";
   $("refereeNotice").textContent = COPY.notice;
   show("refereeNotice", true);
   $("status").textContent = "Connecting to the game server…";

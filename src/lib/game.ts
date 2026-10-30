@@ -4,7 +4,7 @@ export type Game = {
   pusdCategory: string;
   state: { address: string; tokenAddress: string; lockingBytecode: string };
   pot: { address: string; tokenAddress: string; lockingBytecode: string };
-  params: { basePrice: string; priceStep: string; timeoutBlocks: number; seedPot: string };
+  params: { basePrice: string; priceStep: string; seedPot: string };
   creatorPkh: string;
 };
 

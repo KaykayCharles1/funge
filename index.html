@@ -42,12 +42,7 @@
       <div id="live" class="flex flex-col gap-6">
         <section id="artCard" class="rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
           <img id="art" alt="Funge potato art for the current pass" class="mx-auto w-full max-w-sm rounded-xl" />
-          <div class="mt-3 flex items-center justify-between gap-3">
-            <p id="artCaption" class="text-xs text-slate-400"></p>
-            <button id="shareBtn" class="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">Share frame</button>
-          </div>
-          <p id="shareMsg" class="mt-1 text-xs text-slate-400"></p>
-          <div id="frames" class="mt-3 flex gap-2 overflow-x-auto pb-1"></div>
+          <p id="artCaption" class="mt-3 text-xs text-slate-400"></p>
         </section>
         <dl class="grid grid-cols-2 gap-3">
           <div class="col-span-2 rounded-2xl bg-slate-900 p-5 ring-1 ring-amber-500/40">
@@ -151,15 +146,12 @@
           <p id="countdownTitle" class="text-lg font-bold">…</p>
           <p id="countdownTime" class="mt-2 hidden font-mono text-5xl font-extrabold tabular-nums text-amber-400"></p>
           <p id="countdownDetail" class="mt-1 text-sm text-slate-400"></p>
-          <p id="countdownAgo" class="mt-2 text-xs text-slate-500"></p>
           <p id="netNotice" class="mt-2 hidden text-xs text-amber-300"></p>
           <div id="outageBox" class="mt-4 hidden rounded-xl bg-slate-800 p-4">
             <p id="outageText" class="text-sm text-slate-300"></p>
             <button id="fallbackBtn" class="mt-3 hidden w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 enabled:hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"></button>
             <p id="fallbackMsg" class="mt-2 text-sm text-slate-300"></p>
           </div>          
-          <button id="settleBtn" class="mt-4 hidden w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40">Settle: pay the pot to the holder</button>
-          <p id="settleMsg" class="mt-2 text-sm text-slate-300"></p>
         </section>
 
         <section id="actions" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
