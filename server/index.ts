@@ -13,18 +13,15 @@ import { Store } from "./store.ts";
 import { makeUnconfirmed } from "./unconfirmed.ts";
 import { createKeeper } from "./keeper.ts";
 import { installSafeConsole, warnThrottled } from "../src/lib/safeLog.ts";
+import { readServerEnv } from "./env.ts";
 
 const network = CONFIG.network as Network;
 installSafeConsole();
-const port = Number(process.env.FUNGE_PORT ?? 8787);
-const allowedOrigins = (
-  process.env.FUNGE_ALLOWED_ORIGINS ??
-  "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
-).split(",").map((s) => s.trim());
 const dataDir = process.env.FUNGE_DATA_DIR ?? fileURLToPath(new URL("./data", import.meta.url));
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 try {
+  const { host, port, allowedOrigins, trustProxy } = readServerEnv(process.env);
   const { games, chipnetPubkeys } = loadGames(network);
   const keyring = loadKeyring({ network, games, chipnetPubkeys }); // throws if the key is missing or wrong
   if (network === "mainnet" && (process.env.FUNGE_RESET_SECONDS || process.env.FUNGE_KEEPER_DELAY_SECONDS || process.env.FUNGE_UNCONFIRMED_CAP)) {
@@ -52,7 +49,7 @@ try {
   const unconfirmed = makeUnconfirmed(UNCONFIRMED_CAP);
   const locks = makeLocks();
   const app = await buildApp({
-    games, manager, chain, clock: systemClock, allowedOrigins,
+    games, manager, chain, clock: systemClock, allowedOrigins, trustProxy,
     referee, locks, unconfirmed, sleep,
   });
   const keeper = createKeeper({ manager, chain, clock: systemClock, referee, locks, unconfirmed, sleep }, games);
@@ -100,7 +97,7 @@ try {
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
 
-  const address = await app.listen({ host: "127.0.0.1", port }); // localhost only until Step 10
+  const address = await app.listen({ host, port });
   console.log(`referee server listening on ${address}; allowed origins: ${allowedOrigins.join(", ")}`);
   for (const g of games) console.log(`round id: ${g.gameId}`);
 } catch (e) {

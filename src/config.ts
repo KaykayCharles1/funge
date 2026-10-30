@@ -1,5 +1,20 @@
 export type Net = "chipnet" | "mainnet";
 
+
+// The referee server's address. Set VITE_REFEREE_URL when building the page for a real host, e.g.
+//   VITE_REFEREE_URL=https://referee.example.com npm run build
+function refereeUrl(): string {
+  let url: string | undefined;
+  try {
+    url = import.meta.env.VITE_REFEREE_URL; // the browser build
+  } catch {
+    // running in Node (server, scripts, vite config): there is no import.meta.env
+  }
+  if (!url && typeof process !== "undefined") url = process.env.VITE_REFEREE_URL;
+  return (url ?? "http://127.0.0.1:8787").replace(/\/$/, "");
+}
+
+
 export const CONFIG = {
   network: "chipnet" as Net,
     // Chipnet Electrum WebSocket servers, tried in order. The library's own default (chipnet.bch.ninja) is flaky.
@@ -24,8 +39,8 @@ export const CONFIG = {
   waitingFallbackBlocks: 144, // the same, for a round nobody has stolen in yet (about a day)
 
   // The Funge referee server (runs the game clock)
-  referee: { url: "http://127.0.0.1:8787" },
-  
+  referee: { url: refereeUrl() },
+    
   // Minimum BCH (sats) on the state and pot outputs
   minSats: 1000n,
 };

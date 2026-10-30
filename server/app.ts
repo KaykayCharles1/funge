@@ -24,6 +24,7 @@ export type AppDeps = {
   unconfirmed: Unconfirmed;
   sleep: (ms: number) => Promise<void>;
   logger?: boolean;
+  trustProxy?: boolean; // true only behind a host proxy, so rate limits see the visitor and not the proxy
 };
 
 export function describeRound(game: ServerGame, round: RoundRecord, chain: ChainState, now: number) {
@@ -53,7 +54,7 @@ type Client = { send: (text: string) => void };
 
 export async function buildApp(deps: AppDeps) {
   const { games, manager, chain, clock, allowedOrigins } = deps;
-  const app = Fastify({ logger: deps.logger ?? false });
+  const app = Fastify({ logger: deps.logger ?? false, trustProxy: deps.trustProxy ?? false });
   await app.register(cors, { origin: allowedOrigins, methods: ["GET", "POST"] });
   await app.register(rateLimit, { global: true, max: GLOBAL_RATE.max, timeWindow: GLOBAL_RATE.windowMs });
   await app.register(websocket);
