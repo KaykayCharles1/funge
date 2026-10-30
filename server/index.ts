@@ -12,8 +12,10 @@ import { RoundManager } from "./rounds.ts";
 import { Store } from "./store.ts";
 import { makeUnconfirmed } from "./unconfirmed.ts";
 import { createKeeper } from "./keeper.ts";
+import { installSafeConsole, warnThrottled } from "../src/lib/safeLog.ts";
 
 const network = CONFIG.network as Network;
+installSafeConsole();
 const port = Number(process.env.FUNGE_PORT ?? 8787);
 const allowedOrigins = (
   process.env.FUNGE_ALLOWED_ORIGINS ??
@@ -41,7 +43,7 @@ try {
   const pruned = manager.pruneSettled(loaded);
   if (pruned > 0) console.log(`removed ${pruned} settled round(s) of games that are no longer loaded`);
   manager.resumeAfterRestart(loaded); // downtime counts as a pause, for the loaded games only
-  
+
   for (const g of games) manager.ensure(g.gameId);
   manager.heartbeat();
   await manager.flush();
@@ -59,7 +61,7 @@ try {
   // Keep the chain view fresh (Step 7 replaces this polling with address subscriptions)
   setInterval(() => {
     for (const g of games) {
-      chain.read(g).catch((e) => console.warn("chain read failed:", e instanceof Error ? e.message : String(e)));
+        chain.read(g).catch((e) => warnThrottled("chain-read", `chain read failed: ${e instanceof Error ? e.message : String(e)}`));
     }
   }, 2000);
   // Check deadlines every second from the last known chain view (no network needed)
@@ -84,7 +86,7 @@ try {
         }
         lastHeight = h;
       },
-      (e) => console.warn("block height failed:", e instanceof Error ? e.message : String(e)),
+        (e) => warnThrottled("block-height", `block height failed: ${e instanceof Error ? e.message : String(e)}`),
     );
   }, 5000);
 

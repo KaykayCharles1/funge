@@ -9,6 +9,7 @@ import type { ServerGame } from "./games.ts";
 import type { LockRunner } from "./lock.ts";
 import { classifyAction, type RoundManager } from "./rounds.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
+import { safeText } from "../src/lib/safeLog.ts";
 
 export type ActErrorCode =
   | "invalid" | "state_changed" | "too_late" | "round_over"
@@ -193,8 +194,7 @@ export function mapBroadcastError(e: unknown, deps: ActDeps, id: string, pause =
   if (/websocket|establish connection|failed to connect|timed? ?out|closed|socket/i.test(msg)) {
     return new ActError("outcome_unknown", "We could not confirm that the network received the steal. Check the pass number before trying again.");
   }
-  return new ActError("invalid", `The network rejected the transaction: ${msg.slice(0, 200)}`);
-}
+  return new ActError("invalid", `The network rejected the transaction: ${safeText(msg).slice(0, 200)}`);}
 
 export type ActResult = { txid: string; passCount: number; king: string; deadline: number | null; serverNow: number; lastSeq: number };
 

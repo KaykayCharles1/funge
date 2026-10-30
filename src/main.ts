@@ -1,6 +1,9 @@
 import "./style.css";
 import { CONFIG } from "./config.ts";
+import { installSafeConsole } from "./lib/safeLog.ts";
 import { startRefereeMode } from "./refereeMode.ts";
+
+installSafeConsole();
 
 const byId = (id: string) => document.getElementById(id)!;
 

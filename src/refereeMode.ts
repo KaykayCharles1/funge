@@ -19,6 +19,7 @@ import { settleWithoutReferee } from "./referee/fallback.ts";
 import { grabViaReferee } from "./referee/grab.ts";
 import { grabViaExternalWallet } from "./referee/grabExternal.ts";
 import { vault } from "./wallet/vault.ts";
+import { clearKit, refreshKit } from "./referee/kit.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -304,6 +305,15 @@ async function onFallback() {
   }
 }
 
+
+// Keeps the grab kit fresh in the background so a click can be sent at once
+function warmKit() {
+  const w = getLocalWallet();
+  if (!w || grabbing || endedShown || !round || (round.status !== "open" && round.status !== "waiting")) return;
+  void refreshKit(game, provider, w.lock);
+}
+
+
 function grabState(): { enabled: boolean; label: string; hint: string } {
   const price = shown?.price ?? null;
   const base = price === null ? "Grab the potato" : `Grab the potato · ${formatUnits(BigInt(price), CONFIG.pusdDecimals)} PUSD`;
@@ -352,34 +362,38 @@ async function onGrab() {
   const timeout =
     external !== null ? setTimeout(() => controller.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS) : undefined;
   renderGrab();
-  try {
-    const out =
-      external !== null
-        ? await grabViaExternalWallet(game, provider, external, price, controller.signal, (text) => {
-            signPrompt = text;
-            renderGrab();
-          })
-        : await grabViaReferee(game, provider, local!, price);
-    if (out.ok) {
-      note = { text: COPY.grab.done, expires: null, pass: out.passCount };
-      setTimeout(() => void refreshBalances(provider), 2_000);
-      setTimeout(() => void refreshBalances(provider), 8_000);
-    } else {
-      note = { text: out.text, expires: Date.now() + 10_000, pass: null };
-      if (out.code === "outcome_unknown") coolUntil = Date.now() + 8_000;
+    try {
+        const out =
+        external !== null
+            ? await grabViaExternalWallet(game, provider, external, price, controller.signal, (text) => {
+                signPrompt = text;
+                renderGrab();
+            })
+            : await grabViaReferee(game, provider, local!, price);
+            
+        if (out.ok) {
+            note = { text: COPY.grab.done, expires: null, pass: out.passCount };
+            clearKit(); // the coins just changed
+            setTimeout(warmKit, 1_500);
+            setTimeout(warmKit, 6_000);
+            setTimeout(() => void refreshBalances(provider), 2_000);
+            setTimeout(() => void refreshBalances(provider), 8_000);
+        } else {
+            note = { text: out.text, expires: Date.now() + 10_000, pass: null };
+            if (out.code === "outcome_unknown") coolUntil = Date.now() + 8_000;
+        }
+    } catch (e) {
+        console.error(e);
+        note = { text: errorText("internal"), expires: Date.now() + 10_000, pass: null };
+    } finally {
+        clearTimeout(timeout);
+        grabbing = false;
+        grabMode = null;
+        activeGrab = null;
+        signPrompt = "";
+        renderGrab();
+        kick();
     }
-  } catch (e) {
-    console.error(e);
-    note = { text: errorText("internal"), expires: Date.now() + 10_000, pass: null };
-  } finally {
-    clearTimeout(timeout);
-    grabbing = false;
-    grabMode = null;
-    activeGrab = null;
-    signPrompt = "";
-    renderGrab();
-    kick();
-  }
 }
 
 async function loadEnded() {
@@ -516,11 +530,15 @@ export async function startRefereeMode() {
   subscribe(renderWallet);
   if (externalWanted()) resumeIfStored(); // only reconnect an old pairing if the player opted in
 
-  onLocalWalletChange(() => renderStats());
+  onLocalWalletChange(() => {
+    renderStats();
+    warmKit();
+  });
   void initLocalWallet(provider);
 
   await Promise.race([syncClock(), sleep(2000)]); // the countdown must follow the server's clock
   setInterval(() => void syncClock(3), 60_000);
+  setInterval(warmKit, 5_000);
   setInterval(() => {
     renderClock();
     renderGrab();

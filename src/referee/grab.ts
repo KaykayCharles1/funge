@@ -13,6 +13,7 @@ import { retry } from "../lib/retry.ts";
 import type { LocalWallet } from "../wallet/local.ts";
 import { act } from "./api.ts";
 import type { ApiErrorCode, WalletInputClaim } from "./api.ts";
+import { KIT_MAX_AGE_MS, getKit } from "./kit.ts";
 
 const FEE_RATE = 2;
 const MIN_FEE_COIN_SATS = 6_000n; // a PUSD coin with less BCH than this needs a second coin for the fee
@@ -52,15 +53,32 @@ export async function grabViaReferee(
     return fail("mismatch", COPY.grab.mismatch);
   }
 
+  // Use the coins read ahead of time when they are for this very pass and still fresh; otherwise read the chain now
+  const startedAt = performance.now();
+  const wantedPass = Number((expectedPrice - BigInt(game.params.basePrice)) / BigInt(game.params.priceStep));
+  const ready = getKit();
+  const usable =
+    ready !== null &&
+    ready.passCount === wantedPass &&
+    binToHex(ready.lock) === binToHex(wallet.lock) &&
+    Date.now() - ready.at < KIT_MAX_AGE_MS
+      ? ready
+      : null;
   let stateUtxo, potUtxo, coins;
-  try {
-    [[stateUtxo], [potUtxo]] = await Promise.all([
-      retry(() => provider.getUtxos(game.state.address)),
-      retry(() => provider.getUtxos(game.pot.address)),
-    ]);
-    coins = await retry(() => provider.getUtxosForLockingBytecode(wallet.lock));
-  } catch {
-    return fail("chain_unavailable", errorText("chain_unavailable"));
+  if (usable) {
+    stateUtxo = usable.stateUtxo;
+    potUtxo = usable.potUtxo;
+    coins = usable.coins;
+  } else {
+    try {
+      [[stateUtxo], [potUtxo]] = await Promise.all([
+        retry(() => provider.getUtxos(game.state.address)),
+        retry(() => provider.getUtxos(game.pot.address)),
+      ]);
+      coins = await retry(() => provider.getUtxosForLockingBytecode(wallet.lock));
+    } catch {
+      return fail("chain_unavailable", errorText("chain_unavailable"));
+    }
   }
   if (!stateUtxo?.token?.nft || !potUtxo?.token) return fail("no_round", COPY.grab.noRound);
 
@@ -129,6 +147,8 @@ export async function grabViaReferee(
     ...(u.token ? { token: { amount: String(u.token.amount), category: u.token.category } } : {}),
   }));
 
+
+  console.log(`grab ready ${Math.round(performance.now() - startedAt)} ms after the click (${usable ? "prepared coins" : "read live"})`);
   const res = await act(game.gameCategory, { action: "steal", txHex, walletInputs });
   if (res.ok) return { ok: true, txid: res.txid, passCount: res.passCount };
   if (res.message) console.error(`grab refused (${res.error}): ${res.message}`);
