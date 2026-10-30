@@ -49,6 +49,7 @@ On chipnet (real transactions, against a running server; read the header of each
 
 ## Putting it online
 The page is static; the server needs a host with HTTPS.
+- **Before going live:** `node scripts/preflight.ts https://<server> https://<page>` checks both ends without sending anything. The full checklist, what to do when something breaks, and the backup-server plan are in `RUNBOOK.md`.
 
 - **Page:** `VITE_REFEREE_URL=https://<server address> npm run build`, then upload `dist/`.
 - **Server:** `FUNGE_HOST=0.0.0.0`, `FUNGE_ALLOWED_ORIGINS=https://<page address>`, `FUNGE_TRUST_PROXY=1` (only behind the host's proxy), `REFEREE_KEY_CHIPNET` or `REFEREE_KEY_MAINNET` (the key, as a secret of the host), and `FUNGE_DATA_DIR` on a disk that survives restarts. The server refuses to start with unsafe combinations.
