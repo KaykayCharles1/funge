@@ -67,6 +67,16 @@ export const COPY = {
     locked: "Unlock your game wallet to settle. It only pays the small network fee.",
     noWallet: "Create a game wallet to settle. It only pays the small network fee.",
   },
+  external: {
+    ready: "Playing with your connected wallet. You approve each grab in it.",
+    preparing: "Preparing transaction…",
+    approve: (price: string, fee: string) => `Approve in your wallet: pay ${price} PUSD (network fee about ${fee} sats).`,
+    rejected: "The request was rejected in your wallet. Nothing was sent.",
+    cancelled: "Cancelled. Nothing was sent.",
+    timeout: "Timed out waiting for your wallet. Nothing was sent.",
+    disconnected: "Your wallet disconnected. Nothing was sent.",
+    failed: "Could not prepare the grab. Nothing was sent. Please try again.",
+  },
   errors: {
     invalid: "The network did not accept that grab. Nothing was sent. Please try again.",
     state_changed: "Someone grabbed first. Check the new price and try again.",

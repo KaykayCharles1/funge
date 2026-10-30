@@ -1,4 +1,6 @@
 import type { ElectrumNetworkProvider } from "cashscript";
+import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
+import type { WalletState } from "./bch_wallet.ts";
 import { CONFIG } from "./config.ts";
 import { COPY, errorText, pauseText } from "./copy.ts";
 import { findEndedRound } from "./ended.ts";
@@ -7,16 +9,17 @@ import { frameSvg, svgToDataUrl } from "./lib/art.ts";
 import { formatDuration, formatUnits } from "./lib/format.ts";
 import type { GameV2 } from "./lib/game.ts";
 import { makeProvider } from "./lib/provider.ts";
+import { qrDataUrl } from "./lib/qr.ts";
 import { claim, getRound, watchRound } from "./referee/api.ts";
 import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts";
-import { serverNow, syncClock } from "./referee/clock.ts";
-import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
-import { grabViaReferee } from "./referee/grab.ts";
-import { vault } from "./wallet/vault.ts";
 import { watchChain } from "./referee/chainWatch.ts";
 import type { ChainWatch } from "./referee/chainWatch.ts";
+import { serverNow, syncClock } from "./referee/clock.ts";
 import { settleWithoutReferee } from "./referee/fallback.ts";
-
+import { grabViaReferee } from "./referee/grab.ts";
+import { grabViaExternalWallet } from "./referee/grabExternal.ts";
+import { vault } from "./wallet/vault.ts";
+import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 
 const $ = (id: string) => document.getElementById(id)!;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
@@ -27,6 +30,7 @@ const CARD = "rounded-2xl p-5 ring-1";
 const CARD_NORMAL = `${CARD} bg-slate-900 ring-slate-800`;
 const CARD_READY = `${CARD} bg-amber-500/10 ring-amber-400`;
 const POLL_MS = 20_000; // safety net: the live socket does the real work
+const SIGN_TIMEOUT_MS = 180_000; // how long we wait for the player to approve in their own wallet
 
 type Shown = { passCount: number; king: string | null; pot: string | null; price: string | null };
 
@@ -42,6 +46,10 @@ let endedBusy = false;
 let failures = 0;
 let running = false;
 let grabbing = false;
+let grabMode: "local" | "external" | null = null;
+let activeGrab: AbortController | null = null;
+let signPrompt = "";
+let lastQr = "";
 let coolUntil = 0; // after "outcome unknown", wait before allowing another grab
 let claiming = false;
 let claimNote = "";
@@ -49,13 +57,42 @@ let chain: ChainWatch | null = null;
 let chainBusy = false;
 let fallbackBusy = false;
 let fallbackNote = "";
-const serverDown = () => failures >= 2 || net === "offline";
 let note: { text: string; expires: number | null; pass: number | null } | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
+const serverDown = () => failures >= 2 || net === "offline";
 const priceFor = (pass: number) => BigInt(game.params.basePrice) + BigInt(game.params.priceStep) * BigInt(pass);
 const fmtClock = (ms: number) => formatDuration(Math.ceil(Math.max(0, ms) / 1000));
-const myKeys = () => [getLocalWallet()?.pkhHex].filter((k): k is string => !!k);
+
+// The player's own wallet (WizardConnect), when connected
+const externalPkh = (): string | null => {
+  const w = getWalletState();
+  return w.status === "connected" ? w.pkhHex : null;
+};
+// Every key that counts as "you": the game wallet and/or a connected own wallet
+const myKeys = () => [getLocalWallet()?.pkhHex, externalPkh()].filter((k): k is string => !!k);
+const isMine = (key: string | null) => key !== null && myKeys().includes(key);
+
+const EXTERNAL_FLAG = "funge:external";
+const externalWanted = () => {
+  try {
+    return localStorage.getItem(EXTERNAL_FLAG) === "1";
+  } catch {
+    return false;
+  }
+};
+const setExternalFlag = (on: boolean) => {
+  try {
+    if (on) localStorage.setItem(EXTERNAL_FLAG, "1");
+    else localStorage.removeItem(EXTERNAL_FLAG);
+  } catch {
+    // optional
+  }
+};
+function setExternalVisible(visible: boolean) {
+  show("wallet", visible);
+  $("useOwnWalletBtn").textContent = visible ? "Hide the external wallet options" : "Use my own wallet instead (WizardConnect)";
+}
 
 // Time left, from the SERVER's clock. While paused it is frozen at the moment of the pause.
 function remainingMs(): number | null {
@@ -70,8 +107,7 @@ function renderStats() {
   $("passCount").textContent = String(s.passCount);
   $("pot").textContent = s.pot === null ? "…" : formatUnits(BigInt(s.pot), dec);
   $("price").textContent = s.price === null ? "—" : formatUnits(BigInt(s.price), dec);
-  const mine = s.king !== null && getLocalWallet()?.pkhHex === s.king;
-  $("holder").textContent = s.king === null ? "No one yet" : mine ? `${shortKey(s.king)} (you)` : shortKey(s.king);
+  $("holder").textContent = s.king === null ? "No one yet" : isMine(s.king) ? `${shortKey(s.king)} (you)` : shortKey(s.king);
   if (artPass !== s.passCount) {
     artPass = s.passCount;
     ($("art") as HTMLImageElement).src = svgToDataUrl(
@@ -80,6 +116,32 @@ function renderStats() {
     $("artCaption").textContent = `Pass ${s.passCount} · pot ${s.pot === null ? "…" : formatUnits(BigInt(s.pot), dec)} PUSD`;
   }
   renderGrab();
+}
+
+// The player's own wallet (WizardConnect) card
+function renderWallet(s: WalletState) {
+  if (s.status === "idle" && grabMode === "external") activeGrab?.abort(new Error("Wallet disconnected"));
+  show("walletIdle", s.status === "idle");
+  show("walletWaiting", s.status === "waiting");
+  show("walletConnected", s.status === "connected");
+  $("walletError").textContent = s.error ?? "";
+  if (s.status === "waiting") {
+    $("walletWaitingText").textContent = s.qrUri
+      ? "Scan this code with your wallet, or copy the link into it."
+      : "Reconnecting to your wallet…";
+    show("qr", !!s.qrUri);
+    if (s.qrUri && s.qrUri !== lastQr) {
+      lastQr = s.qrUri;
+      ($("qr") as HTMLImageElement).src = qrDataUrl(s.qrUri);
+    }
+    const link = document.getElementById("openWallet") as HTMLAnchorElement | null;
+    if (link) link.href = s.uri ?? "#";
+  }
+  if (s.status === "connected") {
+    $("walletName").textContent = s.walletName ?? "Wallet";
+    $("walletKey").textContent = s.pkhHex ? `Key ${shortKey(s.pkhHex)}` : "";
+  }
+  renderStats();
 }
 
 function renderClock() {
@@ -142,8 +204,7 @@ function renderOver() {
   show("overModal", open);
   if (!open) return;
   const king = shown?.king ?? null;
-  const wallet = getLocalWallet();
-  const iAmKing = !!wallet && king !== null && wallet.pkhHex === king;
+  const iAmKing = isMine(king);
   const pot = shown?.pot == null ? "…" : formatUnits(BigInt(shown.pot), CONFIG.pusdDecimals);
   $("overTitle").textContent = COPY.over.title;
   $("overText").textContent = iAmKing
@@ -153,7 +214,7 @@ function renderOver() {
   const btn = $("claimBtn") as HTMLButtonElement;
   btn.disabled = claiming;
   btn.textContent = claiming ? COPY.claim.working : COPY.claim.button;
-  const locked = !wallet && vault.state() === "locked";
+  const locked = !getLocalWallet() && externalPkh() === null && vault.state() === "locked";
   $("claimMsg").textContent = claimNote !== "" ? claimNote : !iAmKing && locked ? COPY.over.unlockHint : "";
 }
 
@@ -254,11 +315,12 @@ function grabState(): { enabled: boolean; label: string; hint: string } {
   if (endedShown || timeUp) return { enabled: false, label: COPY.grab.roundOver, hint: "" };
   if (!r || net === "offline") return { enabled: false, label: base, hint: COPY.network.offline };
   if (r.paused) return { enabled: false, label: base, hint: pauseText(r.paused.reason) };
-  if (!getLocalWallet()) {
+  const external = externalPkh() !== null;
+  if (!external && !getLocalWallet()) {
     return { enabled: false, label: base, hint: vault.state() === "locked" ? COPY.grab.locked : COPY.grab.noWallet };
   }
   if (Date.now() < coolUntil) return { enabled: false, label: base, hint: COPY.grab.cooling };
-  return { enabled: price !== null, label: base, hint: "" };
+  return { enabled: price !== null, label: base, hint: external ? COPY.external.ready : "" };
 }
 
 function renderGrab() {
@@ -266,21 +328,38 @@ function renderGrab() {
   const btn = $("grabBtn") as HTMLButtonElement;
   btn.disabled = !g.enabled;
   btn.textContent = g.label;
+  show("cancelGrabBtn", grabbing && grabMode === "external");
   const noteVisible =
     note !== null &&
     (note.expires === null || Date.now() < note.expires) &&
     (note.pass === null || (shown?.passCount ?? 0) <= note.pass);
-  $("grabMsg").textContent = grabbing ? COPY.grab.sending : noteVisible && note ? note.text : g.hint;
+  const busyText = grabMode === "external" ? signPrompt || COPY.external.preparing : COPY.grab.sending;
+  $("grabMsg").textContent = grabbing ? busyText : noteVisible && note ? note.text : g.hint;
 }
 
 async function onGrab() {
-  const wallet = getLocalWallet();
-  if (grabbing || !wallet || !shown || shown.price === null || !grabState().enabled) return;
+  if (grabbing || !shown || shown.price === null || !grabState().enabled) return;
+  const price = BigInt(shown.price);
+  const external = externalPkh(); // a wallet the player explicitly connected wins; otherwise the game wallet plays
+  const local = getLocalWallet();
+  if (external === null && !local) return;
   grabbing = true; // set before anything is awaited, so a double click cannot send twice
+  grabMode = external !== null ? "external" : "local";
+  signPrompt = "";
   note = null;
+  const controller = new AbortController();
+  activeGrab = controller;
+  const timeout =
+    external !== null ? setTimeout(() => controller.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS) : undefined;
   renderGrab();
   try {
-    const out = await grabViaReferee(game, provider, wallet, BigInt(shown.price));
+    const out =
+      external !== null
+        ? await grabViaExternalWallet(game, provider, external, price, controller.signal, (text) => {
+            signPrompt = text;
+            renderGrab();
+          })
+        : await grabViaReferee(game, provider, local!, price);
     if (out.ok) {
       note = { text: COPY.grab.done, expires: null, pass: out.passCount };
       setTimeout(() => void refreshBalances(provider), 2_000);
@@ -293,7 +372,11 @@ async function onGrab() {
     console.error(e);
     note = { text: errorText("internal"), expires: Date.now() + 10_000, pass: null };
   } finally {
+    clearTimeout(timeout);
     grabbing = false;
+    grabMode = null;
+    activeGrab = null;
+    signPrompt = "";
     renderGrab();
     kick();
   }
@@ -307,13 +390,13 @@ async function loadEnded() {
       const r = await findEndedRound(game, provider).catch((e) => {
         console.error(e);
         return null;
-      })
-        if (r) {
-            renderEndedRound(r, game.gameCategory, myKeys(), getLocalWallet()?.pkhHex ?? null);
-            endedShown = true;
-            $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-            break;
-        }
+      });
+      if (r) {
+        renderEndedRound(r, game.gameCategory, myKeys(), getLocalWallet()?.pkhHex ?? null);
+        endedShown = true;
+        $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        break;
+      }
       await sleep(3000); // the settlement may not be visible on the network yet
     }
   } finally {
@@ -389,9 +472,9 @@ async function tick() {
         });
       }
     } else {
-        failures++;
-        $("status").textContent = res.error === "server_unreachable" ? COPY.network.offline : errorText(res.error);
-        if (serverDown()) void pollChain();
+      failures++;
+      $("status").textContent = res.error === "server_unreachable" ? COPY.network.offline : errorText(res.error);
+      if (serverDown()) void pollChain();
     }
   } finally {
     running = false;
@@ -408,8 +491,6 @@ function kick() {
 export async function startRefereeMode() {
   // The original block-based controls do not apply here
   show("settleBtn", false);
-  show("useOwnWalletBtn", false);
-  show("wallet", false);
   show("shareBtn", false);
   $("settleMsg").textContent = "";
   $("countdownAgo").textContent = "";
@@ -419,6 +500,26 @@ export async function startRefereeMode() {
 
   provider = makeProvider();
   game = (await (await fetch(`${import.meta.env.BASE_URL}game.${CONFIG.network}.v2.json`)).json()) as GameV2;
+
+  // The player's own wallet (WizardConnect): a second option next to the game wallet
+  $("connectBtn").addEventListener("click", () => startConnection(true));
+  $("cancelBtn").addEventListener("click", () => void disconnectWallet());
+  $("disconnectBtn").addEventListener("click", () => void disconnectWallet());
+  $("copyUri").addEventListener("click", () => {
+    const uri = getWalletState().uri;
+    if (uri) void navigator.clipboard.writeText(uri);
+  });
+  $("cancelGrabBtn").addEventListener("click", () => activeGrab?.abort(new Error("Cancelled by you")));
+  setExternalVisible(externalWanted());
+  $("useOwnWalletBtn").addEventListener("click", () => {
+    const opening = $("wallet").classList.contains("hidden");
+    setExternalVisible(opening);
+    setExternalFlag(opening);
+    // Hiding the option also disconnects it, so the game wallet is the active one again
+    if (!opening && getWalletState().status !== "idle") void disconnectWallet();
+  });
+  subscribe(renderWallet);
+  if (externalWanted()) resumeIfStored(); // only reconnect an old pairing if the player opted in
 
   onLocalWalletChange(() => renderStats());
   void initLocalWallet(provider);
