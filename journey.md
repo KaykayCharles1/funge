@@ -155,3 +155,43 @@
 - README added. The repo is tagged v1-grab as the demo-safe version.
 - The first production preview test caught a missing allowed address (the Cauldron relay used by the pairing library): the browser blocked it and the console said exactly which address to add. After adding it, the policy shows no violations.
 - Testing also showed that only one public chipnet Electrum server answers on the default secure WebSocket port, so the failover list has little to fail over to; finding more working servers is the next resilience task.
+
+
+
+## Referee timer: why
+- The first version counted blocks, and blocks arrive at random, so a round could end in minutes or take hours. A game about the last second needs a clock people can watch.
+- Design: the Funge server holds a wall-clock deadline (10 minutes per grab). The contract requires the server's signature to grab and to settle, and a fallback anyone can use after a number of blocks if the server is gone. The server controls timing only; the contract pays the last holder, always.
+
+
+## Referee timer: contract and the signature spike
+- FungeStateV2 adds `pass(newHolder, refereeSig)`, `settle(refereeSig)` and `settleFallback()` (needs `this.age` of 12 blocks, or 144 for a round nobody joined).
+- The key question was whether the player's wallet signatures survive the server adding its signature afterwards. A spike on chipnet proved it: a wallet signature does not cover the contract input's unlocking script. So the browser builds the grab with a throwaway placeholder signature, the wallet signs its own coins, and the server swaps in the real referee signature and broadcasts.
+
+
+## Referee timer: the server
+- A Fastify server with one lock per round: a duplicate or stale grab is refused, simultaneous grabs have one winner, and the chain is the source of truth for the pass count and the holder.
+- The deadline lives in a saved state file with a heartbeat. After a crash, the downtime is treated as a pause so players keep the time they had left.
+- Near the node's limit on chained unconfirmed grabs the round pauses ("network busy") and resumes at the next block.
+- A keeper settles a finished round two minutes after the deadline if nobody presses Claim.
+
+
+## Referee timer: timing rules found by testing
+- A real test showed an in-time grab refused as "round over" because the server judged it after a slow chain read. Fix: judge by the moment the request arrived, with one second of grace.
+- A second flaw showed on the page: the round flashed "over" while an in-time grab was still being checked. Fix: a grab that arrived in time holds the round open until it is processed.
+- A last-second click was still refused, because the page read the chain (three network calls, plus retry waits) after the click. Fix: the game wallet keeps its coins and the state ready in the background, so the click is sent at once. Clicks two and three seconds before the end now succeed.
+
+
+## Referee timer: failure drills
+- Each drill was run on chipnet with real transactions: duplicate and stale grabs, last-second timing, a crash in the middle of a round, a busy network, the server being off while a round ends, and a full two-player round with the production build and its Content-Security-Policy.
+- With the server off, the page reads the chain itself, shows how long until the fallback opens, and offers a Settle button when it does. A settle test with the server off paid the holder.
+
+
+## Referee timer: WizardConnect stays
+- WizardConnect is a requirement of the hackathon and the second way to play. It was ported to the referee mode: the wallet signs its own coins, the page sends the signed transaction to the server, the server adds its signature. Tested with Cashonize: grab, reject, cancel, a late approval (refused, the faster player kept the potato) and claiming a pot.
+- The game wallet stays the recommended way: one tap, no approval pop-up.
+- The original block-based page and its code were removed after the port, and kept in the git tag `v1-grab`.
+
+
+## Referee timer: hardening for deployment
+- Every console message passes through a cleaner that removes CashScript debug links and key-shaped text, because a debug link can contain private keys. A repeating warning from a failing network server is shown once a minute with a count.
+- The server's address, listening address and allowed page origins come from the environment, and it refuses to start in unsafe combinations (a network address without an allowed origin, a plain-http page, a wildcard). The page build refuses a plain-http server address.

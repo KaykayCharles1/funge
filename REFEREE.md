@@ -58,8 +58,7 @@ Funge referee. An optional public audit trail is described under "Later, optiona
 - **If the referee is gone:** after WAITING_FALLBACK_BLOCKS (144, about a day) with no action, anyone can run the
   fallback settle, with the same result.
 - Nobody else can ever receive the seed.
-- For comparison, the v1-grab contract does the same through its block timeout: after its timeout, anyone can
-  settle and the seed returns to the creator.
+
 
 ## One steal, step by step
 1. The app builds the steal transaction: the state coin (with a placeholder where the referee's signature will go),
@@ -130,27 +129,26 @@ deadline is pushed out by the length of the pause and an event with reason `paus
 ## The server, in outline
 - Round registry keyed by the game's token category: status, deadline, king, last action.
 - `GET /rounds/:id` returns state, deadline and serverNow. A WebSocket pushes deadline changes and events.
-- Rate limits, logging that never contains secrets, the referee key only in an environment variable.
+- `POST /rounds/:id/act` takes a grab built by the player's wallet, checks it, adds the referee signature and broadcasts it. `POST /rounds/:id/claim` settles a finished round.
+- Both wallets use the same route: the game wallet signs its own coins in the browser; a WizardConnect wallet signs them in the wallet app. The wallet's signatures do not cover the contract input's unlocking script, so adding the referee signature afterwards keeps them valid.
 
-## To be proven first (spikes, before the server is built)
-1. **Signature insertion.** The player's wallet signatures must stay valid after the referee signature is inserted
-   into the contract input (Step 3). Which signature type the referee uses is decided by that evidence.
-2. **Unconfirmed chain limit.** How many chained steals the node accepts without a new block (Step 4).
+## What was proven first
+1. **Signature insertion:** the wallet signatures stay valid after the referee signature is inserted (Step 3 spike, repeated with a real WizardConnect wallet).
+2. **Unconfirmed chain limit:** the server pauses the round before the node's limit on chained unconfirmed grabs (UNCONFIRMED_CAP), and lifts the pause at the next block.
+3. **Failure drills on chipnet:** duplicate and stale grabs, last-second timing and grace, a crash and restart in the middle of a round, a busy network, the server being off for the fallback settle, and a full two-player round with the production build.
 
-## Later, optional
-- **Public audit trail (Step 10 option):** the server's timestamp in an `OP_RETURN` output of each action
-  transaction. The player's wallet signs every output, so the app must get the timestamp from the server *before*
-  it signs, which needs a small "prepare" call.
-
-## Open points for the owner
-1. **Where the server runs** is decided in Step 10.
 ## Restart and downtime
-
+- The server saves a heartbeat timestamp to its state file every few seconds (HEARTBEAT_SECONDS).
+- On start it compares now with the last heartbeat. For every round of a loaded game that is open and not paused, the downtime is treated as a pause: the deadline is pushed out by the downtime, so players keep exactly the time they had left when the server went away. A `clock_resumed` event (reason `restart`, with the downtime) is published for each such round. Rounds that were paused stay paused. Rounds already marked over or settled are not touched.
+- Settled rounds of games that are no longer loaded are removed from the state file. Unsettled ones are kept, because the contract may still owe a payout.
+- The chain stays the source of truth for the king, the pass count and the state coin. The state file only holds what the chain cannot tell: deadline, status, pause info, recent events and the heartbeat. Every event carries a per-round sequence number, so a reconnecting client asks for events after its last number, or reloads the whole round if the history no longer reaches back that far.
 
 ## Server protection
-- The server saves a heartbeat timestamp to its state file every few seconds (HEARTBEAT_SECONDS).
-- On start it compares now with the last heartbeat. For every round that is open and not paused, the
-downtime is treated as a pause: the deadline is pushed out by the downtime, so the players keep exactly the time they had left when the server went away. A "clock resumed after restart" event (type
-clock_resumed, reason restart, with the downtime) is published for each such round. Rounds that were
-paused stay paused. Rounds already marked over or settled are not touched.
-- The chain stays the source of truth for the king, the pass count and the state coin. The state file only holds what the chain cannot tell: deadline, status, pause info, recent events and the heartbeat. Every event carries a per-round sequence number, so a reconnecting client asks for events after its last number, or reloads the whole round if the history no longer reaches back that far.
+- Listens on 127.0.0.1 unless told otherwise. On a network address it refuses to start without the page's exact https address in FUNGE_ALLOWED_ORIGINS (no wildcards, no plain http).
+- Cross-origin requests and WebSocket connections are only accepted from those origins. Rate limits per visitor (behind a proxy, only with FUNGE_TRUST_PROXY=1), a small body limit on `/act`, and one lock per round.
+- Timer overrides for testing are refused on mainnet, and a chipnet key is refused in a mainnet environment.
+- Logs never contain secrets: every console message passes through a cleaner that removes CashScript debug links and anything shaped like a private key. The referee key exists only in the host's environment.
+- A grab is judged by when it reaches the server, and a grab that arrived in time keeps the round open until it is processed.
+
+## Later, optional
+- **Public audit trail:** the server's timestamp in an `OP_RETURN` output of each action transaction. The player's wallet signs every output, so the app must get the timestamp from the server *before* it signs, which needs a small "prepare" call.
