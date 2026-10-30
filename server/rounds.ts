@@ -14,6 +14,7 @@ export class RoundManager {
   private store: Store;
   private clock: Clock;
   private listeners = new Set<Listener>();
+  private holds = new Map<string, number>(); // grabs that arrived in time and are still being processed
 
   constructor(store: Store, clock: Clock) {
     this.store = store;
@@ -57,17 +58,44 @@ export class RoundManager {
     this.store.save().catch((e) => console.error("heartbeat save failed:", e instanceof Error ? e.message : String(e)));
   }
 
-  // Call once at startup, before serving. Downtime counts as a pause for open, unpaused rounds.
-  resumeAfterRestart(): void {
+  // Call once at startup, before serving. Downtime counts as a pause for open, unpaused rounds of the
+  // games that are loaded now (rounds of old games are left alone).
+  resumeAfterRestart(only?: string[]): void {
     const hb = this.store.data.heartbeat;
     if (hb === null) return;
     const down = Math.max(0, this.clock.now() - hb);
     for (const r of Object.values(this.store.data.rounds)) {
+      if (only && !only.includes(r.gameId)) continue;
       if (r.status === "open" && r.deadline !== null && !r.paused) {
         r.deadline += down;
         this.publish(r, "clock_resumed", "restart", { downtimeMs: down, deadline: r.deadline });
       }
     }
+  }
+
+  // Removes settled rounds of games that are not loaded any more. Unsettled ones are kept: the contract may still owe a payout.
+  pruneSettled(keep: string[]): number {
+    let removed = 0;
+    for (const [id, r] of Object.entries(this.store.data.rounds)) {
+      if (r.status === "settled" && !keep.includes(id)) {
+        delete this.store.data.rounds[id];
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  // A grab that arrived in time calls this while it is being processed; the round cannot become "over" until it releases.
+  hold(gameId: string): () => void {
+    this.holds.set(gameId, (this.holds.get(gameId) ?? 0) + 1);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      const n = (this.holds.get(gameId) ?? 1) - 1;
+      if (n <= 0) this.holds.delete(gameId);
+      else this.holds.set(gameId, n);
+    };
   }
 
     observe(gameId: string, chain: ChainView): RoundRecord {
@@ -89,7 +117,7 @@ export class RoundManager {
     } else if (r.seenPassCount === undefined) {
       r.seenPassCount = chain.passCount;
     }
-    if (r.status === "open" && !r.paused && r.deadline !== null && now >= r.deadline + GRACE_SECONDS * 1000) {
+    if (r.status === "open" && !r.paused && r.deadline !== null && !this.holds.get(gameId) && now >= r.deadline + GRACE_SECONDS * 1000) {
       r.status = "over";
       this.publish(r, "round_over", "deadline", { deadline: r.deadline });
     }

@@ -140,6 +140,41 @@ assert.equal(classifyAction("settle"), null);
   console.log("ok: steals made outside /act restart the clock");
 }
 
+// a grab that is being processed holds the round open, so there is no "over" flash
+{
+  const { mgr, clock } = await setup("hold");
+  mgr.applyAction("g", "steal", "steal", { passCount: 1 });
+  const deadline = mgr.get("g").deadline!;
+  clock.set(deadline + GRACE + 500);
+  const release = mgr.hold("g");
+  assert.equal(mgr.observe("g", { live: true, passCount: 1 }).status, "open");
+  assert.equal(mgr.get("g").events.some((e) => e.type === "round_over"), false);
+  release();
+  release(); // releasing twice is harmless
+  assert.equal(mgr.observe("g", { live: true, passCount: 1 }).status, "over");
+  console.log("ok: a grab in progress keeps the round open");
+}
+
+// restart only touches rounds of loaded games; old settled rounds are pruned, unsettled ones kept
+{
+  const a = await setup("orphans");
+  a.mgr.applyAction("old", "steal", "steal");
+  a.mgr.applyAction("live", "steal", "steal");
+  a.mgr.applyAction("lost", "steal", "steal");
+  a.mgr.observe("old", { live: false, passCount: 1 }); // settled
+  a.mgr.heartbeat();
+  await a.mgr.flush();
+  a.clock.advance(30_000);
+  const { store } = await Store.open(a.path);
+  const m2 = new RoundManager(store, a.clock);
+  assert.equal(m2.pruneSettled(["live"]), 1);
+  assert.equal(store.data.rounds["old"], undefined);
+  m2.resumeAfterRestart(["live"]);
+  assert.equal(m2.get("live").events.at(-1)?.reason, "restart");
+  assert.equal(m2.get("lost").events.length, 1); // untouched
+  console.log("ok: restart and pruning only concern loaded games");
+}
+
 await new Promise((r) => setTimeout(r, 100)); // let the background saves finish
 console.log("\nAll round tests passed.");
 process.exit(0);

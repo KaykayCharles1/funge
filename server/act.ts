@@ -205,6 +205,20 @@ export async function executeAct(deps: ActDeps, game: ServerGame, raw: unknown):
   const id = game.gameId;
   const arrivedAt = deps.clock.now(); // timing is judged by when the request arrived, not by how long our network checks take
 
+  // A grab that arrived in time keeps the round open while it is processed, so nobody sees "Round is over" flash by
+  const r0 = deps.manager.get(id);
+  const inTime = r0.status === "open" && r0.deadline !== null && arrivedAt < r0.deadline + GRACE_SECONDS * 1000;
+  const release = inTime ? deps.manager.hold(id) : () => {};
+  try {
+    return await runAct(deps, game, body, handler, arrivedAt);
+  } finally {
+    release();
+  }
+}
+
+async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: ActionHandler, arrivedAt: number): Promise<ActResult> {
+  const id = game.gameId;
+
   return deps.locks(id, async () => {
     const { manager, chain, clock } = deps;
     if (manager.get(id).status === "settled") throw new ActError("round_over", "The round is over.");

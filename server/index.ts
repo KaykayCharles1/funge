@@ -36,8 +36,12 @@ try {
   const { store, source } = await Store.open(`${dataDir}/rounds.${network}.json`);
   if (source === "bak") console.warn("state file was damaged; recovered from backup");
   const manager = new RoundManager(store, systemClock);
-  manager.onEvent((_id, e) => console.log(`event #${e.seq} ${e.type} (${e.reason})`));
-  manager.resumeAfterRestart(); // downtime counts as a pause
+  manager.onEvent((id, e) => console.log(`[${id.slice(0, 8)}] event #${e.seq} ${e.type} (${e.reason})`));
+  const loaded = games.map((g) => g.gameId);
+  const pruned = manager.pruneSettled(loaded);
+  if (pruned > 0) console.log(`removed ${pruned} settled round(s) of games that are no longer loaded`);
+  manager.resumeAfterRestart(loaded); // downtime counts as a pause, for the loaded games only
+  
   for (const g of games) manager.ensure(g.gameId);
   manager.heartbeat();
   await manager.flush();
