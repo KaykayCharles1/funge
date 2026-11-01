@@ -15,3 +15,14 @@ export type GameV2 = Omit<Game, "params"> & {
   refereePubkey: string;
   params: { basePrice: string; priceStep: string; seedPot: string; fallbackBlocks: number; waitingFallbackBlocks: number };
 };
+
+
+// The Kingdom game file (contractVersion 3), written by scripts/deploy-kingdom.ts
+export type GameKingdom = Omit<Game, "params"> & {
+  contractVersion: 3;
+  refereePubkey: string;
+  params: {
+    openingPrice: string; feePercent: string; cutPercent: string; cap: string;
+    protectsPerReign: number; unit: string; fallbackBlocks: number;
+  };
+};

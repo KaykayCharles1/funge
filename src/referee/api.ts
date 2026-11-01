@@ -20,6 +20,27 @@ export type RoundSnapshot = {
   stateCoin: { txid: string; vout: number | null } | null;
   refereePubkey: string;
   chainStale: boolean;
+  kind?: "steal" | "kingdom";
+  kingdom?: KingdomSnapshot | null; // Kingdom rounds only
+};
+
+export type KingdomSnapshot = {
+  holder: string | null;
+  previousKing: string | null; // the first 11 bytes of the dethroned king's key hash
+  value: string;
+  openingPrice: string;
+  cap: string;
+  wallsAtMaximum: boolean;
+  protectsUsed: number;
+  protectsLeft: number;
+  protectsPerReign: number;
+  protectAmounts: string[];
+  conquest: { pay: string; fee: string; kingGets: string; poolGets: string } | null;
+  clockSeconds: number | null;
+  nextClockSeconds: number | null;
+  floorSeconds: number | null;
+  protectLockoutSeconds: number;
+  protectClosesInMs: number | null;
 };
 
 export type RefereeEvent = {
@@ -32,7 +53,8 @@ export type RefereeEvent = {
 
 export type ApiErrorCode =
   | "invalid" | "state_changed" | "too_late" | "round_over" | "not_over" | "paused" | "network_busy"
-  | "chain_unavailable" | "outcome_unknown" | "unknown_round" | "internal" | "rate_limited" | "server_unreachable";
+  | "chain_unavailable" | "outcome_unknown" | "unknown_round" | "internal" | "rate_limited" | "server_unreachable"
+  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left";
 
 export type ApiFailure = { ok: false; error: ApiErrorCode; message: string; serverNow: number | null };
 
@@ -43,7 +65,7 @@ export type WalletInputClaim = {
   lockingBytecode: string;
   token?: { amount: string; category: string; nft?: { capability: "none" | "mutable" | "minting"; commitment: string } };
 };
-export type ActRequest = { action: "steal"; txHex: string; walletInputs: WalletInputClaim[] };
+export type ActRequest = { action: "steal" | "open" | "conquer" | "protect"; txHex: string; walletInputs: WalletInputClaim[] };
 export type ActSuccess = {
   ok: true; txid: string; passCount: number; king: string; deadline: number | null; serverNow: number; lastSeq: number;
 };
@@ -55,6 +77,7 @@ export type ClaimSuccess = {
 const KNOWN: string[] = [
   "invalid", "state_changed", "too_late", "round_over", "not_over", "paused", "network_busy",
   "chain_unavailable", "outcome_unknown", "unknown_round", "internal",
+  "not_open", "protect_locked", "not_king", "already_king", "walls_at_maximum", "no_protects_left",
 ];
 const base = () => CONFIG.referee.url.replace(/\/$/, "");
 

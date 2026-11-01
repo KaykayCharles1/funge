@@ -92,6 +92,12 @@ export const COPY = {
     internal: "Something went wrong on the game server. Please try again.",
     rate_limited: "Too many tries. Wait a minute and try again.",
     server_unreachable: "Could not reach the game server. Nothing was sent.",
+    not_open: "Nobody has opened this round yet.",
+    protect_locked: "Protect is closed for the last 30 seconds of the clock.",
+    not_king: "Only the king can protect the kingdom.",
+    already_king: "You already hold this throne.",
+    walls_at_maximum: "The walls are at their maximum.",
+    no_protects_left: "No protects left in this reign.",
   } satisfies Record<ApiErrorCode, string>,
 } as const;
 
