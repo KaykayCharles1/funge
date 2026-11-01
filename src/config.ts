@@ -33,6 +33,16 @@ export const CONFIG = {
   priceStep: 10n,
   seedPot: 1_000n, // starting PUSD in the pot (base units), from the creator's own tokens
 
+  // Kingdom (FungeKingdom contract). Deploy-time contract settings, in base units of PUSD (2 decimals).
+  // The fallback block count below is used for Kingdom games too.
+  kingdom: {
+    openingPrice: 1_000n, // 10.00 PUSD: what the first player pays; it becomes the kingdom's value
+    feePercent: 2n, // whole percent of the value, paid on top by the conqueror, goes to the dethroned king
+    cutPercent: 10n, // whole percent of the value taken from the dethroned king's share into the pool
+    cap: 5_000n, // 50.00 PUSD: the value can never be raised above this
+    protectsPerReign: 2, // protects the king may use before the next conquest
+    unit: 100n, // 1.00 PUSD: the smallest protect; the three amounts are 1x, 5x and 10x
+  },
   
   // Referee design (V2 contract). Deploy-time contract settings.
   fallbackBlocks: 12, // anyone can settle without the referee after this many blocks with no action
