@@ -1,11 +1,13 @@
 const LOCAL_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173", "http://127.0.0.1:4173"];
 const LOOPBACK = ["127.0.0.1", "localhost", "::1"];
 
-export type ServerEnv = { host: string; port: number; allowedOrigins: string[]; trustProxy: boolean };
+export type BellPresetName = "standard" | "demo";
+export type ServerEnv = { host: string; port: number; allowedOrigins: string[]; trustProxy: boolean; bellPreset: BellPresetName };
 
 // FUNGE_HOST            where to listen. Default 127.0.0.1 (this computer only). On a cloud host use 0.0.0.0.
 // PORT / FUNGE_PORT     the port (cloud hosts usually set PORT).
 // FUNGE_ALLOWED_ORIGINS the exact address(es) of the page, comma separated, e.g. https://funge.example.com
+// FUNGE_BELL_PRESET    Kingdom clock: "standard" (10:00 start, default) or "demo" (5:00 start). Both go down 0:30 per conquest to 2:00.
 // FUNGE_TRUST_PROXY=1   only when a host proxy sits in front: use the visitor address it forwards, for rate limits
 export function readServerEnv(env: Record<string, string | undefined>): ServerEnv {
   const host = env.FUNGE_HOST?.trim() || "127.0.0.1";
@@ -31,5 +33,7 @@ export function readServerEnv(env: Record<string, string | undefined>): ServerEn
     const local = ["localhost", "127.0.0.1"].includes(url.hostname);
     if (exposed && !local && url.protocol !== "https:") throw new Error(`Refusing to start: the page address must be https: "${o}".`);
   }
-  return { host, port, allowedOrigins, trustProxy: env.FUNGE_TRUST_PROXY === "1" };
+  const preset = env.FUNGE_BELL_PRESET?.trim() || "standard";
+  if (preset !== "standard" && preset !== "demo") throw new Error(`FUNGE_BELL_PRESET must be "standard" or "demo", not "${preset}".`);
+  return { host, port, allowedOrigins, trustProxy: env.FUNGE_TRUST_PROXY === "1", bellPreset: preset };
 }

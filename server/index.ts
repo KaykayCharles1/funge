@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { CONFIG } from "../src/config.ts";
 import { makeProvider } from "../src/lib/provider.ts";
-import { GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS, RESET_SECONDS, UNCONFIRMED_CAP } from "../src/refereeParams.ts";import { buildApp } from "./app.ts";
+import { BELL_PRESETS, GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS, RESET_SECONDS, UNCONFIRMED_CAP } from "../src/refereeParams.ts";import { buildApp } from "./app.ts";
 import { makeChainReader } from "./chain.ts";
 import { systemClock } from "./clock.ts";
 import { loadGames } from "./games.ts";
@@ -21,7 +21,7 @@ const dataDir = process.env.FUNGE_DATA_DIR ?? fileURLToPath(new URL("./data", im
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 try {
-  const { host, port, allowedOrigins, trustProxy } = readServerEnv(process.env);
+  const { host, port, allowedOrigins, trustProxy, bellPreset } = readServerEnv(process.env);
   const { games, chipnetPubkeys } = loadGames(network);
   const keyring = loadKeyring({ network, games, chipnetPubkeys }); // throws if the key is missing or wrong
   if (network === "mainnet" && (process.env.FUNGE_RESET_SECONDS || process.env.FUNGE_KEEPER_DELAY_SECONDS || process.env.FUNGE_UNCONFIRMED_CAP)) {
@@ -36,6 +36,11 @@ try {
   if (source === "bak") console.warn("state file was damaged; recovered from backup");
   const manager = new RoundManager(store, systemClock);
   manager.onEvent((id, e) => console.log(`[${id.slice(0, 8)}] event #${e.seq} ${e.type} (${e.reason})`));
+  for (const g of games) if (g.kingdom) manager.setBell(g.gameId, BELL_PRESETS[bellPreset]); // before any restart handling or observing
+  if (games.some((g) => g.kingdom)) {
+    const b = BELL_PRESETS[bellPreset];
+    console.log(`kingdom clock (${bellPreset}): ${b.startSeconds}s at the open, -${b.stepSeconds}s per conquest, floor ${b.floorSeconds}s`);
+  }
   const loaded = games.map((g) => g.gameId);
   const pruned = manager.pruneSettled(loaded);
   if (pruned > 0) console.log(`removed ${pruned} settled round(s) of games that are no longer loaded`);

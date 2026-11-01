@@ -1,5 +1,6 @@
 import type { ElectrumNetworkProvider, Utxo } from "cashscript";
 import { decodeCommitment } from "../src/lib/commitment.ts";
+import { decodeKingdomCommitment, type KingdomState } from "../src/lib/kingdom.ts";
 import { retry } from "../src/lib/retry.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
@@ -14,6 +15,7 @@ export type ChainState = {
   stateUtxo: Utxo | null;
   potUtxo: Utxo | null;
   stale: boolean; // true when this is the last good answer because a fresh read failed
+  kingdom?: KingdomState | null; // Kingdom games: the decoded 40-byte state
 };
 
 export type ChainReader = {
@@ -36,7 +38,11 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
       retry(() => provider.getUtxos(game.potAddress)),
     ]);
     const s = states.find((u) => u.token?.nft && u.token.category === game.gameId);
-    const p = pots.find((u) => u.token && u.token.category === game.pusdCategory);
+    // Steal games: the pot is the coin that holds PUSD. Kingdom games: while waiting the pot holds no PUSD, and strangers can
+    // send coins to the pot address, so the pot is exactly output 1 of the transaction that created the state coin.
+    const p = game.kingdom
+      ? s && pots.find((u) => u.txid === s.txid && u.vout === 1)
+      : pots.find((u) => u.token && u.token.category === game.pusdCategory);
     const prev = good.get(id);
     if (!s || !s.token?.nft) {
       // A missing state coin must be seen twice before we believe it (flaky servers)
@@ -52,6 +58,14 @@ export function makeChainReader(provider: ElectrumNetworkProvider, clock: Clock,
       };
     }
     emptyStreak.set(id, 0);
+    if (game.kingdom) {
+      const k = decodeKingdomCommitment(s.token.nft.commitment);
+      return {
+        live: true, passCount: k.passCount, holderPkh: k.passCount > 0 ? k.holderPkh : null,
+        potAmount: p ? (p.token?.amount ?? 0n) : null, // a waiting pot is a BCH-only coin: 0 PUSD
+        stateTxid: s.txid, stateVout: s.vout, stateUtxo: s, potUtxo: p ?? null, stale: false, kingdom: k,
+      };
+    }
     const { passCount, holderPkh } = decodeCommitment(s.token.nft.commitment);
     return {
       live: true, passCount, holderPkh,

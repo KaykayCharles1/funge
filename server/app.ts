@@ -2,7 +2,8 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
-import { ACT_BODY_LIMIT, ACT_RATE, GLOBAL_RATE, GRACE_SECONDS } from "../src/refereeParams.ts";
+import { conquestMoney, protectAmounts } from "../src/lib/kingdom.ts";
+import { ACT_BODY_LIMIT, ACT_RATE, GLOBAL_RATE, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
 import { ActError, executeAct, type Referee } from "./act.ts";
 import { settleRound } from "./keeper.ts";
 import type { ChainReader, ChainState } from "./chain.ts";
@@ -27,12 +28,54 @@ export type AppDeps = {
   trustProxy?: boolean; // true only behind a host proxy, so rate limits see the visitor and not the proxy
 };
 
-export function describeRound(game: ServerGame, round: RoundRecord, chain: ChainState, now: number) {
+type BellInfo = ReturnType<RoundManager["bellInfo"]>;
+
+// Everything a Kingdom page needs to show, computed on the server so the page and the contract cannot disagree
+function describeKingdom(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, bell: BellInfo) {
+  const params = game.kingdom;
+  const k = chain.kingdom;
+  if (!params || !k || !chain.live) return null;
+  const open = k.passCount >= 1;
+  const money = open ? conquestMoney(k.value, params) : null;
+  const protectsLeft = open ? Math.max(0, params.protectsPerReign - k.protects) : 0;
+  const amounts = protectAmounts(params.unit).filter((a) => open && protectsLeft > 0 && k.value + a <= params.cap);
+  const remainingMs = round.deadline === null ? null : round.paused ? round.deadline - round.paused.since : round.deadline - now;
+  return {
+    holder: open ? k.holderPkh : null,
+    previousKing: open && !/^0+$/.test(k.previous) ? k.previous : null, // the first 11 bytes of the dethroned king's key hash
+    value: k.value.toString(),
+    openingPrice: params.openingPrice.toString(),
+    cap: params.cap.toString(),
+    wallsAtMaximum: open && k.value + params.unit > params.cap,
+    protectsUsed: k.protects,
+    protectsLeft,
+    protectsPerReign: params.protectsPerReign,
+    protectAmounts: amounts.map((a) => a.toString()),
+    conquest: money
+      ? { pay: money.payment.toString(), fee: money.fee.toString(), kingGets: money.kingGets.toString(), poolGets: money.poolGets.toString() }
+      : null,
+    clockSeconds: bell?.clockSeconds ?? null, // the clock the current king's pass started with
+    nextClockSeconds: bell?.nextClockSeconds ?? null, // what the next conquest will set the clock to
+    floorSeconds: bell?.floorSeconds ?? null,
+    protectLockoutSeconds: PROTECT_LOCKOUT_SECONDS,
+    protectClosesInMs: round.status === "open" && remainingMs !== null ? Math.max(0, remainingMs - PROTECT_LOCKOUT_SECONDS * 1000) : null,
+  };
+}
+
+export function describeRound(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, bell: BellInfo = null) {
   const remainingMs =
     round.deadline === null ? null : round.paused ? round.deadline - round.paused.since : round.deadline - now;
+  const kingdom = describeKingdom(game, round, chain, now, bell);
+  // "price" is what it costs to take the throne right now
+  const price = !chain.live
+    ? null
+    : game.kingdom
+      ? kingdom?.conquest?.pay ?? game.kingdom.openingPrice.toString()
+      : (game.basePrice + game.priceStep * BigInt(chain.passCount)).toString();
   return {
     gameId: game.gameId,
     network: game.network,
+    kind: game.kingdom ? "kingdom" : "steal",
     status: round.status,
     deadline: round.deadline, // epoch ms on the SERVER clock
     remainingMs, // frozen while paused; clients should prefer this plus serverNow
@@ -42,11 +85,12 @@ export function describeRound(game: ServerGame, round: RoundRecord, chain: Chain
     lastSeq: round.nextSeq - 1,
     passCount: chain.passCount,
     king: chain.live && chain.passCount > 0 ? chain.holderPkh : null,
-    price: chain.live ? (game.basePrice + game.priceStep * BigInt(chain.passCount)).toString() : null,
+    price,
     pot: chain.potAmount === null ? null : chain.potAmount.toString(),
     stateCoin: chain.stateTxid ? { txid: chain.stateTxid, vout: chain.stateVout } : null,
     refereePubkey: game.refereePubkey,
     chainStale: chain.stale,
+    kingdom,
   };
 }
 
@@ -77,7 +121,7 @@ export async function buildApp(deps: AppDeps) {
     try {
       const c = await chain.read(game);
       const round = manager.observe(id, { live: c.live, passCount: c.passCount });
-      return describeRound(game, round, c, clock.now());
+      return describeRound(game, round, c, clock.now(), manager.bellInfo(id, c.passCount));
     } catch {
       return reply.code(503).send({ error: "chain_unavailable" });
     }

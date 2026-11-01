@@ -3,41 +3,24 @@ import type { Transaction } from "@bitauth/libauth";
 import type { LibauthOutput, Utxo } from "cashscript";
 import { decodeCommitment } from "../src/lib/commitment.ts";
 import { GRACE_SECONDS } from "../src/refereeParams.ts";
+import { ActError, invalid } from "./actTypes.ts";
+import type { ActBody, ActErrorCode, ActionHandler, Capability, SignCall, ValidateCtx, Validated, WalletInputClaim } from "./actTypes.ts";
 import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
+import { KINGDOM_HANDLERS } from "./kingdomAct.ts";
 import type { LockRunner } from "./lock.ts";
-import { classifyAction, type RoundManager } from "./rounds.ts";
+import { classifyAction, classifyKingdomAction, type RoundManager } from "./rounds.ts";
+import type { RoundRecord } from "./store.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
 import { safeText } from "../src/lib/safeLog.ts";
 
-export type ActErrorCode =
-  | "invalid" | "state_changed" | "too_late" | "round_over"
-  | "paused" | "network_busy" | "chain_unavailable" | "outcome_unknown" | "not_over";
-
-const STATUS: Record<ActErrorCode, number> = {
-  invalid: 400, state_changed: 409, too_late: 409, round_over: 409, not_over: 409,
-  paused: 503, network_busy: 503, chain_unavailable: 503, outcome_unknown: 503,
-};
-
-export class ActError extends Error {
-  code: ActErrorCode;
-  constructor(code: ActErrorCode, message: string) {
-    super(message);
-    this.code = code;
-  }
-  get status(): number {
-    return STATUS[this.code];
-  }
-}
-
-function invalid(message: string): never {
-  throw new ActError("invalid", message);
-}
+export { ActError };
+export type { ActBody, ActErrorCode, SignCall, WalletInputClaim };
 
 export type Referee = {
   // Returns the unlocking bytecode for input 0 (the state coin) with the referee signature inside
-  sign: (game: ServerGame, tx: Transaction, sourceOutputs: LibauthOutput[], newHolderPkh: string) => Uint8Array;
+  sign: (game: ServerGame, tx: Transaction, sourceOutputs: LibauthOutput[], call: SignCall) => Uint8Array;
   broadcast: (hex: string) => Promise<string>;
   settle: (game: ServerGame, chain: ChainState) => string;
 };
@@ -51,16 +34,6 @@ export type ActDeps = {
   unconfirmed: Unconfirmed;
   sleep: (ms: number) => Promise<void>;
 };
-
-type Capability = "none" | "mutable" | "minting";
-export type WalletInputClaim = {
-  txid: string;
-  vout: number;
-  satoshis: bigint;
-  lockingBytecode: string;
-  token?: { amount: bigint; category: string; nft?: { capability: Capability; commitment: string } };
-};
-export type ActBody = { action: string; txHex: string; walletInputs: WalletInputClaim[] };
 
 const isHex = (s: unknown, length?: number): boolean =>
   typeof s === "string" && /^[0-9a-f]*$/i.test(s) && s.length % 2 === 0 && (length === undefined || s.length === length);
@@ -105,10 +78,6 @@ export function parseActBody(raw: unknown): ActBody {
   });
   return { action: b.action, txHex: b.txHex as string, walletInputs };
 }
-
-type ValidateCtx = { game: ServerGame; chain: ChainState; tx: Transaction; body: ActBody };
-type Validated = { newHolder: string; newPassCount: number };
-type ActionHandler = { fn: "pass" | "settle"; validate: (ctx: ValidateCtx) => Validated };
 
 const spends = (inp: Transaction["inputs"][number], u: Utxo) =>
   binToHex(inp.outpointTransactionHash) === u.txid && inp.outpointIndex === u.vout;
@@ -160,11 +129,11 @@ function validateSteal({ game, chain, tx, body }: ValidateCtx): Validated {
   if (!out1!.token || binToHex(out1!.token.category) !== game.pusdCategory || out1!.token.amount !== potCoin.token.amount + price) {
     throw new ActError("invalid", "The pot must grow by exactly the current price.");
   }
-  return { newHolder: decoded.holderPkh, newPassCount: decoded.passCount };
+  return { newHolder: decoded.holderPkh, newPassCount: decoded.passCount, sign: { fn: "pass", newHolder: decoded.holderPkh } };
 }
 
-// Pluggable: only "steal" exists now. Settle is the keeper's job (Step 7).
-const HANDLERS: Record<string, ActionHandler> = { steal: { fn: "pass", validate: validateSteal } };
+// One table per kind of game. Settle is the keeper's job, not an action a player sends.
+const STEAL_HANDLERS: Record<string, ActionHandler> = { steal: { fn: "pass", validate: validateSteal } };
 
 const toLibauth = (
   lockingHex: string, satoshis: bigint,
@@ -200,7 +169,8 @@ export type ActResult = { txid: string; passCount: number; king: string; deadlin
 
 export async function executeAct(deps: ActDeps, game: ServerGame, raw: unknown): Promise<ActResult> {
   const body = parseActBody(raw);
-  const handler = Object.prototype.hasOwnProperty.call(HANDLERS, body.action) ? HANDLERS[body.action] : undefined;
+  const table = game.kingdom ? KINGDOM_HANDLERS : STEAL_HANDLERS;
+  const handler = Object.prototype.hasOwnProperty.call(table, body.action) ? table[body.action] : undefined;
   if (!handler) throw new ActError("invalid", `Unknown action "${body.action}".`);
   const id = game.gameId;
   const arrivedAt = deps.clock.now(); // timing is judged by when the request arrived, not by how long our network checks take
@@ -254,6 +224,16 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     if (!c.live || round.status === "settled") throw new ActError("round_over", "The round is over.");
     if (round.paused) throw new ActError("paused", "The clock is paused. Try again shortly.");
 
+    // 2b. Kingdom protect has its own clock rule: closed in the last PROTECT_LOCKOUT_SECONDS (conquest is not affected)
+    if (handler.fn === "protect") {
+      const pc = manager.protectCheck(id, arrivedAt);
+      if (!pc.ok) {
+        if (pc.why === "paused") throw new ActError("paused", "The clock is paused. Try again shortly.");
+        if (pc.why === "not_open") throw new ActError("not_open", "Nobody can protect a kingdom that is not in play.");
+        throw new ActError("protect_locked", "Protect is closed in the last seconds before the deadline.");
+      }
+    }
+
     // 3. Legal action?
     const decoded = decodeTransaction(hexToBin(body.txHex));
     if (typeof decoded === "string") throw new ActError("invalid", "The transaction could not be read.");
@@ -272,7 +252,7 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
       toLibauth(game.potLockingBytecode, c.potUtxo!.satoshis, c.potUtxo!.token),
       ...body.walletInputs.map((w) => toLibauth(w.lockingBytecode, w.satoshis, w.token)),
     ];
-    tx.inputs[0]!.unlockingBytecode = deps.referee.sign(game, tx, sourceOutputs, checked.newHolder);
+    tx.inputs[0]!.unlockingBytecode = deps.referee.sign(game, tx, sourceOutputs, checked.sign);
     const hex = binToHex(encodeTransaction(tx));
 
     // 6. Broadcast
@@ -283,14 +263,26 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
       throw mapBroadcastError(e, deps, id);
     }
 
-    // 7. Success: reset the deadline, publish the event
+    // 7. Success: set the clock (or leave it alone, for protect) and publish the event
     deps.unconfirmed.record(id);
-    const type = classifyAction(handler.fn);
-    if (!type) throw new Error("action has no deadline reset");
-    const r = manager.applyAction(id, type, body.action, {
-      passCount: checked.newPassCount,
-      data: { txid, king: checked.newHolder, passCount: checked.newPassCount },
-    });
+    let r: RoundRecord;
+    if (handler.fn === "pass") {
+      const type = classifyAction("pass");
+      if (!type) throw new Error("action has no deadline reset");
+      r = manager.applyAction(id, type, body.action, {
+        passCount: checked.newPassCount,
+        data: { txid, king: checked.newHolder, passCount: checked.newPassCount },
+      });
+    } else if (handler.fn === "protect") {
+      if (!checked.protect) throw new Error("protect without its details");
+      r = manager.applyProtect(id, {
+        txid, king: checked.newHolder, amount: checked.protect.amount.toString(),
+        value: checked.protect.value.toString(), protectsUsed: checked.protect.used,
+      });
+    } else {
+      if (classifyKingdomAction(handler.fn) === null) throw new Error("action has no deadline reset");
+      r = manager.applyKingdomAction(id, handler.fn, checked.newPassCount, { txid, king: checked.newHolder });
+    }
     chain.invalidate(id);
     return { txid, passCount: checked.newPassCount, king: checked.newHolder, deadline: r.deadline, serverNow: clock.now(), lastSeq: r.nextSeq - 1 };
   });
