@@ -1,0 +1,154 @@
+pragma cashscript ^0.14.0;
+
+// Kingdom v1.
+// State commitment (40 bytes) = passCount (4) + holder key hash (20) + value (4) + protects used this reign (1)
+//   + previous king (11: the first bytes of the dethroned king's key hash).
+// passCount 0 means waiting: no king, and no PUSD anywhere (the pot is a BCH-only coin until the opener pays).
+// The referee must co-sign open, conquer, protect and settle. It only decides TIMING; every money rule is
+// enforced here. If the referee is unavailable, settleFallback() lets anyone settle after a number of blocks.
+// Layout of every action: input 0 = state, input 1 = pot, output 0 = state, output 1 = pot.
+contract FungeKingdom(
+    bytes potLockingBytecode,
+    bytes32 pusdCategory,
+    pubkey refereePubkey,
+    int openingPrice,
+    int feePercent,
+    int cutPercent,
+    int cap,
+    int protectsPerReign,
+    int unit,
+    int fallbackBlocks
+) {
+    // The first player pays the opening price, becomes king, value = opening price.
+    function open(bytes20 newHolder, sig refereeSig) {
+        require(checkSig(refereeSig, refereePubkey), "Referee signature missing or wrong");
+        require(this.activeInputIndex == 0, "State must be input 0");
+        require(int(tx.inputs[0].nftCommitment.split(4)[0]) == 0, "Round is already open");
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory.length == 0, "Waiting pot must hold no tokens");
+
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode, "Output 0 must be the state contract");
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory, "State NFT must be kept");
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount, "State token amount changed");
+        require(tx.outputs[0].value >= tx.inputs[0].value, "State BCH shrank");
+        require(tx.outputs[0].nftCommitment == toPaddedBytes(1, 4) + newHolder + toPaddedBytes(openingPrice, 4) + toPaddedBytes(0, 1) + toPaddedBytes(0, 11), "Bad new commitment");
+
+        require(tx.outputs[1].lockingBytecode == potLockingBytecode, "Output 1 must be the pot");
+        require(tx.outputs[1].tokenCategory == pusdCategory, "Pot output must hold PUSD");
+        require(tx.outputs[1].tokenAmount >= openingPrice, "Opening price not paid");
+        require(tx.outputs[1].value >= tx.inputs[1].value, "Pot BCH shrank");
+    }
+
+    // The next player pays value + fee. The dethroned king gets value x (1 - cut) + fee; the pool gets the rest.
+    function conquer(bytes20 newHolder, sig refereeSig) {
+        require(checkSig(refereeSig, refereePubkey), "Referee signature missing or wrong");
+        require(this.activeInputIndex == 0, "State must be input 0");
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory == pusdCategory, "Pot must hold PUSD");
+
+        bytes commitment = tx.inputs[0].nftCommitment;
+        int passCount = int(commitment.split(4)[0]);
+        bytes oldHolder = commitment.split(4)[1].split(20)[0];
+        int value = int(commitment.split(24)[1].split(4)[0]);
+        require(passCount >= 1, "Nobody has opened the round");
+        require(newHolder != oldHolder, "The king cannot conquer their own throne");
+
+        int fee = value * feePercent / 100;
+        int payment = value + fee;
+        int kingGets = value * (100 - cutPercent) / 100 + fee;
+        int poolGets = payment - kingGets;
+
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode, "Output 0 must be the state contract");
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory, "State NFT must be kept");
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount, "State token amount changed");
+        require(tx.outputs[0].value >= tx.inputs[0].value, "State BCH shrank");
+        require(tx.outputs[0].nftCommitment == toPaddedBytes(passCount + 1, 4) + newHolder + toPaddedBytes(value, 4) + toPaddedBytes(0, 1) + oldHolder.split(11)[0], "Bad new commitment");
+
+        require(tx.outputs[1].lockingBytecode == potLockingBytecode, "Output 1 must be the pot");
+        require(tx.outputs[1].tokenCategory == pusdCategory, "Pot output must hold PUSD");
+        require(tx.outputs[1].tokenAmount >= tx.inputs[1].tokenAmount + poolGets, "Pool share not paid");
+        require(tx.outputs[1].value >= tx.inputs[1].value, "Pot BCH shrank");
+
+        require(tx.outputs[2].lockingBytecode == 0x76a914 + oldHolder + 0x88ac, "Output 2 must pay the dethroned king");
+        require(tx.outputs[2].tokenCategory == pusdCategory, "Payout must be PUSD");
+        require(tx.outputs[2].tokenAmount >= kingGets, "King not paid");
+        require(tx.outputs[2].value >= 1000, "Payout needs BCH");
+    }
+
+    // King only, proved by input 2 sitting at the holder's address (its signature covers this whole transaction).
+    // The payment goes 100% into the pool and raises the value. The clock is not touched (the referee decides that).
+    function protect(sig refereeSig, int amount) {
+        require(checkSig(refereeSig, refereePubkey), "Referee signature missing or wrong");
+        require(this.activeInputIndex == 0, "State must be input 0");
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory == pusdCategory, "Pot must hold PUSD");
+
+        bytes commitment = tx.inputs[0].nftCommitment;
+        int passCount = int(commitment.split(4)[0]);
+        bytes holder = commitment.split(4)[1].split(20)[0];
+        int value = int(commitment.split(24)[1].split(4)[0]);
+        int used = int(commitment.split(28)[1].split(1)[0]);
+        bytes previous = commitment.split(29)[1];
+        require(passCount >= 1, "Nobody has opened the round");
+        require(tx.inputs[2].lockingBytecode == 0x76a914 + holder + 0x88ac, "Input 2 must be the king's");
+        require(amount == unit || amount == unit * 5 || amount == unit * 10, "Protect amount must be 1, 5 or 10");
+        require(used < protectsPerReign, "No protects left this reign");
+        require(value + amount <= cap, "Walls at maximum");
+
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode, "Output 0 must be the state contract");
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory, "State NFT must be kept");
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount, "State token amount changed");
+        require(tx.outputs[0].value >= tx.inputs[0].value, "State BCH shrank");
+        require(tx.outputs[0].nftCommitment == toPaddedBytes(passCount, 4) + holder + toPaddedBytes(value + amount, 4) + toPaddedBytes(used + 1, 1) + previous, "Bad new commitment");
+
+        require(tx.outputs[1].lockingBytecode == potLockingBytecode, "Output 1 must be the pot");
+        require(tx.outputs[1].tokenCategory == pusdCategory, "Pot output must hold PUSD");
+        require(tx.outputs[1].tokenAmount >= tx.inputs[1].tokenAmount + amount, "Protect not paid");
+        require(tx.outputs[1].value >= tx.inputs[1].value, "Pot BCH shrank");
+    }
+
+    // The referee decides when. The last king takes the whole pool plus the trophy.
+    // With only the opener (pass count 1) the pool goes back to the opener.
+    function settle(sig refereeSig) {
+        require(checkSig(refereeSig, refereePubkey), "Referee signature missing or wrong");
+        require(this.activeInputIndex == 0, "State must be input 0");
+        require(int(tx.inputs[0].nftCommitment.split(4)[0]) >= 1, "Nobody has opened the round");
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory == pusdCategory, "Pot must hold PUSD");
+
+        bytes holderPkh = tx.inputs[0].nftCommitment.split(4)[1].split(20)[0];
+        bytes holderLock = 0x76a914 + holderPkh + 0x88ac;
+
+        require(tx.outputs[0].lockingBytecode == holderLock, "Pot must go to the holder");
+        require(tx.outputs[0].tokenCategory == pusdCategory, "Payout must be PUSD");
+        require(tx.outputs[0].tokenAmount == tx.inputs[1].tokenAmount, "Whole pot must be paid");
+
+        bytes gameCategory = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[1].lockingBytecode == holderLock, "Trophy must go to the holder");
+        require(tx.outputs[1].tokenCategory == gameCategory, "Trophy must be immutable");
+        require(tx.outputs[1].nftCommitment == tx.inputs[0].nftCommitment, "Trophy commitment changed");
+        require(tx.outputs[1].tokenAmount == 0, "Trophy must carry no tokens");
+    }
+
+    // No referee needed: anyone can settle once enough blocks have passed with no action.
+    function settleFallback() {
+        require(this.activeInputIndex == 0, "State must be input 0");
+        require(int(tx.inputs[0].nftCommitment.split(4)[0]) >= 1, "Nobody has opened the round");
+        require(this.age >= fallbackBlocks, "Too early");
+        require(tx.inputs[1].lockingBytecode == potLockingBytecode, "Input 1 must be the pot");
+        require(tx.inputs[1].tokenCategory == pusdCategory, "Pot must hold PUSD");
+
+        bytes holderPkh = tx.inputs[0].nftCommitment.split(4)[1].split(20)[0];
+        bytes holderLock = 0x76a914 + holderPkh + 0x88ac;
+
+        require(tx.outputs[0].lockingBytecode == holderLock, "Pot must go to the holder");
+        require(tx.outputs[0].tokenCategory == pusdCategory, "Payout must be PUSD");
+        require(tx.outputs[0].tokenAmount == tx.inputs[1].tokenAmount, "Whole pot must be paid");
+
+        bytes gameCategory = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[1].lockingBytecode == holderLock, "Trophy must go to the holder");
+        require(tx.outputs[1].tokenCategory == gameCategory, "Trophy must be immutable");
+        require(tx.outputs[1].nftCommitment == tx.inputs[0].nftCommitment, "Trophy commitment changed");
+        require(tx.outputs[1].tokenAmount == 0, "Trophy must carry no tokens");
+    }
+}

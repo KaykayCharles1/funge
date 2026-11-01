@@ -32,7 +32,7 @@ The clock settings and the protect lockout live in the referee, not in the contr
 | 0-3 | passCount | kings so far (open = 1); 0 = waiting. Same as today |
 | 4-23 | holder | 20-byte key hash; zeros while waiting. Same as today |
 | 24-27 | value | base units; 0 while waiting |
-| 28 | flags | bits 0-1: protects used this reign; other bits must be 0 |
+| 28 | protects used | protects used this reign, a plain number 0 to 2 (no bit tricks) |
 | 29-39 | previous king | first 11 bytes of the dethroned king's key hash; zeros after open |
 
 The trophy copies the final commitment. The first 24 bytes keep today's meaning, so the ended card keeps working.
@@ -74,6 +74,7 @@ Every conquest conserves tokens: what the payer sends out equals what the king a
 5. **Protect on a maxed value.** Refused by the contract ("Walls at maximum").
 6. **Coexistence.** New contract file, new game file `public/game.<network>.kingdom.json` (contractVersion 3). The server will load the old v2 game and the kingdom game side by side, and the page picks one (a config flag, plus `?mode=kingdom` for testing) until the old path is retired.
 7. **How the next round starts (open point).** After a round settles, a new game must be deployed. For the hackathon, the owner runs a one-command deploy script, and the page shows "Next round is being prepared" until the new game file is live. Later, optionally, the server could auto-deploy: after a settlement it would deploy the next game using a separate small key that only holds deploy funds. This key is never the referee key, so a leak can lose only that small balance and cannot touch rounds or signatures. Not built in v1.
+8. **What "PUSD payout" means to the contract.** It checks that the output's token category equals PUSD, so mutable and minting NFTs riding along are refused. An immutable NFT of the PUSD category is not detectable by the category check. It is harmless: the sender gives it away, and amount, destination and category are still enforced.
 
 ## Deferred
 Reclaim, multi-kingdom, the design pass, trophy art for kingdoms, a Withdraw button, the mainnet round.
