@@ -1,4 +1,5 @@
-import { EVENT_HISTORY, GRACE_SECONDS, RESET_SECONDS, type ActionType } from "../src/refereeParams.ts";
+import { clockSecondsFor, nextClockSecondsFor, validateBell, type BellSettings } from "../src/lib/bell.ts";
+import { EVENT_HISTORY, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS, RESET_SECONDS, type ActionType } from "../src/refereeParams.ts";
 import type { Clock } from "./clock.ts";
 import type { EventData, EventRecord, RoundRecord, Store } from "./store.ts";
 
@@ -10,7 +11,18 @@ export function classifyAction(fn: "pass" | "settle"): ActionType | null {
   return fn === "pass" ? "steal" : null; // settle does not reset the deadline
 }
 
+// Kingdom: what each contract function means for the clock. "protect" is real but never touches the clock.
+export type KingdomAction = "open" | "conquer" | "protect";
+export function classifyKingdomAction(fn: "open" | "conquer" | "protect" | "settle"): KingdomAction | null {
+  return fn === "settle" ? null : fn;
+}
+
+export type ProtectCheck =
+  | { ok: true; remainingMs: number }
+  | { ok: false; why: "not_open" | "paused" | "locked"; remainingMs: number | null };
+
 export class RoundManager {
+  private bells = new Map<string, BellSettings>(); // games that use the bell clock (Kingdom)
   private store: Store;
   private clock: Clock;
   private listeners = new Set<Listener>();
@@ -19,6 +31,23 @@ export class RoundManager {
   constructor(store: Store, clock: Clock) {
     this.store = store;
     this.clock = clock;
+  }
+
+  // Marks a game as a Kingdom game: its clock follows the bell instead of a fixed reset
+  setBell(gameId: string, settings: BellSettings): void {
+    validateBell(settings);
+    this.bells.set(gameId, settings);
+  }
+
+  // For the round description: the clock this pass got, and the clock the next conquest will set
+  bellInfo(gameId: string, passCount: number): { clockSeconds: number | null; nextClockSeconds: number; floorSeconds: number } | null {
+    const s = this.bells.get(gameId);
+    if (!s) return null;
+    return {
+      clockSeconds: passCount >= 1 ? clockSecondsFor(passCount, s) : null,
+      nextClockSeconds: passCount >= 1 ? nextClockSecondsFor(passCount, s) : s.startSeconds,
+      floorSeconds: s.floorSeconds,
+    };
   }
 
   onEvent(fn: Listener): () => void {
@@ -110,10 +139,15 @@ export class RoundManager {
     const seen = r.seenPassCount ?? (r.status === "waiting" ? 0 : chain.passCount);
     if ((r.status === "waiting" || r.status === "open") && chain.passCount > seen) {
       // A steal the timer has not accounted for (not made through /act): restart the clock from now
+      const bell = this.bells.get(gameId);
+      const seconds = bell ? clockSecondsFor(chain.passCount, bell) : RESET_SECONDS.steal;
       r.status = "open";
-      r.deadline = now + RESET_SECONDS.steal * 1000;
+      r.deadline = now + seconds * 1000;
       r.seenPassCount = chain.passCount;
-      this.publish(r, "deadline_changed", "observed_on_chain", { deadline: r.deadline });
+      this.publish(r, "deadline_changed", "observed_on_chain", {
+        deadline: r.deadline,
+        ...(bell ? { clockSeconds: seconds, nextClockSeconds: nextClockSecondsFor(chain.passCount, bell), passCount: chain.passCount } : {}),
+      });
     } else if (r.seenPassCount === undefined) {
       r.seenPassCount = chain.passCount;
     }
@@ -136,6 +170,46 @@ export class RoundManager {
     r.deadline = this.clock.now() + RESET_SECONDS[type] * 1000;
     if (opts?.passCount !== undefined) r.seenPassCount = opts.passCount;
     this.publish(r, "deadline_changed", reason, { deadline: r.deadline, action: type, ...(opts?.data ?? {}) });
+    return r;
+  }
+
+  // Kingdom open or conquest, after a successful broadcast: the clock is set to the bell for this pass.
+  applyKingdomAction(
+    gameId: string,
+    action: "open" | "conquer",
+    passCount: number,
+    data?: EventData,
+  ): RoundRecord {
+    const bell = this.bells.get(gameId);
+    if (!bell) throw new Error("applyKingdomAction: this game has no bell");
+    if (action === "open" ? passCount !== 1 : passCount < 2) throw new Error(`applyKingdomAction: pass count ${passCount} does not fit "${action}"`);
+    const r = this.ensure(gameId);
+    const seconds = clockSecondsFor(passCount, bell);
+    r.status = "open";
+    r.deadline = this.clock.now() + seconds * 1000;
+    r.seenPassCount = passCount;
+    this.publish(r, "deadline_changed", action, {
+      deadline: r.deadline, action, passCount, clockSeconds: seconds, nextClockSeconds: nextClockSecondsFor(passCount, bell), ...(data ?? {}),
+    });
+    return r;
+  }
+
+  // Is a protect allowed right now? Judged by when the request arrived. The last PROTECT_LOCKOUT_SECONDS
+  // before the deadline are closed (exactly 30.000 s left is closed, 30.001 s is open). Conquest is not affected.
+  protectCheck(gameId: string, arrivedAt: number, lockoutSeconds = PROTECT_LOCKOUT_SECONDS): ProtectCheck {
+    const r = this.ensure(gameId);
+    if (r.status !== "open" || r.deadline === null) return { ok: false, why: "not_open", remainingMs: null };
+    if (r.paused) return { ok: false, why: "paused", remainingMs: r.deadline - r.paused.since };
+    const remainingMs = r.deadline - arrivedAt;
+    if (remainingMs <= lockoutSeconds * 1000) return { ok: false, why: "locked", remainingMs };
+    return { ok: true, remainingMs };
+  }
+
+  // Kingdom protect, after a successful broadcast. Informational: the clock, the status and the pass count stay as they are.
+  applyProtect(gameId: string, data?: EventData): RoundRecord {
+    const r = this.ensure(gameId);
+    if (r.status !== "open" || r.deadline === null || r.paused) throw new Error("applyProtect: the round is not running");
+    this.publish(r, "protect_applied", "protect", { deadline: r.deadline, ...(data ?? {}) });
     return r;
   }
 
