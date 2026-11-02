@@ -21,6 +21,8 @@ import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts"
 import { serverNow, syncClock } from "./referee/clock.ts";
 import { kingdomAct, kingdomProtect } from "./referee/kingdomActions.ts";
 import { kingdomActExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
+import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
+import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 
@@ -72,6 +74,10 @@ let claiming = false;
 let claimNote = "";
 let endedShown = false;
 let endedBusy = false;
+let chain: KingdomChainWatch | null = null;
+let chainBusy = false;
+let fallbackBusy = false;
+let fallbackNote = "";
 
 const serverDown = () => failures >= 2 || net === "offline";
 
@@ -213,6 +219,7 @@ function renderClock() {
   $("netNotice").textContent = notice;
   show("netNotice", notice !== "");
   renderOver();
+  renderOutage();
 }
 
 // The window everyone sees once the server says time is up. Only the winner gets the Claim button.
@@ -254,6 +261,62 @@ async function onClaim() {
     claiming = false;
     renderOver();
     kick();
+  }
+}
+
+// While the server is unreachable, ask the chain directly
+async function pollChain() {
+  if (chainBusy || endedShown) return;
+  chainBusy = true;
+  try {
+    const c = await watchKingdomChain(game, provider);
+    chain = c;
+    if (!c.live) void loadEnded(); // the state coin is gone: the round was settled, show the result from the chain
+    renderOutage();
+  } catch (e) {
+    console.error(e);
+  } finally {
+    chainBusy = false;
+  }
+}
+
+// If the server stays down, anyone can settle without it after enough quiet blocks. The contract still pays the last king.
+function renderOutage() {
+  const c = chain;
+  const visible = serverDown() && !endedShown && c !== null && c.live && c.passCount >= 1;
+  show("outageBox", visible);
+  if (!visible || !c) return;
+  const ready = c.confirmations !== null && c.confirmations >= c.limit;
+  $("outageText").textContent = ready ? COPY.outage.ready : COPY.outage.waiting(c.confirmations ?? 0, c.limit);
+  show("fallbackBtn", ready);
+  const btn = $("fallbackBtn") as HTMLButtonElement;
+  const wallet = getLocalWallet();
+  btn.disabled = fallbackBusy || !wallet;
+  btn.textContent = fallbackBusy ? COPY.fallback.working : COPY.fallback.button;
+  $("fallbackMsg").textContent =
+    fallbackNote !== ""
+      ? fallbackNote
+      : ready && !wallet
+        ? vault.state() === "locked" ? COPY.fallback.locked : COPY.fallback.noWallet
+        : "";
+}
+
+async function onFallback() {
+  const wallet = getLocalWallet();
+  if (fallbackBusy || !wallet) return;
+  fallbackBusy = true; // before anything is awaited, so a double click cannot send twice
+  fallbackNote = "";
+  renderOutage();
+  try {
+    const out = await kingdomSettleWithoutReferee(game, provider, wallet, artifacts);
+    fallbackNote = out.ok ? COPY.fallback.done : out.text;
+    if (out.ok || out.code === "round_gone") setTimeout(() => void pollChain(), 3_000);
+  } catch (e) {
+    console.error(e);
+    fallbackNote = COPY.fallback.failed;
+  } finally {
+    fallbackBusy = false;
+    renderOutage();
   }
 }
 
@@ -622,6 +685,7 @@ async function tick() {
       failures++;
       $("status").textContent = res.error === "server_unreachable" ? COPY.network.offline : errorText(res.error);
       renderClock();
+      if (serverDown()) void pollChain();
     }
   } finally {
     running = false;
@@ -676,6 +740,7 @@ export async function startKingdomMode() {
   $("kCancelBtn").addEventListener("click", () => activeAct?.abort(new Error("Cancelled by you")));
   [0, 1, 2].forEach((i) => $(`kProt${i}`).addEventListener("click", () => onProtect(i)));
   $("claimBtn").addEventListener("click", () => void onClaim());
+  $("fallbackBtn").addEventListener("click", () => void onFallback());
 
   await Promise.race([syncClock(), sleep(2000)]); // the countdown must follow the server's clock
   setInterval(() => void syncClock(3), 60_000);
