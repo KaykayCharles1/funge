@@ -6,7 +6,7 @@ import { COPY, errorText, notEnoughText, splitCoinsText } from "../copy.ts";
 import { p2pkhLock, toVmCategory } from "../lib/chain.ts";
 import { formatUnits } from "../lib/format.ts";
 import type { GameKingdom } from "../lib/game.ts";
-import { conquestMoney, decodeKingdomCommitment, encodeKingdomCommitment, previousOf } from "../lib/kingdom.ts";
+import { conquestMoney, decodeKingdomCommitment, encodeKingdomCommitment, previousOf, protectAmounts } from "../lib/kingdom.ts";
 import type { KingdomState } from "../lib/kingdom.ts";
 import { retry } from "../lib/retry.ts";
 import type { LocalWallet } from "../wallet/local.ts";
@@ -95,6 +95,92 @@ export const claimsFor = (wallet: LocalWallet, inputs: SpendableUtxo[]): WalletI
     ...(u.token ? { token: { amount: String(u.token.amount), category: u.token.category } } : {}),
   }));
 
+type KingdomFailure = Extract<KingdomOutcome, { ok: false }>;
+export type KingdomPlan = { pay: bigint; money: ReturnType<typeof conquestMoney> | null; next: KingdomState };
+
+// What an open or a conquest costs and what the new state is, from the state on the chain.
+// The contract enforces the same numbers. Used by both kinds of wallet.
+export function planKingdomAction(
+  game: GameKingdom,
+  s: KingdomState,
+  action: "open" | "conquer",
+  pkhHex: string,
+  expectedPay: bigint,
+): { ok: true; plan: KingdomPlan } | KingdomFailure {
+  const fmt = (n: bigint) => formatUnits(n, CONFIG.pusdDecimals);
+  const params = { feePercent: BigInt(game.params.feePercent), cutPercent: BigInt(game.params.cutPercent) };
+  if (action === "open") {
+    if (s.passCount !== 0) return fail("state_changed", errorText("state_changed")) as KingdomFailure;
+  } else {
+    if (s.passCount < 1) return fail("not_open", errorText("not_open")) as KingdomFailure;
+    if (s.holderPkh === pkhHex) return fail("already_king", errorText("already_king")) as KingdomFailure;
+  }
+  const money = action === "conquer" ? conquestMoney(s.value, params) : null;
+  const pay = money ? money.payment : BigInt(game.params.openingPrice);
+  // The player agreed to expectedPay; never spend more than that without asking again
+  if (pay !== expectedPay) {
+    return fail("price_changed", `The price is now ${fmt(pay)} PUSD. Check it and try again.`) as KingdomFailure;
+  }
+  const next: KingdomState =
+    action === "open"
+      ? { passCount: 1, holderPkh: pkhHex, value: BigInt(game.params.openingPrice), protects: 0, previous: "00".repeat(11) }
+      : { passCount: s.passCount + 1, holderPkh: pkhHex, value: s.value, protects: 0, previous: previousOf(s.holderPkh) };
+  return { ok: true, plan: { pay, money, next } };
+}
+
+// The unlocking script for input 0 (the state). The referee signature is a throwaway; the server replaces it.
+export function stateUnlocker(state: Contract, action: "open" | "conquer", pkhHex: string) {
+  const placeholder = new SignatureTemplate(crypto.getRandomValues(new Uint8Array(32)));
+  const newHolder = hexToBin(pkhHex);
+  return action === "open" ? state.unlock.open(newHolder, placeholder) : state.unlock.conquer(newHolder, placeholder);
+}
+
+// Outputs 0 to 2 of an open or a conquest: the state, the pot and (conquest only) the dethroned king's payout.
+// The caller adds the inputs before and the change outputs after.
+export function addKingdomOutputs(
+  builder: TransactionBuilder,
+  o: {
+    game: GameKingdom; state: Contract; pot: Contract; stateUtxo: SpendableUtxo; potUtxo: SpendableUtxo;
+    s: KingdomState; plan: KingdomPlan;
+  },
+): void {
+  const { game, state, pot, stateUtxo, potUtxo, s, plan } = o;
+  const potBefore = potUtxo.token?.amount ?? 0n;
+  builder
+    .addOutput({
+      to: state.tokenAddress,
+      amount: stateUtxo.satoshis,
+      token: {
+        amount: 0n,
+        category: game.gameCategory,
+        nft: { capability: "mutable", commitment: encodeKingdomCommitment(plan.next) },
+      },
+    })
+    .addOutput({
+      to: pot.tokenAddress,
+      amount: potUtxo.satoshis,
+      token: { amount: potBefore + (plan.money ? plan.money.poolGets : plan.pay), category: game.pusdCategory },
+    });
+  if (plan.money) {
+    // output 2: the dethroned king's payout, a plain P2PKH output (the contract reads it by its exact script)
+    builder.addOutput({
+      to: p2pkhLock(hexToBin(s.holderPkh)),
+      amount: PAYOUT_SATS,
+      token: { amount: plan.money.kingGets, category: game.pusdCategory },
+    });
+  }
+}
+
+// Turns a failed coin pick into the player's message
+export function coinFailure(picked: { code: "no_funds" | "needs_bch"; have: bigint }, pay: bigint): KingdomFailure {
+  const fmt = (n: bigint) => formatUnits(n, CONFIG.pusdDecimals);
+  return (
+    picked.code === "needs_bch"
+      ? fail("needs_bch", COPY.grab.needsBch)
+      : fail("no_funds", picked.have >= pay ? splitCoinsText(fmt(pay)) : notEnoughText(fmt(pay), fmt(picked.have)))
+  ) as KingdomFailure;
+}
+
 export async function kingdomAct(opts: {
   game: GameKingdom;
   provider: ElectrumNetworkProvider;
@@ -104,11 +190,6 @@ export async function kingdomAct(opts: {
   artifacts: KingdomArtifacts;
 }): Promise<KingdomOutcome> {
   const { game, provider, wallet, action, expectedPay, artifacts } = opts;
-  const fmt = (n: bigint) => formatUnits(n, CONFIG.pusdDecimals);
-  const params = {
-    feePercent: BigInt(game.params.feePercent),
-    cutPercent: BigInt(game.params.cutPercent),
-  };
 
   const { pot, state, matches } = kingdomContracts(game, provider, artifacts);
   if (!matches) return fail("mismatch", COPY.grab.mismatch);
@@ -126,65 +207,21 @@ export async function kingdomAct(opts: {
   if (!live) return fail("no_round", COPY.grab.noRound);
   const { stateUtxo, potUtxo, state: s } = live;
 
-  // What this action must cost, from the chain. The contract enforces the same numbers.
-  let pay: bigint;
-  if (action === "open") {
-    if (s.passCount !== 0) return fail("state_changed", errorText("state_changed"));
-    pay = BigInt(game.params.openingPrice);
-  } else {
-    if (s.passCount < 1) return fail("not_open", errorText("not_open"));
-    if (s.holderPkh === wallet.pkhHex) return fail("already_king", errorText("already_king"));
-    pay = conquestMoney(s.value, params).payment;
-  }
-  if (pay !== expectedPay) return fail("price_changed", `The price is now ${fmt(pay)} PUSD. Check it and try again.`);
+  const planned = planKingdomAction(game, s, action, wallet.pkhHex, expectedPay);
+  if (!planned.ok) return planned;
+  const { plan } = planned;
 
-  const picked = pickWalletCoins(walletCoins, game.pusdCategory, pay);
-  if (!picked.ok) {
-    return picked.code === "needs_bch"
-      ? fail("needs_bch", COPY.grab.needsBch)
-      : fail("no_funds", picked.have >= pay ? splitCoinsText(fmt(pay)) : notEnoughText(fmt(pay), fmt(picked.have)));
-  }
+  const picked = pickWalletCoins(walletCoins, game.pusdCategory, plan.pay);
+  if (!picked.ok) return coinFailure(picked, plan.pay);
   const inputs = picked.inputs;
 
   let txHex: string;
   try {
-    // The server replaces this throwaway signature with the real referee signature
-    const placeholder = new SignatureTemplate(crypto.getRandomValues(new Uint8Array(32)));
-    const newHolder = hexToBin(wallet.pkhHex);
-    const next: KingdomState =
-      action === "open"
-        ? { passCount: 1, holderPkh: wallet.pkhHex, value: BigInt(game.params.openingPrice), protects: 0, previous: "00".repeat(11) }
-        : { passCount: s.passCount + 1, holderPkh: wallet.pkhHex, value: s.value, protects: 0, previous: previousOf(s.holderPkh) };
-    const potBefore = potUtxo.token?.amount ?? 0n;
-    const money = action === "conquer" ? conquestMoney(s.value, params) : null;
-
     const builder = new TransactionBuilder({ provider })
-      .addInput(stateUtxo, action === "open" ? state.unlock.open(newHolder, placeholder) : state.unlock.conquer(newHolder, placeholder))
+      .addInput(stateUtxo, stateUnlocker(state, action, wallet.pkhHex))
       .addInput(potUtxo, pot.unlock.release());
     for (const coin of inputs) builder.addInput(coin, wallet.unlockP2PKH());
-    builder
-      .addOutput({
-        to: state.tokenAddress,
-        amount: stateUtxo.satoshis,
-        token: {
-          amount: 0n,
-          category: game.gameCategory,
-          nft: { capability: "mutable", commitment: encodeKingdomCommitment(next) },
-        },
-      })
-      .addOutput({
-        to: pot.tokenAddress,
-        amount: potUtxo.satoshis,
-        token: { amount: potBefore + (money ? money.poolGets : pay), category: game.pusdCategory },
-      });
-    if (money) {
-      // output 2: the dethroned king's payout, a plain P2PKH output (the contract reads it by its exact script)
-      builder.addOutput({
-        to: p2pkhLock(hexToBin(s.holderPkh)),
-        amount: PAYOUT_SATS,
-        token: { amount: money.kingGets, category: game.pusdCategory },
-      });
-    }
+    addKingdomOutputs(builder, { game, state, pot, stateUtxo, potUtxo, s, plan });
     builder
       .addTokenChangeOutputIfNeeded({ category: game.pusdCategory, to: wallet.tokenAddress })
       .addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate: FEE_RATE });
@@ -197,5 +234,111 @@ export async function kingdomAct(opts: {
   const res = await act(game.gameCategory, { action, txHex, walletInputs: claimsFor(wallet, inputs) });
   if (res.ok) return { ok: true, txid: res.txid, passCount: res.passCount };
   if (res.message) console.error(`${action} refused (${res.error}): ${res.message}`);
+  return fail(res.error, errorText(res.error));
+}
+
+
+// ---------- protect ----------
+
+// What a protect does to the state. Without `force` the rules are checked here first, so a player gets a clear answer
+// without a round trip. `force` skips those checks so a test can see what the SERVER and the contract answer.
+export function planProtect(
+  game: GameKingdom,
+  s: KingdomState,
+  pkhHex: string,
+  amount: bigint,
+  force = false,
+): { ok: true; next: KingdomState } | KingdomFailure {
+  if (s.passCount < 1) return fail("not_open", errorText("not_open")) as KingdomFailure;
+  if (!force) {
+    if (s.holderPkh !== pkhHex) return fail("not_king", errorText("not_king")) as KingdomFailure;
+    if (s.protects >= game.params.protectsPerReign) return fail("no_protects_left", errorText("no_protects_left")) as KingdomFailure;
+    if (s.value + amount > BigInt(game.params.cap)) return fail("walls_at_maximum", errorText("walls_at_maximum")) as KingdomFailure;
+    if (!protectAmounts(BigInt(game.params.unit)).includes(amount)) {
+      return fail("invalid", "A protect adds exactly 1, 5 or 10 PUSD.") as KingdomFailure;
+    }
+  }
+  return { ok: true, next: { ...s, value: s.value + amount, protects: s.protects + 1 } };
+}
+
+// Outputs 0 and 1 of a protect: the state with the raised value, and the pot with the payment added.
+export function addProtectOutputs(
+  builder: TransactionBuilder,
+  o: { game: GameKingdom; state: Contract; pot: Contract; stateUtxo: SpendableUtxo; potUtxo: SpendableUtxo; next: KingdomState; amount: bigint },
+): void {
+  const { game, state, pot, stateUtxo, potUtxo, next, amount } = o;
+  builder
+    .addOutput({
+      to: state.tokenAddress,
+      amount: stateUtxo.satoshis,
+      token: { amount: 0n, category: game.gameCategory, nft: { capability: "mutable", commitment: encodeKingdomCommitment(next) } },
+    })
+    .addOutput({
+      to: pot.tokenAddress,
+      amount: potUtxo.satoshis,
+      token: { amount: (potUtxo.token?.amount ?? 0n) + amount, category: game.pusdCategory },
+    });
+}
+
+// The unlocking script for input 0 in a protect. The referee signature is a throwaway; the server replaces it.
+export function protectUnlocker(state: Contract, amount: bigint) {
+  const placeholder = new SignatureTemplate(crypto.getRandomValues(new Uint8Array(32)));
+  return state.unlock.protect(placeholder, amount);
+}
+
+// The king pays 1, 5 or 10 PUSD into the pool and raises the kingdom's value. The wallet's PUSD coin is the first wallet
+// input (input 2): the contract takes it as proof that the king agreed, because it sits at the king's address.
+export async function kingdomProtect(opts: {
+  game: GameKingdom;
+  provider: ElectrumNetworkProvider;
+  wallet: LocalWallet;
+  amount: bigint;
+  artifacts: KingdomArtifacts;
+  force?: boolean; // tests only: skip the checks made here, so the server's own answer can be seen
+}): Promise<KingdomOutcome> {
+  const { game, provider, wallet, amount, artifacts } = opts;
+
+  const { pot, state, matches } = kingdomContracts(game, provider, artifacts);
+  if (!matches) return fail("mismatch", COPY.grab.mismatch);
+
+  let live: Awaited<ReturnType<typeof readKingdomCoins>>;
+  let walletCoins: SpendableUtxo[];
+  try {
+    [live, walletCoins] = await Promise.all([
+      readKingdomCoins(game, provider),
+      retry(() => provider.getUtxosForLockingBytecode(wallet.lock)),
+    ]);
+  } catch {
+    return fail("chain_unavailable", errorText("chain_unavailable"));
+  }
+  if (!live) return fail("no_round", COPY.grab.noRound);
+  const { stateUtxo, potUtxo, state: s } = live;
+
+  const planned = planProtect(game, s, wallet.pkhHex, amount, opts.force ?? false);
+  if (!planned.ok) return planned;
+
+  const picked = pickWalletCoins(walletCoins, game.pusdCategory, amount);
+  if (!picked.ok) return coinFailure(picked, amount);
+  const inputs = picked.inputs;
+
+  let txHex: string;
+  try {
+    const builder = new TransactionBuilder({ provider })
+      .addInput(stateUtxo, protectUnlocker(state, amount))
+      .addInput(potUtxo, pot.unlock.release());
+    for (const coin of inputs) builder.addInput(coin, wallet.unlockP2PKH());
+    addProtectOutputs(builder, { game, state, pot, stateUtxo, potUtxo, next: planned.next, amount });
+    builder
+      .addTokenChangeOutputIfNeeded({ category: game.pusdCategory, to: wallet.tokenAddress })
+      .addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate: FEE_RATE });
+    txHex = builder.build();
+  } catch (e) {
+    console.error(e);
+    return fail("build_failed", COPY.grab.buildFailed);
+  }
+
+  const res = await act(game.gameCategory, { action: "protect", txHex, walletInputs: claimsFor(wallet, inputs) });
+  if (res.ok) return { ok: true, txid: res.txid, passCount: res.passCount };
+  if (res.message) console.error(`protect refused (${res.error}): ${res.message}`);
   return fail(res.error, errorText(res.error));
 }
