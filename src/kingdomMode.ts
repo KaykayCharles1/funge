@@ -1,17 +1,27 @@
-// The Kingdom page (open it with ?mode=kingdom). Step K8a: it only shows the round, it has no action buttons yet.
+// The Kingdom page (open it with ?mode=kingdom): state, price previews, event feed, and (K8b) the buttons to open,
+// conquer and protect with either kind of wallet, the claim window, and the finished-round view.
 // The old steal page (refereeMode.ts) is untouched until the Kingdom is approved to replace it.
+import { hexToBin } from "@bitauth/libauth";
 import type { ElectrumNetworkProvider } from "cashscript";
+import kingdomJson from "../contracts/FungeKingdom.json";
+import potJson from "../contracts/FungePot.json";
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { CONFIG } from "./config.ts";
 import { COPY, errorText, pauseText } from "./copy.ts";
+import { findEndedKingdom } from "./endedKingdom.ts";
+import type { EndedKingdom } from "./endedKingdom.ts";
+import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
 import { formatDuration, formatUnits } from "./lib/format.ts";
 import type { GameKingdom } from "./lib/game.ts";
 import { makeProvider } from "./lib/provider.ts";
 import { qrDataUrl } from "./lib/qr.ts";
-import { getEvents, getRound, watchRound } from "./referee/api.ts";
+import { claim, getEvents, getRound, watchRound } from "./referee/api.ts";
 import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts";
 import { serverNow, syncClock } from "./referee/clock.ts";
+import { kingdomAct, kingdomProtect } from "./referee/kingdomActions.ts";
+import { kingdomActExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
+import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -32,6 +42,13 @@ const CARD_NORMAL = `${CARD} bg-slate-900 ring-slate-800`;
 const CARD_READY = `${CARD} bg-amber-500/10 ring-amber-400`;
 const POLL_MS = 20_000; // safety net: the live socket does the real work
 const FEED_MAX = 12;
+const SIGN_TIMEOUT_MS = 180_000; // how long we wait for the player to approve in their own wallet
+
+// The compiled contracts, imported as JSON so the browser can build transactions
+const artifacts = { pot: potJson as any, kingdom: kingdomJson as any };
+
+type Outcome = { ok: true } | { ok: false; code: string; text: string };
+type Kind = "open" | "conquer" | "protect";
 
 let game: GameKingdom;
 let provider: ElectrumNetworkProvider;
@@ -45,6 +62,17 @@ let lastQr = "";
 let timer: ReturnType<typeof setTimeout> | undefined;
 const feed = new Map<number, RefereeEvent>();
 
+let acting = false;
+let actMode: "local" | "external" | null = null;
+let activeAct: AbortController | null = null;
+let signPrompt = "";
+let note: { text: string; expires: number } | null = null;
+let coolUntil = 0; // after "outcome unknown", wait before allowing another move
+let claiming = false;
+let claimNote = "";
+let endedShown = false;
+let endedBusy = false;
+
 const serverDown = () => failures >= 2 || net === "offline";
 
 // The player's own wallet (WizardConnect), when connected
@@ -57,6 +85,8 @@ const myKeys = () => [getLocalWallet()?.pkhHex, externalPkh()].filter((k): k is 
 const isMine = (key: string | null) => key !== null && myKeys().includes(key);
 // The previous king is stored as the first 11 bytes of the key hash, so it is compared by prefix
 const isMinePrefix = (prefix: string) => myKeys().some((k) => k.startsWith(prefix));
+// The wallet that would play right now: a wallet the player explicitly connected wins; otherwise the game wallet
+const actingPkh = (): string | null => externalPkh() ?? getLocalWallet()?.pkhHex ?? null;
 
 const EXTERNAL_FLAG = "funge:external";
 const externalWanted = () => {
@@ -85,8 +115,16 @@ function remainingMs(): number | null {
   return round.paused ? round.deadline - round.paused.since : round.deadline - serverNow();
 }
 
+function timeUp(): boolean {
+  const r = round;
+  if (!r) return false;
+  const rem = remainingMs();
+  return r.status === "over" || r.status === "settled" || (r.status === "open" && !r.paused && rem !== null && rem <= 0);
+}
+
 // The player's own wallet (WizardConnect) card
 function renderWallet(s: WalletState) {
+  if (s.status === "idle" && actMode === "external") activeAct?.abort(new Error("Wallet disconnected"));
   show("walletIdle", s.status === "idle");
   show("walletWaiting", s.status === "waiting");
   show("walletConnected", s.status === "connected");
@@ -125,6 +163,10 @@ function renderStats() {
 }
 
 function renderClock() {
+  if (endedShown) {
+    show("overModal", false);
+    return;
+  }
   const section = $("countdown");
   const time = $("countdownTime");
   show("countdownTime", true);
@@ -138,7 +180,7 @@ function renderClock() {
     title = serverDown() ? COPY.network.unreachable : "Connecting to the game server…";
   } else if (r.status === "settled") {
     title = COPY.clock.settled;
-    detail = COPY.kingdom.finished;
+    detail = COPY.clock.settling;
   } else if (r.status === "waiting") {
     title = COPY.kingdom.waiting;
     detail = COPY.kingdom.waitingDetail;
@@ -170,6 +212,49 @@ function renderClock() {
   const notice = net === "offline" ? COPY.network.offline : r?.chainStale ? COPY.network.stale : "";
   $("netNotice").textContent = notice;
   show("netNotice", notice !== "");
+  renderOver();
+}
+
+// The window everyone sees once the server says time is up. Only the winner gets the Claim button.
+function renderOver() {
+  const open = !!round && round.status === "over" && !endedShown;
+  show("overModal", open);
+  if (!open) return;
+  const s = round?.kingdom ? round : lastLive;
+  const king = s?.kingdom?.holder ?? s?.king ?? null;
+  const iAmKing = isMine(king);
+  const pool = units(s?.pot);
+  $("overTitle").textContent = COPY.over.title;
+  $("overText").textContent = iAmKing
+    ? COPY.kingdom.overYouWin(pool)
+    : `${COPY.kingdom.overSomeone(pool, king ? shortKey(king) : "the last king")} ${COPY.over.auto}`;
+  show("claimBtn", iAmKing);
+  const btn = $("claimBtn") as HTMLButtonElement;
+  btn.disabled = claiming;
+  btn.textContent = claiming ? COPY.claim.working : COPY.claim.button;
+  const locked = !getLocalWallet() && externalPkh() === null && vault.state() === "locked";
+  $("claimMsg").textContent = claimNote !== "" ? claimNote : !iAmKing && locked ? COPY.over.unlockHint : "";
+}
+
+async function onClaim() {
+  if (claiming) return;
+  claiming = true; // before anything is awaited, so a double click cannot send twice
+  claimNote = "";
+  renderOver();
+  try {
+    const res = await claim(game.gameCategory);
+    if (res.ok) claimNote = COPY.claim.done;
+    else if (res.error === "round_over" || res.error === "state_changed") claimNote = COPY.claim.already;
+    else if (res.error === "outcome_unknown") claimNote = COPY.claim.unknown;
+    else claimNote = errorText(res.error);
+  } catch (e) {
+    console.error(e);
+    claimNote = errorText("internal");
+  } finally {
+    claiming = false;
+    renderOver();
+    kick();
+  }
 }
 
 // What the next move costs, and what protecting looks like right now
@@ -221,6 +306,151 @@ function renderPreview() {
   show("kProtectClock", protectClock !== "");
   $("kNextClock").textContent = nextClock;
   show("kNextClock", nextClock !== "");
+}
+
+// The main button: open (first player), conquer, or take back the throne
+function actState(): { enabled: boolean; label: string; hint: string } {
+  const r = round;
+  const k = r?.kingdom ?? null;
+  if (!r || !k) return { enabled: false, label: "…", hint: "" };
+  const king = k.holder ?? r.king;
+  const mine = actingPkh() !== null && king === actingPkh();
+  let label: string = COPY.kingdom.roundOver;
+  if (r.status === "waiting") label = COPY.kingdom.openBtn(units(k.openingPrice));
+  else if (r.status === "open" && k.conquest) {
+    label = mine
+      ? COPY.kingdom.youKingBtn
+      : k.previousKing !== null && isMinePrefix(k.previousKing)
+        ? COPY.kingdom.takeBackBtn(units(k.conquest.pay))
+        : COPY.kingdom.conquerBtn(units(k.conquest.pay));
+  }
+  if (acting) return { enabled: false, label, hint: COPY.kingdom.sending };
+  if (endedShown || timeUp()) return { enabled: false, label: COPY.kingdom.roundOver, hint: "" };
+  if (net === "offline") return { enabled: false, label, hint: COPY.network.offline };
+  if (r.paused) return { enabled: false, label, hint: pauseText(r.paused.reason) };
+  const external = externalPkh() !== null;
+  if (!external && !getLocalWallet()) {
+    return { enabled: false, label, hint: vault.state() === "locked" ? COPY.grab.locked : COPY.grab.noWallet };
+  }
+  if (Date.now() < coolUntil) return { enabled: false, label, hint: COPY.grab.cooling };
+  if (r.status === "open" && mine) return { enabled: false, label, hint: "" };
+  const playable = r.status === "waiting" || (r.status === "open" && k.conquest !== null);
+  return { enabled: playable, label, hint: external ? COPY.external.ready : "" };
+}
+
+function renderActions() {
+  const r = round;
+  const k = r?.kingdom ?? null;
+  const a = actState();
+  const btn = $("kActBtn") as HTMLButtonElement;
+  btn.disabled = !a.enabled;
+  btn.textContent = a.label;
+  show("kCancelBtn", acting && actMode === "external");
+  const noteVisible = note !== null && Date.now() < note.expires;
+  const busyText = actMode === "external" ? signPrompt || COPY.external.preparing : COPY.kingdom.sending;
+  $("kActMsg").textContent = acting ? busyText : noteVisible && note ? note.text : a.hint;
+
+  // Protect: only the king, only while the round runs
+  const king = k ? (k.holder ?? r?.king ?? null) : null;
+  const acts = actingPkh();
+  const showProtect = !!r && !!k && r.status === "open" && !endedShown && acts !== null && king === acts;
+  show("kProtectBox", showProtect);
+  if (!showProtect || !k) return;
+  $("kProtectTitle").textContent = COPY.kingdom.protectTitle;
+  const rem = remainingMs();
+  const closed = rem !== null && rem - k.protectLockoutSeconds * 1000 <= 0;
+  const blocked = acting || !!r?.paused || closed || timeUp() || net === "offline" || Date.now() < coolUntil || k.protectsLeft <= 0;
+  [0, 1, 2].forEach((i) => {
+    const amount = k.protectAmounts[i];
+    const b = $(`kProt${i}`) as HTMLButtonElement;
+    if (amount === undefined) {
+      b.disabled = true;
+      return;
+    }
+    b.textContent = COPY.kingdom.protectBtn(units(amount));
+    b.disabled = blocked || BigInt(k.value) + BigInt(amount) > BigInt(k.cap);
+  });
+  $("kProtectMsg").textContent = closed
+    ? COPY.kingdom.protectClosed
+    : k.protectsLeft <= 0
+      ? COPY.errors.no_protects_left
+      : k.wallsAtMaximum
+        ? COPY.kingdom.wallsMax
+        : COPY.kingdom.protectHint;
+}
+
+// Open, conquer or protect with whichever wallet is playing. `amount` is the price the player agreed to (open, conquer)
+// or the protect amount. Nothing is spent beyond it: the helpers re-check the chain and refuse a changed price.
+async function run(kind: Kind, amount: bigint) {
+  if (acting) return;
+  const external = externalPkh();
+  const local = getLocalWallet();
+  if (external === null && !local) return;
+  acting = true; // set before anything is awaited, so a double click cannot send twice
+  actMode = external !== null ? "external" : "local";
+  signPrompt = "";
+  note = null;
+  const controller = new AbortController();
+  activeAct = controller;
+  const timeout =
+    external !== null ? setTimeout(() => controller.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS) : undefined;
+  renderActions();
+  try {
+    let out: Outcome;
+    const onPrompt = (text: string) => {
+      signPrompt = text;
+      renderActions();
+    };
+    if (kind === "protect") {
+      out =
+        external !== null
+          ? await kingdomProtectExternal({ game, provider, walletPkhHex: external, amount, artifacts, signal: controller.signal, onPrompt })
+          : await kingdomProtect({ game, provider, wallet: local!, amount, artifacts });
+    } else {
+      out =
+        external !== null
+          ? await kingdomActExternal({
+              game, provider, walletPkhHex: external, action: kind, expectedPay: amount, artifacts, signal: controller.signal, onPrompt,
+            })
+          : await kingdomAct({ game, provider, wallet: local!, action: kind, expectedPay: amount, artifacts });
+    }
+    if (out.ok) {
+      const text = kind === "open" ? COPY.kingdom.doneOpen : kind === "conquer" ? COPY.kingdom.doneConquer : COPY.kingdom.doneProtect;
+      note = { text, expires: Date.now() + 8_000 };
+      setTimeout(() => void refreshBalances(provider), 2_000);
+      setTimeout(() => void refreshBalances(provider), 8_000);
+    } else {
+      note = { text: out.text, expires: Date.now() + 10_000 };
+      if (out.code === "outcome_unknown") coolUntil = Date.now() + 8_000;
+    }
+  } catch (e) {
+    console.error(e);
+    note = { text: errorText("internal"), expires: Date.now() + 10_000 };
+  } finally {
+    clearTimeout(timeout);
+    acting = false;
+    actMode = null;
+    activeAct = null;
+    signPrompt = "";
+    renderActions();
+    kick();
+    setTimeout(kick, 6_000);
+  }
+}
+
+function onAct() {
+  const r = round;
+  const k = r?.kingdom ?? null;
+  if (acting || !r || !k || !actState().enabled) return;
+  if (r.status === "waiting") void run("open", BigInt(k.openingPrice));
+  else if (k.conquest) void run("conquer", BigInt(k.conquest.pay));
+}
+
+function onProtect(i: number) {
+  const k = round?.kingdom ?? null;
+  const amount = k?.protectAmounts[i];
+  if (acting || !k || amount === undefined || ($(`kProt${i}`) as HTMLButtonElement).disabled) return;
+  void run("protect", BigInt(amount));
 }
 
 // One friendly line for each thing the server tells us. Events we have no wording for are not shown.
@@ -277,7 +507,51 @@ function renderAll() {
   renderStats();
   renderClock();
   renderPreview();
+  renderActions();
   renderFeed();
+}
+
+// The finished-round screen, reusing the steal page's "ended" block with Kingdom wording
+function renderEnded(r: EndedKingdom) {
+  show("live", false);
+  show("ended", true);
+  show("endedArt", false);
+  const mine = myKeys().includes(r.winnerPkh);
+  const alone = r.passes === 1; // nobody challenged the first king: the pool went back to them
+  const winner = lockToAddress(p2pkhLock(hexToBin(r.winnerPkh)), false);
+  $("endedTitle").textContent = alone
+    ? mine ? COPY.kingdom.aloneMine : COPY.kingdom.aloneOther
+    : mine ? COPY.kingdom.wonTitle : COPY.kingdom.otherWonTitle;
+  $("endedWinner").textContent = mine ? `${winner} (${COPY.kingdom.you})` : winner;
+  $("endedPot").textContent = `${formatUnits(r.potPaid, CONFIG.pusdDecimals)} PUSD`;
+  $("endedPassesLabel").textContent = COPY.kingdom.endedKings;
+  $("endedPasses").textContent = String(r.passes);
+  $("endedTrophy").textContent =
+    getLocalWallet()?.pkhHex === r.winnerPkh ? COPY.kingdom.trophyGame : mine ? COPY.kingdom.trophyMine : COPY.kingdom.trophyOther;
+  $("endedTx").textContent = `Settlement transaction: ${r.settleTxid}${r.confirmed ? "" : " (waiting for confirmation)"}`;
+}
+
+async function loadEnded() {
+  if (endedBusy || endedShown) return;
+  endedBusy = true;
+  try {
+    for (let i = 0; i < 6 && !endedShown; i++) {
+      const r = await findEndedKingdom(game, provider).catch((e) => {
+        console.error(e);
+        return null;
+      });
+      if (r) {
+        renderEnded(r);
+        endedShown = true;
+        show("overModal", false);
+        $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        break;
+      }
+      await sleep(3000); // the settlement may not be visible on the network yet
+    }
+  } finally {
+    endedBusy = false;
+  }
 }
 
 async function loadHistory() {
@@ -293,6 +567,7 @@ function applySnapshot(s: RoundSnapshot) {
   watcher?.setSeq(s.lastSeq); // the snapshot already includes every event up to here
   renderAll();
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  if (s.status === "settled") void loadEnded();
 }
 
 // Instant reaction to a pushed event, then the server's snapshot confirms it
@@ -397,11 +672,17 @@ export async function startKingdomMode() {
   onLocalWalletChange(renderAll);
   void initLocalWallet(provider);
 
+  $("kActBtn").addEventListener("click", onAct);
+  $("kCancelBtn").addEventListener("click", () => activeAct?.abort(new Error("Cancelled by you")));
+  [0, 1, 2].forEach((i) => $(`kProt${i}`).addEventListener("click", () => onProtect(i)));
+  $("claimBtn").addEventListener("click", () => void onClaim());
+
   await Promise.race([syncClock(), sleep(2000)]); // the countdown must follow the server's clock
   setInterval(() => void syncClock(3), 60_000);
   setInterval(() => {
     renderClock();
     renderPreview();
+    renderActions();
   }, 250);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
