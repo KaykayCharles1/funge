@@ -76,7 +76,9 @@ export const COPY = {
     timeout: "Timed out waiting for your wallet. Nothing was sent.",
     disconnected: "Your wallet disconnected. Nothing was sent.",
     failed: "Could not prepare the grab. Nothing was sent. Please try again.",
+    noKingCoin: "Your wallet has no coin at your king address. Send a small amount of BCH to it, then try again.",  
   },
+  
   errors: {
     invalid: "The network did not accept that grab. Nothing was sent. Please try again.",
     state_changed: "Someone grabbed first. Check the new price and try again.",

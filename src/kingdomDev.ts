@@ -11,7 +11,7 @@ import { qrDataUrl } from "./lib/qr.ts";
 import { installSafeConsole } from "./lib/safeLog.ts";
 import { getRound } from "./referee/api.ts";
 import type { RoundSnapshot } from "./referee/api.ts";
-import { kingdomActExternal } from "./referee/kingdomExternal.ts";
+import { kingdomActExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
 
 installSafeConsole();
 
@@ -79,6 +79,42 @@ function renderAct() {
   show("cancelActBtn", busy);
 }
 
+let protectKey = ""; // the buttons are only rebuilt when they change, so a click is never lost to a redraw
+
+function renderProtect() {
+  const k = round?.kingdom;
+  const row = $("protectRow");
+  const isKing = !!round && round.status === "open" && round.king !== null && round.king === me();
+  if (!k || !isKing) {
+    $("protectInfo").textContent = "";
+    if (protectKey !== "") row.textContent = "";
+    protectKey = "";
+    return;
+  }
+  const closesIn = k.protectClosesInMs === null ? null : k.protectClosesInMs - (Date.now() - fetchedAt);
+  const closed = closesIn !== null && closesIn <= 0;
+  $("protectInfo").textContent = k.wallsAtMaximum
+    ? "Walls at maximum."
+    : k.protectsLeft === 0
+      ? "No protects left in this reign."
+      : closed
+        ? "Protect is closed for the last seconds of the clock."
+        : `Protects left: ${k.protectsLeft}. ${closesIn === null ? "" : `Protect closes in ${Math.ceil(closesIn / 1000)} s.`}`;
+  const amounts = closed ? [] : k.protectAmounts;
+  const key = `${busy}|${amounts.join(",")}`;
+  if (key === protectKey) return;
+  protectKey = key;
+  row.textContent = "";
+  for (const a of amounts) {
+    const b = document.createElement("button");
+    b.className = "small";
+    b.textContent = `Protect +${units(a)}`;
+    b.disabled = busy;
+    b.addEventListener("click", () => void onProtect(BigInt(a)));
+    row.appendChild(b);
+  }
+}
+
 function renderRound() {
   if (!round || !round.kingdom) return;
   const k = round.kingdom;
@@ -93,6 +129,7 @@ function renderRound() {
     ms === null ? `next clock ${k.nextClockSeconds ?? "—"} s` : `${Math.ceil(Math.max(0, ms) / 1000)} s${round.paused ? " (paused)" : ""}`;
   $("protects").textContent = `${k.protectsLeft} of ${k.protectsPerReign}`;
   renderAct();
+  renderProtect();
 }
 
 async function poll() {
@@ -132,6 +169,40 @@ async function onAct() {
   } catch (e) {
     console.error(e);
     log(`${action} failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    clearTimeout(timeout);
+    busy = false;
+    prompt = "";
+    controller = null;
+    renderAct();
+    setTimeout(() => void poll(), 1500);
+    setTimeout(() => void poll(), 6000);
+  }
+}
+
+async function onProtect(amount: bigint) {
+  const w = me();
+  if (busy || !w || !round) return;
+  busy = true;
+  prompt = "Preparing the transaction…";
+  controller = new AbortController();
+  const c = controller;
+  const timeout = setTimeout(() => c.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS);
+  renderAct();
+  renderProtect();
+  log(`protect +${units(amount.toString())} PUSD: asking the wallet`);
+  try {
+    const out = await kingdomProtectExternal({
+      game, provider, walletPkhHex: w, amount, artifacts, signal: c.signal,
+      onPrompt: (text) => {
+        prompt = text;
+        renderAct();
+      },
+    });
+    log(out.ok ? `protect accepted, txid ${out.txid}` : `protect refused (${out.code}): ${out.text}`);
+  } catch (e) {
+    console.error(e);
+    log(`protect failed: ${e instanceof Error ? e.message : String(e)}`);
   } finally {
     clearTimeout(timeout);
     busy = false;
