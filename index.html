@@ -9,7 +9,7 @@
     <main id="app" class="mx-auto flex min-h-screen max-w-md flex-col gap-6 px-5 py-10">
       <header>
         <h1 class="text-4xl font-extrabold tracking-tight text-amber-400">Funge</h1>
-        <p class="mt-2 text-slate-300">Grab the potato. Last holder wins the pot.</p>
+        <p id="tagline" class="mt-2 text-slate-300">Grab the potato. Last holder wins the pot.</p>
         <p id="networkTag" class="mt-1 text-xs uppercase tracking-wide text-slate-500">Test mode · chipnet</p>
       </header>
 
@@ -44,7 +44,7 @@
           <img id="art" alt="Funge potato art for the current pass" class="mx-auto w-full max-w-sm rounded-xl" />
           <p id="artCaption" class="mt-3 text-xs text-slate-400"></p>
         </section>
-        <dl class="grid grid-cols-2 gap-3">
+        <dl id="stealStats" class="grid grid-cols-2 gap-3">
           <div class="col-span-2 rounded-2xl bg-slate-900 p-5 ring-1 ring-amber-500/40">
             <dt class="text-xs uppercase tracking-wide text-slate-400">Pot</dt>
             <dd id="pot" class="mt-1 text-4xl font-extrabold text-amber-400">…</dd>
@@ -63,6 +63,29 @@
           </div>
         </dl>
         
+        <dl id="kingdomStats" class="hidden grid-cols-2 gap-3">
+          <div class="col-span-2 rounded-2xl bg-slate-900 p-5 ring-1 ring-amber-500/40">
+            <dt class="text-xs uppercase tracking-wide text-slate-400">Pool</dt>
+            <dd id="kPool" class="mt-1 text-4xl font-extrabold text-amber-400">…</dd>
+          </div>
+          <div class="rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+            <dt class="text-xs uppercase tracking-wide text-slate-400">Throne value</dt>
+            <dd id="kValue" class="mt-1 text-2xl font-bold">…</dd>
+          </div>
+          <div class="rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+            <dt class="text-xs uppercase tracking-wide text-slate-400">King number</dt>
+            <dd id="kPass" class="mt-1 text-2xl font-bold">…</dd>
+          </div>
+          <div class="col-span-2 rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+            <dt class="text-xs uppercase tracking-wide text-slate-400">King</dt>
+            <dd id="kKing" class="mt-1 break-all font-mono text-sm">…</dd>
+          </div>
+          <div class="col-span-2 rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
+            <dt class="text-xs uppercase tracking-wide text-slate-400">Previous king</dt>
+            <dd id="kPrev" class="mt-1 break-all font-mono text-sm">—</dd>
+          </div>
+        </dl>
+
         <section id="localWallet" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
           <p class="text-xs uppercase tracking-wide text-slate-400">Game wallet</p>
           <p id="lwStakes" class="mt-2 hidden rounded-lg bg-amber-500/10 p-3 text-xs text-amber-200 ring-1 ring-amber-400/40">Mainnet: this wallet lives in your browser and holds real money. Keep only what you play with, and back up your seed phrase.</p>
@@ -153,6 +176,22 @@
             <p id="fallbackMsg" class="mt-2 text-sm text-slate-300"></p>
           </div>          
         </section>
+
+        <div id="kingdomView" class="hidden flex-col gap-6">
+          <section class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+            <p id="kPreview" class="text-sm text-slate-200"></p>
+            <ul class="mt-3 space-y-1 text-xs text-slate-400">
+              <li id="kProtects"></li>
+              <li id="kWalls" class="hidden text-amber-300"></li>
+              <li id="kProtectClock"></li>
+              <li id="kNextClock"></li>
+            </ul>
+          </section>
+          <section class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
+            <p id="kFeedTitle" class="text-xs uppercase tracking-wide text-slate-400"></p>
+            <ul id="kFeed" class="mt-3 space-y-2 text-sm text-slate-300"></ul>
+          </section>
+        </div>
 
         <section id="actions" class="rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-800">
           <button id="grabBtn" disabled class="w-full rounded-xl bg-amber-400 px-4 py-3 font-bold text-slate-950 enabled:hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40">Grab the potato</button>
