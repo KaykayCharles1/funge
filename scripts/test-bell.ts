@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fakeClock } from "../server/clock.ts";
-import { RoundManager, classifyAction, classifyKingdomAction } from "../server/rounds.ts";
+import { RoundManager, classifyKingdomAction } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
 import { clockSecondsFor, nextClockSecondsFor, validateBell } from "../src/lib/bell.ts";
 import { BELL_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
@@ -62,8 +62,7 @@ assert.equal(classifyKingdomAction("open"), "open");
 assert.equal(classifyKingdomAction("conquer"), "conquer");
 assert.equal(classifyKingdomAction("protect"), "protect");
 assert.equal(classifyKingdomAction("settle"), null);
-assert.equal(classifyAction("pass"), "steal"); // the old path is unchanged
-console.log("ok: action classification (settle never touches the clock; the old steal path is unchanged)");
+console.log("ok: action classification (settle never touches the clock)");
 
 // --- open and conquer set the clock to the bell, not to what was left ---
 {

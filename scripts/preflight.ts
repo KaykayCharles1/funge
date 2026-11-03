@@ -75,23 +75,22 @@ async function main() {
   console.log(`Server ${server}\nPage   ${page}\nNetwork ${CONFIG.network}\n`);
 
   // 1. the game file in this checkout
-  const gameFile = new URL(`../public/game.${CONFIG.network}.v2.json`, import.meta.url);
+  const gameFile = new URL(`../public/game.${CONFIG.network}.kingdom.json`, import.meta.url);
   let game: { contractVersion?: number; network?: string; gameCategory?: string; refereePubkey?: string; params?: Record<string, unknown> };
   try {
     game = JSON.parse(readFileSync(gameFile, "utf8"));
   } catch {
-    report("fail", "game file", `public/game.${CONFIG.network}.v2.json is missing`);
+    report("fail", "game file", `public/game.${CONFIG.network}.kingdom.json is missing`);
     return;
   }
-  const goodGame = game.contractVersion === 2 && game.network === CONFIG.network && /^[0-9a-f]{64}$/.test(game.gameCategory ?? "");
-  report(goodGame ? "ok" : "fail", "game file", goodGame ? `round ${game.gameCategory!.slice(0, 8)}…` : "not a v2 game for this network");
+  const goodGame = game.contractVersion === 3 && game.network === CONFIG.network && /^[0-9a-f]{64}$/.test(game.gameCategory ?? "");
+  report(goodGame ? "ok" : "fail", "game file", goodGame ? `round ${game.gameCategory!.slice(0, 8)}…` : "not a Kingdom game for this network");
   if (!goodGame) return;
   const fb = Number(game.params?.fallbackBlocks);
-  const wfb = Number(game.params?.waitingFallbackBlocks);
-  if (fb === CONFIG.fallbackBlocks && wfb === CONFIG.waitingFallbackBlocks) {
-    report("ok", "fallback blocks", `${fb} and ${wfb}`);
+  if (fb === CONFIG.fallbackBlocks) {
+    report("ok", "fallback blocks", `${fb}`);
   } else {
-    report(CONFIG.network === "mainnet" ? "fail" : "warn", "fallback blocks", `${fb} and ${wfb}, expected ${CONFIG.fallbackBlocks} and ${CONFIG.waitingFallbackBlocks}: a throwaway test game?`);
+    report(CONFIG.network === "mainnet" ? "fail" : "warn", "fallback blocks", `${fb}, expected ${CONFIG.fallbackBlocks}: a throwaway test game?`);
   }
 
   // 2. addresses
@@ -168,7 +167,7 @@ async function main() {
       const js = await (await fetch(new URL(src, `${page}/`), { signal: timeout() })).text();
       report(js.includes(serverOrigin) ? "ok" : "fail", "page code uses this server", js.includes(serverOrigin) ? "address is built in" : "the built code has another server address");
     }
-    const pg = (await (await fetch(`${page}/game.${CONFIG.network}.v2.json`, { signal: timeout() })).json()) as { gameCategory?: string };
+    const pg = (await (await fetch(`${page}/game.${CONFIG.network}.kingdom.json`, { signal: timeout() })).json()) as { gameCategory?: string };
     report(pg.gameCategory === game.gameCategory ? "ok" : "fail", "page game file", pg.gameCategory === game.gameCategory ? "same game as this checkout" : "the page serves a different game: rebuild after deploying");
   } catch (e) {
     report("fail", "page", message(e));

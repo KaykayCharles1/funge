@@ -28,13 +28,7 @@ export const CONFIG = {
   } as Record<Net, string>,
   pusdDecimals: 2, // TODO: confirm from the token's BCMR metadata before mainnet
 
-  // Amounts are integer base units of the token
-  basePrice: 100n,
-  priceStep: 10n,
-  seedPot: 1_000n, // starting PUSD in the pot (base units), from the creator's own tokens
-
   // Kingdom (FungeKingdom contract). Deploy-time contract settings, in base units of PUSD (2 decimals).
-  // The fallback block count below is used for Kingdom games too.
   kingdom: {
     openingPrice: 1_000n, // 10.00 PUSD: what the first player pays; it becomes the kingdom's value
     feePercent: 2n, // whole percent of the value, paid on top by the conqueror, goes to the dethroned king
@@ -44,9 +38,8 @@ export const CONFIG = {
     unit: 100n, // 1.00 PUSD: the smallest protect; the three amounts are 1x, 5x and 10x
   },
   
-  // Referee design (V2 contract). Deploy-time contract settings.
+  // Deploy-time contract setting.
   fallbackBlocks: 12, // anyone can settle without the referee after this many blocks with no action
-  waitingFallbackBlocks: 144, // the same, for a round nobody has stolen in yet (about a day)
 
   // The Funge referee server (runs the game clock)
   referee: { url: refereeUrl() },

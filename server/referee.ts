@@ -21,23 +21,14 @@ export function makeReferee(
   for (const g of games) {
     const pot = new Contract(artifact("FungePot"), [swapEndianness(g.gameId)], { provider });
     const k = g.kingdom;
-    const state = k
-      ? new Contract(
-          artifact("FungeKingdom"),
-          [
-            hexToBin(pot.lockingBytecode), swapEndianness(g.pusdCategory), hexToBin(g.refereePubkey),
-            k.openingPrice, k.feePercent, k.cutPercent, k.cap, BigInt(k.protectsPerReign), k.unit, BigInt(g.fallbackBlocks),
-          ],
-          { provider },
-        )
-      : new Contract(
-          artifact("FungeStateV2"),
-          [
-            hexToBin(pot.lockingBytecode), swapEndianness(g.pusdCategory), g.basePrice, g.priceStep,
-            hexToBin(g.refereePubkey), BigInt(g.fallbackBlocks), BigInt(g.waitingFallbackBlocks),
-          ],
-          { provider },
-        );
+    const state = new Contract(
+      artifact("FungeKingdom"),
+      [
+        hexToBin(pot.lockingBytecode), swapEndianness(g.pusdCategory), hexToBin(g.refereePubkey),
+        k.openingPrice, k.feePercent, k.cutPercent, k.cap, BigInt(k.protectsPerReign), k.unit, BigInt(g.fallbackBlocks),
+      ],
+      { provider },
+    );
     if (pot.lockingBytecode !== g.potLockingBytecode || state.lockingBytecode !== g.stateLockingBytecode) {
       throw new Error(`Refusing to start: the compiled contracts do not match the deployed game ${g.gameId}.`);
     }
@@ -57,13 +48,11 @@ export function makeReferee(
           ? state.unlock.protect(template, call.amount)
           : call.fn === "open"
             ? state.unlock.open(hexToBin(call.newHolder), template)
-            : call.fn === "conquer"
-              ? state.unlock.conquer(hexToBin(call.newHolder), template)
-              : state.unlock.pass(hexToBin(call.newHolder), template);
+            : state.unlock.conquer(hexToBin(call.newHolder), template);
       return unlocker.generateUnlockingBytecode({ transaction: tx, sourceOutputs, inputIndex: 0 });
     },
     // Whole pot to the holder, trophy to the holder, change to the holder. The referee signs; no wallet needed.
-    // The same for steal games and Kingdom games (a Kingdom round with only the opener pays the opener back).
+    // A Kingdom round with only the opener pays the opener back.
     settle(game, chain) {
       const { state, pot } = need(game.gameId);
       const s = chain.stateUtxo;

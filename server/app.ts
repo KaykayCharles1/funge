@@ -34,7 +34,7 @@ type BellInfo = ReturnType<RoundManager["bellInfo"]>;
 function describeKingdom(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, bell: BellInfo) {
   const params = game.kingdom;
   const k = chain.kingdom;
-  if (!params || !k || !chain.live) return null;
+  if (!k || !chain.live) return null;
   const open = k.passCount >= 1;
   const money = open ? conquestMoney(k.value, params) : null;
   const protectsLeft = open ? Math.max(0, params.protectsPerReign - k.protects) : 0;
@@ -69,13 +69,11 @@ export function describeRound(game: ServerGame, round: RoundRecord, chain: Chain
   // "price" is what it costs to take the throne right now
   const price = !chain.live
     ? null
-    : game.kingdom
-      ? kingdom?.conquest?.pay ?? game.kingdom.openingPrice.toString()
-      : (game.basePrice + game.priceStep * BigInt(chain.passCount)).toString();
+    : kingdom?.conquest?.pay ?? game.kingdom.openingPrice.toString();
   return {
     gameId: game.gameId,
     network: game.network,
-    kind: game.kingdom ? "kingdom" : "steal",
+    kind: "kingdom", // the page checks this, so it never talks to a server of another kind
     status: round.status,
     deadline: round.deadline, // epoch ms on the SERVER clock
     remainingMs, // frozen while paused; clients should prefer this plus serverNow

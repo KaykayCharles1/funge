@@ -477,14 +477,15 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   console.log("ok: two moves built on the same state: exactly one wins, the other is told the game moved on");
 }
 
-// ---------------------------------------------------------------- the two kinds of game do not mix
+// ---------------------------------------------------------------- only the three Kingdom moves are accepted
 {
   const s = await setup();
   await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE, action: "pass" })), "invalid");
   await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE, action: "steal" })), "invalid");
+  await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE, action: "settle" })), "invalid");
   await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE, action: "constructor" })), "invalid");
   assert.equal(s.world.broadcasts.length, 0);
-  console.log("ok: a Kingdom game accepts only open, conquer and protect");
+  console.log("ok: only open, conquer and protect are accepted (the old pass and steal, and settle, are refused)");
 }
 
 // ---------------------------------------------------------------- unconfirmed cap and broadcast errors still apply
@@ -498,6 +499,79 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   await fails(executeAct(f.deps, GAME, body(f.world, "conquer")), "state_changed");
   assert.equal(f.manager.get(GAME.gameId).events.at(-1)?.reason, "open"); // no new clock event: the broadcast failed
   console.log("ok: network-busy pause and broadcast errors behave as before");
+}
+
+// ---------------------------------------------------------------- timing and error cases carried over from the old game's tests
+{
+  // the same move sent twice, one after the other and at the same time
+  const s = await setup();
+  const b = body(s.world, "open", { payer: ALICE });
+  await executeAct(s.deps, GAME, b);
+  await fails(executeAct(s.deps, GAME, b), "state_changed");
+  const t = await setup();
+  const same = body(t.world, "open", { payer: ALICE });
+  const both = await Promise.allSettled([executeAct(t.deps, GAME, same), executeAct(t.deps, GAME, same)]);
+  assert.equal(both.filter((r) => r.status === "fulfilled").length, 1);
+  assert.equal(((both.find((r) => r.status === "rejected") as PromiseRejectedResult).reason as { code: string }).code, "state_changed");
+  assert.equal(t.world.broadcasts.length, 1);
+  console.log("ok: the same move sent twice: one wins, the other is told the game moved on");
+}
+{
+  // an in-time request stays in time even when the network checks are slow; a late one is still refused
+  const s = await setup({ state: open1, pot: 1000n });
+  const d1 = s.manager.get(GAME.gameId).deadline!;
+  const slowChain: ChainReader = {
+    ...s.deps.chain,
+    refresh: async (g) => {
+      s.clock.set(s.clock.now() + 1500); // the network check takes 1.5 s
+      return s.deps.chain.refresh(g);
+    },
+  };
+  const slow = { ...s.deps, chain: slowChain };
+  s.clock.set(d1 - 300);
+  await executeAct(slow, GAME, body(s.world, "conquer")); // arrived 300 ms early, finished 1.2 s after the deadline
+  assert.equal(s.world.broadcasts.length, 1);
+  const r = s.manager.get(GAME.gameId);
+  assert.equal(r.status, "open");
+  assert.equal(r.deadline, d1 + 1200 + 570_000);
+  s.clock.set(r.deadline! + GRACE + 10);
+  await fails(executeAct(slow, GAME, body(s.world, "conquer", { payer: CAROL })), "too_late"); // arrived late: still refused
+  assert.equal(s.world.broadcasts.length, 1);
+  console.log("ok: arrival time decides: slow checks cannot make an in-time move late");
+}
+{
+  // the cap pauses the round and a new block lifts it
+  const s = await setup({ state: open1, pot: 1000n, cap: 2 });
+  await executeAct(s.deps, GAME, body(s.world, "conquer"));
+  await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: CAROL }));
+  await fails(executeAct(s.deps, GAME, body(s.world, "conquer", { payer: BOB })), "network_busy");
+  assert.equal(s.manager.get(GAME.gameId).paused?.reason, "network_busy");
+  s.unconfirmed.resetAll();
+  s.manager.resume(GAME.gameId, "network_ok");
+  await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: BOB }));
+  console.log("ok: the unconfirmed cap pauses the round and a new block lifts it");
+}
+{
+  // what the node can say at broadcast
+  const s = await setup();
+  s.world.fail = new Error("Failed to establish connection: WebSocket: 1006");
+  await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE })), "outcome_unknown");
+  assert.equal(s.manager.get(GAME.gameId).deadline, null); // clock untouched
+  s.world.fail = new Error("too-long-mempool-chain");
+  await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE })), "network_busy");
+  assert.equal(s.manager.get(GAME.gameId).paused?.reason, "network_busy");
+  assert.equal(s.world.broadcasts.length, 0);
+  console.log("ok: broadcast errors mapped (unknown outcome, network busy)");
+}
+{
+  // our own last move not yet visible on the chain view; nothing accepted after settlement
+  const s = await setup();
+  s.manager.get(GAME.gameId).seenPassCount = 5;
+  await fails(executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE })), "chain_unavailable");
+  const t = await setup({ state: open1, pot: 1000n });
+  t.manager.markSettled(GAME.gameId, "t", "claim");
+  await fails(executeAct(t.deps, GAME, body(t.world, "conquer")), "round_over");
+  console.log("ok: a stale chain view is refused; a settled round accepts nothing");
 }
 
 // ---------------------------------------------------------------- what the page is told

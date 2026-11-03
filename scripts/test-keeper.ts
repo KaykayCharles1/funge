@@ -5,14 +5,14 @@ import { join } from "node:path";
 import type { Referee } from "../server/act.ts";
 import type { ChainReader, ChainState } from "../server/chain.ts";
 import { fakeClock } from "../server/clock.ts";
-import type { ServerGame } from "../server/games.ts";
+import { parseKingdomGameFile, type ServerGame } from "../server/games.ts";
 import { createKeeper, settleRound } from "../server/keeper.ts";
 import { makeLocks } from "../server/lock.ts";
 import { RoundManager } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
 import { makeUnconfirmed } from "../server/unconfirmed.ts";
-import { encodeCommitment } from "../src/lib/commitment.ts";
-import { GRACE_SECONDS, KEEPER_DELAY_SECONDS } from "../src/refereeParams.ts";
+import { NO_PREVIOUS, encodeKingdomCommitment, type KingdomState } from "../src/lib/kingdom.ts";
+import { BELL_PRESETS, GRACE_SECONDS, KEEPER_DELAY_SECONDS } from "../src/refereeParams.ts";
 
 const hex32 = (n: number) => n.toString(16).padStart(2, "0").repeat(32);
 const KING = "11".repeat(20);
@@ -21,27 +21,32 @@ const KEEPER = KEEPER_DELAY_SECONDS * 1000;
 const dir = mkdtempSync(join(tmpdir(), "funge-keeper-"));
 let counter = 0;
 
-const GAME: ServerGame = {
-  gameId: hex32(0xa1), network: "chipnet", pusdCategory: hex32(0xb2), refereePubkey: "02" + "11".repeat(32),
-  stateAddress: "state", potAddress: "pot",
-  stateLockingBytecode: "aa20" + "01".repeat(32) + "87", potLockingBytecode: "aa20" + "02".repeat(32) + "87",
-  basePrice: 100n, priceStep: 10n, fallbackBlocks: 12, waitingFallbackBlocks: 144,
-};
+const GAME: ServerGame = parseKingdomGameFile(
+  {
+    contractVersion: 3, network: "chipnet", gameCategory: hex32(0xa1), pusdCategory: hex32(0xb2), refereePubkey: "02" + "11".repeat(32),
+    state: { address: "state", lockingBytecode: "aa20" + "01".repeat(32) + "87" },
+    pot: { address: "pot", lockingBytecode: "aa20" + "02".repeat(32) + "87" },
+    params: { openingPrice: "1000", feePercent: "2", cutPercent: "10", cap: "5000", protectsPerReign: 2, unit: "100", fallbackBlocks: 12 },
+  },
+  "chipnet",
+);
 
 async function setup(opts: { open?: boolean } = {}) {
   const { store } = await Store.open(join(dir, `s${counter++}.json`));
   const clock = fakeClock();
   const manager = new RoundManager(store, clock);
+  manager.setBell(GAME.gameId, BELL_PRESETS.standard);
   const world = { passCount: 3, live: true, settles: 0, broadcasts: 0, fail: null as Error | null };
+  const kingdomState = (): KingdomState => ({ passCount: world.passCount, holderPkh: KING, value: 1000n, protects: 0, previous: NO_PREVIOUS });
   const view = (): ChainState =>
     world.live
       ? {
-          live: true, passCount: world.passCount, holderPkh: KING, potAmount: 1330n, stateTxid: hex32(1), stateVout: 0, stale: false,
+          live: true, passCount: world.passCount, holderPkh: KING, potAmount: 1330n, stateTxid: hex32(1), stateVout: 0, stale: false, kingdom: kingdomState(),
           stateUtxo: { txid: hex32(1), vout: 0, satoshis: 2000n,
-            token: { amount: 0n, category: GAME.gameId, nft: { capability: "mutable", commitment: encodeCommitment(world.passCount, KING) } } },
+            token: { amount: 0n, category: GAME.gameId, nft: { capability: "mutable", commitment: encodeKingdomCommitment(kingdomState()) } } },
           potUtxo: { txid: hex32(2), vout: 0, satoshis: 2000n, token: { amount: 1330n, category: GAME.pusdCategory } },
         }
-      : { live: false, passCount: world.passCount, holderPkh: KING, potAmount: null, stateTxid: null, stateVout: null, stateUtxo: null, potUtxo: null, stale: false };
+      : { live: false, passCount: world.passCount, holderPkh: KING, potAmount: null, stateTxid: null, stateVout: null, stateUtxo: null, potUtxo: null, stale: false, kingdom: null };
   const chain: ChainReader = { read: async () => view(), refresh: async () => view(), invalidate: () => undefined, last: () => view() };
   const referee: Referee = {
     sign: () => Uint8Array.of(1),
@@ -57,7 +62,7 @@ async function setup(opts: { open?: boolean } = {}) {
     },
   };
   const deps = { manager, chain, clock, referee, locks: makeLocks(), unconfirmed: makeUnconfirmed(40), sleep: async () => undefined };
-  if (opts.open !== false) manager.applyAction(GAME.gameId, "steal", "steal", { passCount: 3 });
+  if (opts.open !== false) manager.applyKingdomAction(GAME.gameId, "conquer", 3);
   const deadline = () => manager.get(GAME.gameId).deadline!;
   const goOver = () => {
     clock.set(deadline() + GRACE);

@@ -41,7 +41,7 @@ export type ActBody = { action: string; txHex: string; walletInputs: WalletInput
 
 // Which contract function the referee signs for, and with what arguments
 export type SignCall =
-  | { fn: "pass" | "open" | "conquer"; newHolder: string }
+  | { fn: "open" | "conquer"; newHolder: string }
   | { fn: "protect"; amount: bigint };
 
 export type ValidateCtx = { game: ServerGame; chain: ChainState; tx: Transaction; body: ActBody };
@@ -51,4 +51,4 @@ export type Validated = {
   sign: SignCall;
   protect?: { amount: bigint; value: bigint; used: number }; // Kingdom protect only
 };
-export type ActionHandler = { fn: "pass" | "open" | "conquer" | "protect"; validate: (ctx: ValidateCtx) => Validated };
+export type ActionHandler = { fn: "open" | "conquer" | "protect"; validate: (ctx: ValidateCtx) => Validated };

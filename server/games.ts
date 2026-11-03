@@ -20,11 +20,8 @@ export type ServerGame = {
   potAddress: string;
   stateLockingBytecode: string;
   potLockingBytecode: string;
-  basePrice: bigint; // steal games only. A Kingdom game carries placeholders here; the fields go away when the steal path is retired.
-  priceStep: bigint;
   fallbackBlocks: number;
-  waitingFallbackBlocks: number;
-  kingdom?: KingdomParams; // present on Kingdom games only
+  kingdom: KingdomParams;
 };
 
 const publicFile = (name: string) => new URL(`../public/${name}`, import.meta.url);
@@ -68,49 +65,16 @@ export function parseKingdomGameFile(j: any, network: Network): ServerGame {
     potAddress: j.pot.address,
     stateLockingBytecode: j.state.lockingBytecode,
     potLockingBytecode: j.pot.lockingBytecode,
-    basePrice: params.openingPrice,
-    priceStep: 0n,
     fallbackBlocks,
-    waitingFallbackBlocks: fallbackBlocks,
     kingdom: params,
   };
 }
 
-// Loads the steal game (v2 file) and the Kingdom game (kingdom file) side by side. At least one must exist.
+// Loads the Kingdom game file. The chipnet referee key is checked against the public key in that file.
 export function loadGames(network: Network): { games: ServerGame[]; chipnetPubkeys: string[] } {
-  const games: ServerGame[] = [];
-  const v2File = publicFile(`game.${network}.v2.json`);
-  if (existsSync(v2File)) {
-    const j = JSON.parse(readFileSync(v2File, "utf8"));
-    if (j.contractVersion !== 2 || j.network !== network) {
-      throw new Error(`public/game.${network}.v2.json is not a v2 ${network} game`);
-    }
-    games.push({
-      gameId: j.gameCategory,
-      network,
-      pusdCategory: j.pusdCategory,
-      refereePubkey: j.refereePubkey,
-      stateAddress: j.state.address,
-      potAddress: j.pot.address,
-      stateLockingBytecode: j.state.lockingBytecode,
-      potLockingBytecode: j.pot.lockingBytecode,
-      basePrice: BigInt(j.params.basePrice),
-      priceStep: BigInt(j.params.priceStep),
-      fallbackBlocks: Number(j.params.fallbackBlocks),
-      waitingFallbackBlocks: Number(j.params.waitingFallbackBlocks),
-    });
-  }
-  const kingdomFile = publicFile(`game.${network}.kingdom.json`);
-  if (existsSync(kingdomFile)) {
-    games.push(parseKingdomGameFile(JSON.parse(readFileSync(kingdomFile, "utf8")), network));
-  }
-  if (games.length === 0) throw new Error(`Missing public/game.${network}.v2.json and public/game.${network}.kingdom.json`);
-  if (new Set(games.map((g) => g.gameId)).size !== games.length) throw new Error("Two game files describe the same game.");
-
-  const chipnetPubkeys: string[] = [];
-  for (const name of ["game.chipnet.v2.json", "game.chipnet.kingdom.json"]) {
-    const f = publicFile(name);
-    if (existsSync(f)) chipnetPubkeys.push(JSON.parse(readFileSync(f, "utf8")).refereePubkey as string);
-  }
-  return { games, chipnetPubkeys };
+  const file = publicFile(`game.${network}.kingdom.json`);
+  if (!existsSync(file)) throw new Error(`Missing public/game.${network}.kingdom.json (run scripts/deploy-kingdom.ts)`);
+  const j = JSON.parse(readFileSync(file, "utf8"));
+  const game = parseKingdomGameFile(j, network);
+  return { games: [game], chipnetPubkeys: network === "chipnet" ? [game.refereePubkey] : [] };
 }

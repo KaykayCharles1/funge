@@ -3,23 +3,28 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fakeClock } from "../server/clock.ts";
-import { RoundManager, classifyAction } from "../server/rounds.ts";
+import { RoundManager } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
-import { EVENT_HISTORY, GRACE_SECONDS, RESET_SECONDS } from "../src/refereeParams.ts";
+import { clockSecondsFor } from "../src/lib/bell.ts";
+import { BELL_PRESETS, EVENT_HISTORY, GRACE_SECONDS } from "../src/refereeParams.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "funge-rounds-"));
-const RESET = RESET_SECONDS.steal * 1000;
+const bell = BELL_PRESETS.standard;
+const RESET = bell.startSeconds * 1000; // the clock the open sets (pass 1)
 const GRACE = GRACE_SECONDS * 1000;
 
 async function setup(name: string, clock = fakeClock()) {
   const path = join(dir, `${name}.json`);
   const { store } = await Store.open(path);
-  return { path, clock, store, mgr: new RoundManager(store, clock) };
+  const mgr = new RoundManager(store, clock);
+  for (const id of ["g", "open", "paused", "over", "old", "live", "lost"]) mgr.setBell(id, bell);
+  return { path, clock, store, mgr };
 }
 
-// classification
-assert.equal(classifyAction("pass"), "steal");
-assert.equal(classifyAction("settle"), null);
+// The n-th move of a round: pass 1 is the open, later passes are conquests. The clock follows the bell.
+function move(mgr: RoundManager, id: string, passCount = 1) {
+  return mgr.applyKingdomAction(id, passCount === 1 ? "open" : "conquer", passCount);
+}
 
 // waiting: no deadline, stays idle
 {
@@ -30,10 +35,10 @@ assert.equal(classifyAction("settle"), null);
   console.log("ok: waiting round has no deadline");
 }
 
-// steal sets the deadline; over comes at deadline + grace, not before
+// the open sets the deadline; over comes at deadline + grace, not before
 {
   const { mgr, clock } = await setup("timer");
-  mgr.applyAction("g", "steal", "steal");
+  move(mgr, "g", 1);
   const r = mgr.get("g");
   assert.equal(r.status, "open");
   assert.equal(r.deadline, clock.now() + RESET);
@@ -46,22 +51,22 @@ assert.equal(classifyAction("settle"), null);
   console.log("ok: open until deadline + grace, then over");
 }
 
-// a steal resets the deadline again, and events are numbered
+// a conquest resets the deadline again (to the bell), and events are numbered
 {
   const { mgr, clock } = await setup("reset");
-  mgr.applyAction("g", "steal", "steal");
+  move(mgr, "g", 1);
   clock.advance(100_000);
-  mgr.applyAction("g", "steal", "steal");
+  move(mgr, "g", 2);
   const r = mgr.get("g");
-  assert.equal(r.deadline, clock.now() + RESET);
+  assert.equal(r.deadline, clock.now() + clockSecondsFor(2, bell) * 1000);
   assert.deepEqual(r.events.map((e) => e.seq), [1, 2]);
-  console.log("ok: deadline resets on each steal, events numbered");
+  console.log("ok: deadline resets on each move, events numbered");
 }
 
 // pause freezes the clock; resume pushes the deadline out by the pause length
 {
   const { mgr, clock } = await setup("pause");
-  mgr.applyAction("g", "steal", "steal");
+  move(mgr, "g", 1);
   const before = mgr.get("g").deadline!;
   clock.advance(60_000);
   mgr.pause("g", "network");
@@ -75,10 +80,10 @@ assert.equal(classifyAction("settle"), null);
 // restart: downtime is a pause for open rounds only
 {
   const a = await setup("restart");
-  a.mgr.applyAction("open", "steal", "steal");
-  a.mgr.applyAction("paused", "steal", "steal");
+  move(a.mgr, "open");
+  move(a.mgr, "paused");
   a.mgr.pause("paused", "network");
-  a.mgr.applyAction("over", "steal", "steal");
+  move(a.mgr, "over");
   a.clock.advance(RESET + GRACE);
   a.mgr.observe("over", { live: true, passCount: 1 });
   const openDeadline = a.mgr.get("open").deadline!;
@@ -104,7 +109,7 @@ assert.equal(classifyAction("settle"), null);
 // resync after too many events
 {
   const { mgr } = await setup("resync");
-  for (let i = 0; i < EVENT_HISTORY + 50; i++) mgr.applyAction("g", "steal", "steal");
+  for (let i = 0; i < EVENT_HISTORY + 50; i++) move(mgr, "g", i + 1);
   const r = mgr.get("g");
   assert.equal(r.events.length, EVENT_HISTORY);
   assert.equal(mgr.eventsAfter("g", 0).resync, true);
@@ -116,7 +121,7 @@ assert.equal(classifyAction("settle"), null);
   console.log("ok: reconnect resync");
 }
 
-// chain is the truth: no state coin means settled; an unseen steal opens a waiting round
+// chain is the truth: no state coin means settled; an unseen move opens a waiting round
 {
   const a = await setup("chain");
   assert.equal(a.mgr.observe("g", { live: false, passCount: 5 }).status, "settled");
@@ -127,23 +132,23 @@ assert.equal(classifyAction("settle"), null);
   console.log("ok: chain overrides our record");
 }
 
-// a steal made outside /act still restarts the clock
+// a move made outside /act still restarts the clock
 {
   const { mgr, clock } = await setup("unseen");
-  mgr.applyAction("g", "steal", "steal", { passCount: 1 });
+  move(mgr, "g", 1);
   clock.advance(100_000);
   mgr.observe("g", { live: true, passCount: 1 });
   assert.equal(mgr.get("g").events.length, 1); // nothing new
   mgr.observe("g", { live: true, passCount: 2 });
-  assert.equal(mgr.get("g").deadline, clock.now() + RESET);
+  assert.equal(mgr.get("g").deadline, clock.now() + clockSecondsFor(2, bell) * 1000);
   assert.equal(mgr.get("g").events.at(-1)?.reason, "observed_on_chain");
-  console.log("ok: steals made outside /act restart the clock");
+  console.log("ok: moves made outside /act restart the clock");
 }
 
-// a grab that is being processed holds the round open, so there is no "over" flash
+// a move that is being processed holds the round open, so there is no "over" flash
 {
   const { mgr, clock } = await setup("hold");
-  mgr.applyAction("g", "steal", "steal", { passCount: 1 });
+  move(mgr, "g", 1);
   const deadline = mgr.get("g").deadline!;
   clock.set(deadline + GRACE + 500);
   const release = mgr.hold("g");
@@ -152,15 +157,15 @@ assert.equal(classifyAction("settle"), null);
   release();
   release(); // releasing twice is harmless
   assert.equal(mgr.observe("g", { live: true, passCount: 1 }).status, "over");
-  console.log("ok: a grab in progress keeps the round open");
+  console.log("ok: a move in progress keeps the round open");
 }
 
 // restart only touches rounds of loaded games; old settled rounds are pruned, unsettled ones kept
 {
   const a = await setup("orphans");
-  a.mgr.applyAction("old", "steal", "steal");
-  a.mgr.applyAction("live", "steal", "steal");
-  a.mgr.applyAction("lost", "steal", "steal");
+  move(a.mgr, "old");
+  move(a.mgr, "live");
+  move(a.mgr, "lost");
   a.mgr.observe("old", { live: false, passCount: 1 }); // settled
   a.mgr.heartbeat();
   await a.mgr.flush();

@@ -20,7 +20,7 @@ export type RoundSnapshot = {
   stateCoin: { txid: string; vout: number | null } | null;
   refereePubkey: string;
   chainStale: boolean;
-  kind?: "steal" | "kingdom";
+  kind?: "kingdom";
   kingdom?: KingdomSnapshot | null; // Kingdom rounds only
 };
 
@@ -65,7 +65,7 @@ export type WalletInputClaim = {
   lockingBytecode: string;
   token?: { amount: string; category: string; nft?: { capability: "none" | "mutable" | "minting"; commitment: string } };
 };
-export type ActRequest = { action: "steal" | "open" | "conquer" | "protect"; txHex: string; walletInputs: WalletInputClaim[] };
+export type ActRequest = { action: "open" | "conquer" | "protect"; txHex: string; walletInputs: WalletInputClaim[] };
 export type ActSuccess = {
   ok: true; txid: string; passCount: number; king: string; deadline: number | null; serverNow: number; lastSeq: number;
 };

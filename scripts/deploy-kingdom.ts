@@ -1,12 +1,12 @@
 // Deploys a Kingdom game and writes public/game.<network>.kingdom.json. One command, run by the owner.
 //   node scripts/deploy-kingdom.ts [<33-byte referee public key in hex>]
-// Without a key it reuses the referee key of the existing chipnet test game. No PUSD is needed: the round starts
+// Without a key, on chipnet, it uses the test key in .referee.chipnet.json (made by scripts/gen-referee-key.ts). No PUSD is needed: the round starts
 // "waiting", with a BCH-only pot coin and an empty state. The first player's open puts the first PUSD in.
 // Chipnet test games can use a short fallback: FUNGE_FALLBACK_BLOCKS=3 node scripts/deploy-kingdom.ts
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { Contract, TransactionBuilder } from "cashscript";
-import { hexToBin } from "@bitauth/libauth";
+import { Contract, SignatureTemplate, TransactionBuilder } from "cashscript";
+import { binToHex, hexToBin } from "@bitauth/libauth";
 import { parseKingdomGameFile } from "../server/games.ts";
 import { CONFIG, pusdCategory } from "../src/config.ts";
 import { WAITING_STATE, decodeKingdomCommitment, encodeKingdomCommitment } from "../src/lib/kingdom.ts";
@@ -32,10 +32,12 @@ function fallbackBlocks(): number {
 function refereeKey(): string {
   const given = (process.argv[2] ?? process.env.REFEREE_PUBKEY ?? "").toLowerCase();
   if (given) return given;
-  const v2 = new URL(`../public/game.${CONFIG.network}.v2.json`, import.meta.url);
-  if (CONFIG.network === "chipnet" && existsSync(v2)) {
-    console.log("No referee key given: using the referee key of the existing chipnet test game.");
-    return String(JSON.parse(readFileSync(v2, "utf8")).refereePubkey).toLowerCase();
+  // Chipnet: the test key made by gen-referee-key.ts (git-ignored) is the one the server signs with.
+  const keyFile = new URL("../.referee.chipnet.json", import.meta.url);
+  if (CONFIG.network === "chipnet" && existsSync(keyFile)) {
+    console.log("No referee key given: using the chipnet test key from .referee.chipnet.json.");
+    const privateKey = hexToBin(String(JSON.parse(readFileSync(keyFile, "utf8")).privateKeyHex));
+    return binToHex(new SignatureTemplate(privateKey).publicKey);
   }
   return "";
 }

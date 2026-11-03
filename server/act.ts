@@ -1,16 +1,15 @@
 import { binToHex, decodeTransaction, encodeTransaction, hexToBin } from "@bitauth/libauth";
 import type { Transaction } from "@bitauth/libauth";
-import type { LibauthOutput, Utxo } from "cashscript";
-import { decodeCommitment } from "../src/lib/commitment.ts";
+import type { LibauthOutput } from "cashscript";
 import { GRACE_SECONDS } from "../src/refereeParams.ts";
 import { ActError, invalid } from "./actTypes.ts";
-import type { ActBody, ActErrorCode, ActionHandler, Capability, SignCall, ValidateCtx, Validated, WalletInputClaim } from "./actTypes.ts";
+import type { ActBody, ActErrorCode, ActionHandler, Capability, SignCall, WalletInputClaim } from "./actTypes.ts";
 import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
 import { KINGDOM_HANDLERS } from "./kingdomAct.ts";
 import type { LockRunner } from "./lock.ts";
-import { classifyAction, classifyKingdomAction, type RoundManager } from "./rounds.ts";
+import { classifyKingdomAction, type RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
 import { safeText } from "../src/lib/safeLog.ts";
@@ -79,62 +78,6 @@ export function parseActBody(raw: unknown): ActBody {
   return { action: b.action, txHex: b.txHex as string, walletInputs };
 }
 
-const spends = (inp: Transaction["inputs"][number], u: Utxo) =>
-  binToHex(inp.outpointTransactionHash) === u.txid && inp.outpointIndex === u.vout;
-
-function validateSteal({ game, chain, tx, body }: ValidateCtx): Validated {
-  const stateCoin = chain.stateUtxo;
-  const potCoin = chain.potUtxo;
-  if (!stateCoin || !potCoin?.token) throw new ActError("round_over", "This round has no live state.");
-  if (tx.inputs.length < 3) invalid("A steal needs the state coin, the pot coin and at least one wallet input.");
-  const in0 = tx.inputs[0]!;
-  const in1 = tx.inputs[1]!;
-  if (!spends(in0, stateCoin) || !spends(in1, potCoin)) {
-    throw new ActError("state_changed", "The game moved on. Reload the round and try again.");
-  }
-
-  // wallet inputs: same count and outpoints as claimed, signed, no duplicates
-  const walletTx = tx.inputs.slice(2);
-  if (walletTx.length !== body.walletInputs.length) invalid("walletInputs does not match the transaction inputs.");
-  const seen = new Set<string>([`${stateCoin.txid}:${stateCoin.vout}`, `${potCoin.txid}:${potCoin.vout}`]);
-  walletTx.forEach((inp, i) => {
-    const claim = body.walletInputs[i]!;
-    const key = `${binToHex(inp.outpointTransactionHash)}:${inp.outpointIndex}`;
-    if (key !== `${claim.txid}:${claim.vout}`) invalid(`Wallet input ${i} does not match its description.`);
-    if (seen.has(key)) invalid("The same coin is spent twice.");
-    seen.add(key);
-    if (inp.unlockingBytecode.length === 0) invalid(`Wallet input ${i} is not signed.`);
-  });
-
-  // outputs: state goes back to the state contract with passCount + 1, pot grows by the price
-  const out0 = tx.outputs[0];
-  const out1 = tx.outputs[1];
-  if (!out0 || !out1) invalid("A steal needs at least two outputs.");
-  if (binToHex(out0!.lockingBytecode) !== game.stateLockingBytecode) invalid("Output 0 must go back to the state contract.");
-  if (binToHex(out1!.lockingBytecode) !== game.potLockingBytecode) invalid("Output 1 must go back to the pot contract.");
-  const nft = out0!.token?.nft;
-  if (!out0!.token || !nft || nft.capability !== "mutable" || binToHex(out0!.token.category) !== game.gameId) {
-    invalid("Output 0 must carry the game's state token.");
-  }
-  let decoded: { passCount: number; holderPkh: string };
-  try {
-    decoded = decodeCommitment(binToHex(nft!.commitment));
-  } catch {
-    return invalid("Output 0 has a malformed commitment.");
-  }
-  if (decoded.passCount !== chain.passCount + 1) {
-    throw new ActError("state_changed", "The pass count does not follow the current state. Reload and try again.");
-  }
-  const price = game.basePrice + game.priceStep * BigInt(chain.passCount);
-  if (!out1!.token || binToHex(out1!.token.category) !== game.pusdCategory || out1!.token.amount !== potCoin.token.amount + price) {
-    throw new ActError("invalid", "The pot must grow by exactly the current price.");
-  }
-  return { newHolder: decoded.holderPkh, newPassCount: decoded.passCount, sign: { fn: "pass", newHolder: decoded.holderPkh } };
-}
-
-// One table per kind of game. Settle is the keeper's job, not an action a player sends.
-const STEAL_HANDLERS: Record<string, ActionHandler> = { steal: { fn: "pass", validate: validateSteal } };
-
 const toLibauth = (
   lockingHex: string, satoshis: bigint,
   token?: { amount: bigint; category: string; nft?: { capability: Capability; commitment: string } },
@@ -161,7 +104,7 @@ export function mapBroadcastError(e: unknown, deps: ActDeps, id: string, pause =
     return new ActError("state_changed", "Someone else got there first. Reload the round and try again.");
   }
   if (/websocket|establish connection|failed to connect|timed? ?out|closed|socket/i.test(msg)) {
-    return new ActError("outcome_unknown", "We could not confirm that the network received the steal. Check the pass number before trying again.");
+    return new ActError("outcome_unknown", "We could not confirm that the network received your move. Check the pass number before trying again.");
   }
   return new ActError("invalid", `The network rejected the transaction: ${safeText(msg).slice(0, 200)}`);}
 
@@ -169,13 +112,12 @@ export type ActResult = { txid: string; passCount: number; king: string; deadlin
 
 export async function executeAct(deps: ActDeps, game: ServerGame, raw: unknown): Promise<ActResult> {
   const body = parseActBody(raw);
-  const table = game.kingdom ? KINGDOM_HANDLERS : STEAL_HANDLERS;
-  const handler = Object.prototype.hasOwnProperty.call(table, body.action) ? table[body.action] : undefined;
+  const handler = Object.prototype.hasOwnProperty.call(KINGDOM_HANDLERS, body.action) ? KINGDOM_HANDLERS[body.action] : undefined;
   if (!handler) throw new ActError("invalid", `Unknown action "${body.action}".`);
   const id = game.gameId;
   const arrivedAt = deps.clock.now(); // timing is judged by when the request arrived, not by how long our network checks take
 
-  // A grab that arrived in time keeps the round open while it is processed, so nobody sees "Round is over" flash by
+  // A move that arrived in time keeps the round open while it is processed, so nobody sees "Round is over" flash by
   const r0 = deps.manager.get(id);
   const inTime = r0.status === "open" && r0.deadline !== null && arrivedAt < r0.deadline + GRACE_SECONDS * 1000;
   const release = inTime ? deps.manager.hold(id) : () => {};
@@ -193,7 +135,7 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     const { manager, chain, clock } = deps;
     if (manager.get(id).status === "settled") throw new ActError("round_over", "The round is over.");
     
-    // 1. Latest chain view. If it does not yet show our own last steal, wait briefly.
+    // 1. Latest chain view. If it does not yet show our own last move, wait briefly.
     const behind = (c: ChainState | undefined) => !c || (c.live && c.passCount < (manager.get(id).seenPassCount ?? 0));
     let c: ChainState | undefined;
     for (let t = 0; t < 6; t++) {
@@ -266,14 +208,7 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     // 7. Success: set the clock (or leave it alone, for protect) and publish the event
     deps.unconfirmed.record(id);
     let r: RoundRecord;
-    if (handler.fn === "pass") {
-      const type = classifyAction("pass");
-      if (!type) throw new Error("action has no deadline reset");
-      r = manager.applyAction(id, type, body.action, {
-        passCount: checked.newPassCount,
-        data: { txid, king: checked.newHolder, passCount: checked.newPassCount },
-      });
-    } else if (handler.fn === "protect") {
+    if (handler.fn === "protect") {
       if (!checked.protect) throw new Error("protect without its details");
       r = manager.applyProtect(id, {
         txid, king: checked.newHolder, amount: checked.protect.amount.toString(),
