@@ -14,7 +14,7 @@ export type RoundSnapshot = {
   graceSeconds: number;
   lastSeq: number;
   passCount: number;
-  king: string | null; // pkh hex, null until the first grab
+  king: string | null; // pkh hex, null until the first open
   price: string | null; // base units, as a string
   pot: string | null;
   stateCoin: { txid: string; vout: number | null } | null;

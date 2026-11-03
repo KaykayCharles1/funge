@@ -1,6 +1,6 @@
 # Kingdom v1: rules, state and money flow
 
-Status: spec for the build steps K2 onward. The old steal contract and page keep working until the old path is retired (K9).
+Status: built and running on chipnet. The old steal game was retired in K9d and is kept only in the git tags `v1-grab` and `v2-steal-timer`.
 
 ## Rules
 - **Actions:** open, conquer, protect, settle, plus the existing no-referee settleFallback. No reclaim in v1.
@@ -22,7 +22,7 @@ Status: spec for the build steps K2 onward. The old steal contract and page keep
 | PROTECTS_PER_REIGN | 2 | |
 | UNIT | 100 | base units in 1 PUSD; protect amounts are UNIT, 5 x UNIT, 10 x UNIT |
 | FALLBACK_BLOCKS | 12 | |
-| WAITING_FALLBACK_BLOCKS | dropped | the waiting state holds no PUSD |
+| WAITING_FALLBACK_BLOCKS | dropped | the waiting state holds no PUSD; the setting no longer exists anywhere in the project |
 
 The clock settings and the protect lockout live in the referee, not in the contract.
 
@@ -72,7 +72,7 @@ Every conquest conserves tokens: what the payer sends out equals what the king a
 3. **Same-key conquest is refused, as an accident guard only.** The contract rejects a conquest whose new holder equals the current holder, so a king cannot do it by mistake. It does not prevent self-conquest with a second wallet. That costs about 10% net (returned through the pool if that wallet wins) and resets the protect counter. This is a known limitation of v1 (see KNOWN_ISSUES.md), with no design change.
 4. **Fee and cut are whole percents.** The values are always whole PUSD, so the rounding rule rarely matters, but it is defined.
 5. **Protect on a maxed value.** Refused by the contract ("Walls at maximum").
-6. **Coexistence.** New contract file, new game file `public/game.<network>.kingdom.json` (contractVersion 3). The server will load the old v2 game and the kingdom game side by side, and the page picks one (a config flag, plus `?mode=kingdom` for testing) until the old path is retired.
+6. **Coexistence (finished).** New contract file, new game file `public/game.<network>.kingdom.json` (contractVersion 3). For a while the server loaded the old v2 game and the Kingdom game side by side and the page chose with `?mode=kingdom`. In K9d the old path was deleted, not moved aside: the server, the page, the deploy script, the preflight and the tests know only the Kingdom game, and the old code is reachable through the git tags. The server still takes a list of games, so a second game could be added later.
 7. **How the next round starts (open point).** After a round settles, a new game must be deployed. For the hackathon, the owner runs a one-command deploy script, and the page shows "Next round is being prepared" until the new game file is live. Later, optionally, the server could auto-deploy: after a settlement it would deploy the next game using a separate small key that only holds deploy funds. This key is never the referee key, so a leak can lose only that small balance and cannot touch rounds or signatures. Not built in v1.
 8. **What "PUSD payout" means to the contract.** It checks that the output's token category equals PUSD, so mutable and minting NFTs riding along are refused. An immutable NFT of the PUSD category is not detectable by the category check. It is harmless: the sender gives it away, and amount, destination and category are still enforced.
 

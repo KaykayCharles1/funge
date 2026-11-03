@@ -140,7 +140,7 @@ async function main() {
       Origin: pageOrigin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type",
     });
     const methods = String(pre.headers["access-control-allow-methods"] ?? "");
-    report(pre.status < 300 && methods.includes("POST") ? "ok" : "fail", "CORS preflight for grabs", `status ${pre.status}, methods ${methods || "none"}`);
+    report(pre.status < 300 && methods.includes("POST") ? "ok" : "fail", "CORS preflight for moves", `status ${pre.status}, methods ${methods || "none"}`);
   } catch (e) {
     report("fail", "CORS", message(e));
   }

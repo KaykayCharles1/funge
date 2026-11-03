@@ -21,7 +21,7 @@ export class RoundManager {
   private store: Store;
   private clock: Clock;
   private listeners = new Set<Listener>();
-  private holds = new Map<string, number>(); // grabs that arrived in time and are still being processed
+  private holds = new Map<string, number>(); // moves that arrived in time and are still being processed
 
   constructor(store: Store, clock: Clock) {
     this.store = store;
@@ -109,7 +109,7 @@ export class RoundManager {
     return removed;
   }
 
-  // A grab that arrived in time calls this while it is being processed; the round cannot become "over" until it releases.
+  // A move that arrived in time calls this while it is being processed; the round cannot become "over" until it releases.
   hold(gameId: string): () => void {
     this.holds.set(gameId, (this.holds.get(gameId) ?? 0) + 1);
     let done = false;
