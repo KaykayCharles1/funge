@@ -9,14 +9,6 @@ export type Game = {
 };
 
 
-// The V2 game file (referee mode): no block timeout, but a referee key and fallback settings
-export type GameV2 = Omit<Game, "params"> & {
-  contractVersion: 2;
-  refereePubkey: string;
-  params: { basePrice: string; priceStep: string; seedPot: string; fallbackBlocks: number; waitingFallbackBlocks: number };
-};
-
-
 // The Kingdom game file (contractVersion 3), written by scripts/deploy-kingdom.ts
 export type GameKingdom = Omit<Game, "params"> & {
   contractVersion: 3;

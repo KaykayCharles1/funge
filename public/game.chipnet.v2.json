@@ -1,17 +1,17 @@
 {
   "contractVersion": 2,
   "network": "chipnet",
-  "gameCategory": "96192441b1e4e3e42664d6604621e2c2f4f26aed236b001e1505acc806bc47b3",
+  "gameCategory": "9960abbf27fc10cfbd6dc899eefe15582b5c0ad8ea6d78278ff8de0862de4966",
   "pusdCategory": "8af14ba0e3e6db4d2e6f7290ec7421d3a76d387cf00ea35e9fec1218434549eb",
   "state": {
-    "address": "bchtest:pds9jxy2xmyrfpj53m4d5wngcczlam94jvmew09q8kh0ajez5x7xu2qvd5st2",
-    "tokenAddress": "bchtest:rds9jxy2xmyrfpj53m4d5wngcczlam94jvmew09q8kh0ajez5x7xucnsvd3jp",
-    "lockingBytecode": "aa206059188a36c83486548eeada3a68c605feecb59337973ca03daefecb22a1bc6e87"
+    "address": "bchtest:p0f3yl0wskyqwgj7h2vutq4kdcanearfkcz9r4ye682mzrc7srzwv2ff9vpg7",
+    "tokenAddress": "bchtest:r0f3yl0wskyqwgj7h2vutq4kdcanearfkcz9r4ye682mzrc7srzwvc64y4q34",
+    "lockingBytecode": "aa20d3127dee858807225eba99c582b66e3b3cf469b60451d499d1d5b10f1e80c4e687"
   },
   "pot": {
-    "address": "bchtest:pdhngrcarmjcwt8y477zc3a0xhxhat38zy3vjg4vpmjztrvajjg4stu4uj8wz",
-    "tokenAddress": "bchtest:rdhngrcarmjcwt8y477zc3a0xhxhat38zy3vjg4vpmjztrvajjg4se0fatxhf",
-    "lockingBytecode": "aa206f340f1d1ee5872ce4afbc2c47af35cd7eae271122c922ac0ee4258d9d94915887"
+    "address": "bchtest:pvjhsjlgzevrv36t5vpncz8atpn3780mtpspjnsfnm7s87aqthghcaale9elx",
+    "tokenAddress": "bchtest:rvjhsjlgzevrv36t5vpncz8atpn3780mtpspjnsfnm7s87aqthghc0wrcucxd",
+    "lockingBytecode": "aa2025784be8165836474ba3033c08fd58671f1dfb5860194e099efd03fba05dd17c87"
   },
   "refereePubkey": "02be51ba8c8ec721baf4aba465a3022065527c6f659285383e24cf83180ceafd7b",
   "params": {
@@ -22,6 +22,6 @@
     "waitingFallbackBlocks": 144
   },
   "creatorPkh": "53478d4c3763bfc04cf433a148c8ac14435233f7",
-  "prepTxid": "96192441b1e4e3e42664d6604621e2c2f4f26aed236b001e1505acc806bc47b3",
-  "initTxid": "8c17907f226fa2684d8d4b0cd09c923e0c0455e6935572d170b363eb8c48a0bf"
+  "prepTxid": "9960abbf27fc10cfbd6dc899eefe15582b5c0ad8ea6d78278ff8de0862de4966",
+  "initTxid": "e220679ad28939a364caf45b7f6e5e44671ec69041cefdc014270559a61309ea"
 }

@@ -7,9 +7,12 @@ import { decodeKingdomCommitment } from "../lib/kingdom.ts";
 import type { GameKingdom } from "../lib/game.ts";
 import { retry } from "../lib/retry.ts";
 import type { LocalWallet } from "../wallet/local.ts";
-import type { FallbackOutcome } from "./fallback.ts";
 import { kingdomContracts, readKingdomCoins } from "./kingdomActions.ts";
 import type { KingdomArtifacts } from "./kingdomActions.ts";
+
+export type FallbackOutcome =
+  | { ok: true; txid: string }
+  | { ok: false; code: "too_early" | "round_gone" | "needs_bch" | "outcome_unknown" | "failed"; text: string };
 
 export type KingdomChainWatch = {
   live: boolean; // false: the state coin is gone, so the round has been settled

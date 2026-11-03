@@ -1,6 +1,5 @@
-// The Kingdom page (open it with ?mode=kingdom): state, price previews, event feed, and (K8b) the buttons to open,
+// The Kingdom page: state, price previews, event feed, the buttons to open,
 // conquer and protect with either kind of wallet, the claim window, and the finished-round view.
-// The old steal page (refereeMode.ts) is untouched until the Kingdom is approved to replace it.
 import { hexToBin } from "@bitauth/libauth";
 import type { ElectrumNetworkProvider } from "cashscript";
 import kingdomJson from "../contracts/FungeKingdom.json";
@@ -28,11 +27,6 @@ import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances }
 
 const $ = (id: string) => document.getElementById(id)!;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
-// Some blocks need a display type when they are shown (the "hidden" class and "grid"/"flex" would fight otherwise)
-const showAs = (id: string, display: "grid" | "flex", visible: boolean) => {
-  $(id).classList.toggle("hidden", !visible);
-  $(id).classList.toggle(display, visible);
-};
 const shortKey = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const units = (v: string | null | undefined) => (v == null ? "—" : formatUnits(BigInt(v), CONFIG.pusdDecimals));
@@ -574,11 +568,10 @@ function renderAll() {
   renderFeed();
 }
 
-// The finished-round screen, reusing the steal page's "ended" block with Kingdom wording
+// The finished-round screen
 function renderEnded(r: EndedKingdom) {
   show("live", false);
   show("ended", true);
-  show("endedArt", false);
   const mine = myKeys().includes(r.winnerPkh);
   const alone = r.passes === 1; // nobody challenged the first king: the pool went back to them
   const winner = lockToAddress(p2pkhLock(hexToBin(r.winnerPkh)), false);
@@ -700,13 +693,7 @@ function kick() {
 }
 
 export async function startKingdomMode() {
-  // Swap the steal page's parts for the Kingdom's
   $("tagline").textContent = COPY.kingdom.tagline;
-  show("artCard", false);
-  show("stealStats", false);
-  show("actions", false);
-  showAs("kingdomStats", "grid", true);
-  showAs("kingdomView", "flex", true);
   $("refereeNotice").textContent = COPY.notice;
   show("refereeNotice", true);
   $("status").textContent = "Connecting to the game server…";
