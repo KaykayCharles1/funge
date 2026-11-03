@@ -18,7 +18,7 @@ function refereeUrl(): string {
 export const CONFIG = {
   network: "chipnet" as Net,
     // Chipnet Electrum WebSocket servers, tried in order. The library's own default (chipnet.bch.ninja) is flaky.
-  chipnetServers: ["chipnet.imaginary.cash", "chipnet.bch.ninja", "chipnet.c3-soft.com", "cbch.loping.net"],
+  chipnetServers: ["chipnet.imaginary.cash", "chipnet.bch.ninja"],
 
   // PUSD token category (standard 64-char hex, as shown by explorers/BCMR).
   // chipnet: our own test token (filled in after Step 3a). mainnet: from the official PUSD docs.
