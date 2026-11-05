@@ -5,6 +5,7 @@ import { CONFIG } from "../config.ts";
 import { COPY } from "../copy.ts";
 import { conquestMoney } from "../lib/kingdom.ts";
 import type { GameKingdom } from "../lib/game.ts";
+import type { RoundSnapshot } from "../referee/api.ts";
 import { onSceneEvent, onSceneSnapshot } from "../sceneBus.ts";
 import { mountActionBar } from "./actions.ts";
 import type { PageDo, PageView } from "./actions.ts";
@@ -67,6 +68,7 @@ export function mountBattlefield(opts: MountOptions): void {
     connShown = want;
   };
   setInterval(connection, 500);
+  let early: RoundSnapshot | null = null; // a snapshot that came before the scene was ready
   let devMe: string | null = null; // dev panel: pretend to hold this key
   const isMe = (key: string | null) => !!key && (opts.myKeys().some((k) => sameKey(k, key)) || (devMe !== null && sameKey(devMe, key)));
   const kingOf = (s: FieldState): Identity | null => {
@@ -82,6 +84,9 @@ export function mountBattlefield(opts: MountOptions): void {
       if (!held) director?.tick();
     });
     connection();
+    // The page may have sent its first snapshot while the art was still loading
+    if (early && !held) director.onSnapshot(early, CONFIG.kingdom.openingPrice);
+    early = null;
     if (import.meta.env.DEV && new URLSearchParams(location.search).get("dev") === "1") {
       const panel = devPanel(host, scene, (on) => {
         held = on;
@@ -122,7 +127,8 @@ export function mountBattlefield(opts: MountOptions): void {
     else serverSeen = true;
     connection();
     if (s.lastSeq === 0) book?.reset();
-    if (director && !held) director.onSnapshot(s, CONFIG.kingdom.openingPrice);
+    if (!director) early = s;
+    else if (!held) director.onSnapshot(s, CONFIG.kingdom.openingPrice);
   });
   onSceneEvent((e) => {
     if (!director || held) return;
