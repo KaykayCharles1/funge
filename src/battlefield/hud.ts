@@ -52,6 +52,7 @@ function clockText(ms: number): string {
 }
 
 export class Hud {
+  private s: Phaser.Scene;
   private ring: Phaser.GameObjects.Graphics;
   private ringFrac = 1;
   private time: Phaser.GameObjects.Text;
@@ -66,11 +67,13 @@ export class Hud {
   private crown: Phaser.GameObjects.Image;
   private shields: Phaser.GameObjects.Image[];
   private chest: Phaser.GameObjects.Image;
+  private chestScale: [number, number] = [1, 1]; // the chest's size for the current Treasury
   private coins: Phaser.GameObjects.Image;
   private ribbonBox: Phaser.GameObjects.Graphics;
   private ribbonText: Phaser.GameObjects.Text;
 
   constructor(s: Phaser.Scene) {
+    this.s = s;
     const top = (...objs: Phaser.GameObjects.Components.Depth[]) => objs.forEach((o) => o.setDepth(HUD_DEPTH + 1));
 
     // Bell and ring, top left; the time and the conquest count below it
@@ -153,10 +156,20 @@ export class Hud {
       .lineStyle(3, C.gold, 1).strokeRoundedRect(W / 2 - w / 2, 250 - h / 2, w, h, 14);
   }
 
+  // A coin landed in the chest
+  bumpChest(): void {
+    const c = this.chest, [sx, sy] = this.chestScale;
+    this.s.tweens.killTweensOf(c);
+    c.setScale(sx, sy);
+    this.s.tweens.add({ targets: c, scaleX: sx * 1.15, scaleY: sy * 1.15, duration: 80, yoyo: true, onComplete: () => c.setScale(sx, sy) });
+  }
+
   // The chest grows a little and the coin pile appears as the Treasury fills
   private setTreasure(t: bigint): void {
     const f = Number(t > TREASURY_FULL ? TREASURY_FULL : t < 0n ? 0n : t) / Number(TREASURY_FULL);
+    this.s.tweens.killTweensOf(this.chest);
     this.chest.setDisplaySize(64 * (0.8 + 0.2 * f), 57 * (0.8 + 0.2 * f));
+    this.chestScale = [this.chest.scaleX, this.chest.scaleY];
     this.coins.setVisible(f > 0).setDisplaySize(80 * (0.3 + 0.7 * f), 52 * (0.3 + 0.7 * f));
   }
 

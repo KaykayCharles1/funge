@@ -7,7 +7,8 @@ import type { RefereeEvent, RoundSnapshot, RoundStatus } from "../referee/api.ts
 import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
 import type { Identity } from "./identity.ts";
-import type { BattlefieldScene, SceneRun } from "./scene.ts";
+import { conquestLength } from "./scene.ts";
+import type { BattlefieldScene, Mode, SceneRun } from "./scene.ts";
 
 export type FieldState = {
   roundId: string;
@@ -75,19 +76,18 @@ const EMPTY: FieldState = {
   deadline: null, clockMs: null, pausedSince: null,
 };
 
-type Mode = "full" | "short" | "quick";
 type Kind = "open" | "conquer" | "over" | "settle";
 // Scene lengths in ms. Open and conquer from the brief; round over and settle chosen to match.
 const LENGTH: Record<Kind, Record<Mode, number>> = {
   open: { full: 1800, short: 1000, quick: 400 },
-  conquer: { full: 1400 + 1800 + 1500 + 1600, short: 3500, quick: 1200 },
+  conquer: { full: conquestLength("full"), short: conquestLength("short"), quick: conquestLength("quick") },
   over: { full: 1500, short: 800, quick: 300 },
   settle: { full: 3000, short: 1500, quick: 800 },
 };
 const MAX_WAITING = 3;
 const HUD_LAG_MS = 1500;
 
-type Item = { kind: Kind; event: RefereeEvent; after: FieldState };
+type Item = { kind: Kind; event: RefereeEvent; before: FieldState; after: FieldState };
 
 export type DirectorStats = { playing: string | null; waiting: number; dropped: number; snaps: number; lastSeq: number };
 
@@ -177,7 +177,7 @@ export class Director {
 
     const kind = kindOf(e);
     if (kind) {
-      this.queue.push({ kind, event: e, after });
+      this.queue.push({ kind, event: e, before, after });
       if (this.queue.length > MAX_WAITING) {
         this.dropped += this.queue.length;
         this.snap(after);
@@ -222,7 +222,7 @@ export class Director {
     if (this.playing || this.queue.length === 0) return;
     const item = this.queue.shift()!;
     const mode = modeFor(this.queue.length);
-    const playing = { item, mode, run: this.scene.playScene(label(item.kind, mode), LENGTH[item.kind][mode]) };
+    const playing = { item, mode, run: this.play(item, mode) };
     this.playing = playing;
     this.changed();
     void playing.run.done.then(() => {
@@ -233,6 +233,19 @@ export class Director {
       this.changed();
       this.next();
     });
+  }
+
+  private play(item: Item, mode: Mode): SceneRun {
+    const newKing = this.kingOf(item.after);
+    if (item.kind === "conquer" && newKing) {
+      const d = item.event.data ?? {};
+      return this.scene.playConquest({
+        mode, side: item.event.seq % 2 === 0 ? "left" : "right", before: item.before, after: item.after,
+        oldKing: this.kingOf(item.before), newKing, paid: big(d.paid), refunded: big(d.refunded), toTreasury: big(d.toTreasury),
+        nextCost: this.nextCost(item.after),
+      });
+    }
+    return this.scene.playScene(label(item.kind, mode), LENGTH[item.kind][mode]); // A5b
   }
 
   // Something new is waiting: the scene on screen speeds up to the mode the queue now calls for

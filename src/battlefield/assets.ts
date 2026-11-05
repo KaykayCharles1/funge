@@ -13,13 +13,15 @@ const FIRST: Record<string, string> = {
   crown: "icons/crown.webp",
   chest: "treasure/chest.webp",
   coin_pile: "treasure/coin_pile.webp",
+  coin: "treasure/coin.webp",
+  gem: "treasure/gem.webp",
   keep: "castle/keep.webp",
   castle: "castle/castle.webp",
   wall: "castle/wall.webp",
   banner: "castle/banner.webp",
   soldier_violet: "soldiers/warrior_01.webp",
   soldier_crimson: "soldiers/warrior_02.webp",
-  soldier_obsidian: "soldiers/warrior_03.webp",
+  soldier_obsidian: "soldiers/warrior_03_silver.webp", // the black archer with a silver rim (tools/build_assets.py)
   soldier_sapphire: "soldiers/warrior_04.webp",
 };
 
@@ -29,6 +31,7 @@ const LATER: Record<string, string> = {
 };
 
 export const avatarKey = (p: Portrait) => `avatar_${p.id}`;
+export const portraitKey = (p: Portrait) => `portrait_${p.id}`;
 
 export function loadFirst(load: Phaser.Loader.LoaderPlugin): void {
   for (const [key, file] of Object.entries(FIRST)) load.image(key, base + file);
@@ -39,8 +42,10 @@ export function loadFirst(load: Phaser.Loader.LoaderPlugin): void {
   });
 }
 
+// The dusk field and the full portraits (for the scene cards) come after the first frame
 export function loadLater(scene: Phaser.Scene, done: () => void): void {
   for (const [key, file] of Object.entries(LATER)) scene.load.image(key, base + file);
+  for (const p of portraitsOf(scene)) scene.load.image(portraitKey(p), base + p.image);
   scene.load.once("complete", done);
   scene.load.start();
 }
@@ -99,4 +104,36 @@ function silverEdge(px: Uint8ClampedArray, cloth: Uint8Array, w: number, h: numb
       }
     }
   }
+}
+
+// Effect textures, drawn in code: a spark, a sword slash, a soft glow and sun rays
+export function makeFxTextures(scene: Phaser.Scene): void {
+  const g = scene.make.graphics({}, false);
+  const once = (key: string, w: number, h: number, draw: () => void) => {
+    if (scene.textures.exists(key)) return;
+    g.clear();
+    draw();
+    g.generateTexture(key, w, h);
+  };
+  once("fx_spark", 24, 24, () => {
+    for (let r = 12; r > 0; r -= 2) g.fillStyle(0xfff3c4, 0.12 + (12 - r) * 0.08).fillCircle(12, 12, r);
+    g.fillStyle(0xffffff, 1).fillCircle(12, 12, 3);
+  });
+  once("fx_slash", 160, 80, () => {
+    // a crescent: wide faint stroke under a thin bright one
+    for (const [width, alpha] of [[16, 0.18], [9, 0.45], [4, 1]] as const) {
+      g.lineStyle(width, 0xffffff, alpha).beginPath().arc(80, 110, 92, Math.PI * 1.18, Math.PI * 1.82, false).strokePath();
+    }
+  });
+  once("fx_glow", 128, 128, () => {
+    for (let r = 64; r > 0; r -= 4) g.fillStyle(0xffffff, 0.035 + (64 - r) * 0.002).fillCircle(64, 64, r);
+  });
+  once("fx_rays", 512, 512, () => {
+    const n = 16;
+    for (let i = 0; i < n; i++) {
+      const a0 = (i / n) * Math.PI * 2, a1 = a0 + Math.PI / n;
+      g.fillStyle(0xffffff, i % 2 ? 0.3 : 0.6).fillTriangle(256, 256, 256 + Math.cos(a0) * 256, 256 + Math.sin(a0) * 256, 256 + Math.cos(a1) * 256, 256 + Math.sin(a1) * 256);
+    }
+  });
+  g.destroy();
 }

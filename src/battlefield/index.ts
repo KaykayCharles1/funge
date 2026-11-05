@@ -52,7 +52,9 @@ export function mountBattlefield(): void {
   const scene = new BattlefieldScene(() => {
     book = new IdentityBook(scene.portraits);
     director = new Director(scene, kingOf, nextCost);
-    scene.events.on(Phaser.Scenes.Events.UPDATE, () => director?.tick());
+    scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
+      if (!held) director?.tick();
+    });
     if (!seenSnapshot) scene.hud.ribbon(COPY.battlefield.connecting);
     if (import.meta.env.DEV && new URLSearchParams(location.search).get("dev") === "1") {
       const panel = devPanel(host, scene, (on) => {
@@ -95,6 +97,8 @@ export function mountBattlefield(): void {
   });
 
   if (import.meta.env.DEV) {
+    // For poking at it from the console: window.__battlefield.scene / .director()
+    (window as unknown as { __battlefield: unknown }).__battlefield = { scene, director: () => director, kingOf };
     // Press D to try the crossfade
     window.addEventListener("keydown", (e) => {
       if (director && e.key === "d" && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
@@ -204,6 +208,7 @@ function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: bool
     const fees = getFees();
     scene.cancelScenes();
     scene.hud.ribbon(null);
+    scene.hud.setClock(null, null);
     scene.showState(state, king, fees && king ? conquestMoney(state.value, fees).payment : null);
   }
   for (const e of [hold, house, portrait, value, treasury, protects, conquests]) e.addEventListener("input", apply);

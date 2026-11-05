@@ -135,6 +135,11 @@ export const COPY = {
     waitingTitle: "Waiting for the first king",
     waitingDetail: (price: string) => `The first king pays ${price} PUSD`,
     connecting: "Connecting to the referee…",
+    vs: "VS",
+    newRuler: (title: string) => (title === "Queen" ? "New queen" : "New king"),
+    paid: (amount: string) => `Paid ${amount}`,
+    refunded: (amount: string) => `Refunded ${amount}`,
+    toTreasury: (amount: string) => `+${amount} to the Treasury`,
     // When it persists, the battlefield shows network.unreachable (the old page's wording)
   },
 

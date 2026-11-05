@@ -34,6 +34,9 @@ SIZES = {
     "icons": ("max", 96),
 }
 BANNER_SIZE = ("h", 400)  # the banner is a tall pole: 400 wide would make it 800 tall
+# Extra variants with a light rim, for art that is too dark to read on the field: name -> (rgb, rim px at output size).
+# The black archer is the obsidian house; 4 px at 160 px tall is about 2 px at the 90 px the field shows.
+RIMS = {"warrior_03": ((0xD0, 0xD3, 0xDE), 4)}
 
 # Face square per portrait, as fractions of the source (centre x, centre y, side). Used for the round avatar.
 FACES = {
@@ -123,6 +126,18 @@ def avatar(portrait: Image.Image, face) -> Image.Image:
     return sq.convert("RGBa").resize((128, 128), Image.LANCZOS).convert("RGBA")
 
 
+def rim(im: Image.Image, rgb, px: int) -> Image.Image:
+    """The art on a solid outline `px` wide in `rgb`, following its shape."""
+    padded = Image.new("RGBA", (im.width + 2 * px, im.height + 2 * px), (0, 0, 0, 0))
+    padded.alpha_composite(im, (px, px))
+    grown = padded.getchannel("A").point(lambda a: 255 if a > 96 else 0).filter(ImageFilter.MaxFilter(2 * px + 1))
+    grown = grown.filter(ImageFilter.GaussianBlur(0.6))
+    out = Image.new("RGBA", padded.size, rgb + (0,))
+    out.putalpha(grown)
+    out.alpha_composite(padded)
+    return out
+
+
 def save(im: Image.Image, path: Path) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     im.save(path, "WEBP", quality=QUALITY, method=6, alpha_quality=95)
@@ -163,6 +178,10 @@ def main() -> None:
                     keyed = trim(keyed)
                 out = resize(keyed, fit, sz)
                 n = save(out, OUT / kind / f"{name}.webp")
+                if name in RIMS:
+                    rimmed = rim(out, *RIMS[name])
+                    n += save(rimmed, OUT / kind / f"{name}_silver.webp")
+                    built[f"{kind}/{name}_silver"] = rimmed
                 if kind == "portraits":
                     av = avatar(out, FACES[name])
                     n += save(av, OUT / kind / f"{name}_avatar.webp")
