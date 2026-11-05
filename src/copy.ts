@@ -131,6 +131,11 @@ export const COPY = {
     nextConquest: "Next conquest costs",
     noKing: "No king yet",
     currency: "PUSD",
+    conquests: (n: number) => (n === 1 ? "1 conquest" : `${n} conquests`),
+    waitingTitle: "Waiting for the first king",
+    waitingDetail: (price: string) => `The first king pays ${price} PUSD`,
+    connecting: "Connecting to the referee…",
+    // When it persists, the battlefield shows network.unreachable (the old page's wording)
   },
 
   errors: {

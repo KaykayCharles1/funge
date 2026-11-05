@@ -856,3 +856,32 @@ function mountBattlefieldIfAsked() {
     .then((m) => m.mountBattlefield())
     .catch((e) => console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e)));
 }
+
+// Dev only: the battlefield's extra mock scenarios (src/battlefield/mockScenarios.ts) play through the same
+// doors as the mock round above: the page's event and snapshot handlers, its clock and its cancel check.
+export async function playMockScenario(play: (h: Parameters<typeof playMockRound>[0]) => Promise<void>, label: (t: string) => void): Promise<void> {
+  if (!import.meta.env.DEV) return;
+  mockActive = true;
+  const me = ++mockRun;
+  clearTimeout(timer);
+  watcher?.close();
+  watcher = null;
+  feed.clear();
+  warned.clear();
+  round = null;
+  await play({
+    now: serverNow,
+    shiftClock: (ms) => {
+      mockShift += ms;
+      shiftClockForMock(ms);
+    },
+    onEvent,
+    onSnapshot: applySnapshot,
+    sleep,
+    cancelled: () => me !== mockRun,
+    label,
+  });
+}
+export function stopMockScenario(): void {
+  if (import.meta.env.DEV && mockActive) stopMock();
+}
