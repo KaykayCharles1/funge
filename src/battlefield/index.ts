@@ -18,8 +18,11 @@ const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: sho
 let mounted = false;
 type Fees = { feePercent: bigint; cutPercent: bigint };
 
+export type MountOptions = { myKeys: () => string[] }; // the player's own key hashes (game wallet, own wallet)
+const sameKey = (a: string, b: string) => a.slice(0, 22).toLowerCase() === b.slice(0, 22).toLowerCase();
+
 // Safe to call more than once: only the first call creates the game.
-export function mountBattlefield(): void {
+export function mountBattlefield(opts: MountOptions): void {
   if (mounted || document.getElementById("battlefield")) return;
   mounted = true;
   const host = document.createElement("div");
@@ -43,6 +46,8 @@ export function mountBattlefield(): void {
   let director: Director | null = null;
   let held = false; // the dev panel is in charge
   let seenSnapshot = false;
+  let devMe: string | null = null; // dev panel: pretend to hold this key
+  const isMe = (key: string | null) => !!key && (opts.myKeys().some((k) => sameKey(k, key)) || (devMe !== null && sameKey(devMe, key)));
   const kingOf = (s: FieldState): Identity | null => {
     if (!book || !s.king) return null;
     book.setRound(s.roundId);
@@ -51,7 +56,7 @@ export function mountBattlefield(): void {
 
   const scene = new BattlefieldScene(() => {
     book = new IdentityBook(scene.portraits);
-    director = new Director(scene, kingOf, nextCost);
+    director = new Director({ scene, kingOf, nextCost, isMe, identityOf: (k) => book?.get(k) ?? null });
     scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
       if (!held) director?.tick();
     });
@@ -60,7 +65,7 @@ export function mountBattlefield(): void {
       const panel = devPanel(host, scene, (on) => {
         held = on;
         if (!on && director?.state) director.snap(director.state);
-      }, () => fees);
+      }, () => fees, (key) => (devMe = key));
       director.onChange = (st) => {
         panel.stats(st);
         const s = director?.state;
@@ -116,7 +121,7 @@ export function mountBattlefield(): void {
 // Not player-facing. It sits above the field, so the page's mock-round bar (bottom right) never covers it.
 type DevPanel = { stats: (s: DirectorStats) => void; sync: (s: FieldState, king: Identity | null) => void };
 
-function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: boolean) => void, getFees: () => Fees | null): DevPanel {
+function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: boolean) => void, getFees: () => Fees | null, setMe: (key: string | null) => void): DevPanel {
   const box = document.createElement("div");
   box.className = "mx-auto mb-2 flex w-full max-w-5xl flex-col gap-3 rounded-xl bg-slate-800 p-3 text-xs text-slate-200 ring-1 ring-slate-600";
   host.before(box);
@@ -144,12 +149,18 @@ function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: bool
       });
       buttons.append(b);
     }
+    // Pretend to be mock king A (a1a1…), to see "YOUR kingdom" and "Claim your reward"
+    const meBox = el("label", "ml-2 flex items-center gap-1 text-slate-300");
+    const me = el("input", "");
+    me.type = "checkbox";
+    me.addEventListener("input", () => setMe(me.checked ? "a1".repeat(20) : null));
+    meBox.append(me, "I am king A (a1a1…)");
     const back = el("button", "rounded-lg bg-slate-600 px-3 py-1", "Back to the real round");
     back.addEventListener("click", () => {
       page.stopMockScenario();
       status.textContent = "";
     });
-    buttons.append(back);
+    buttons.append(back, meBox);
   });
 
   // Manual state
@@ -205,7 +216,7 @@ function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: bool
       roundId: "dev", status: waiting ? "waiting" : "open", king: waiting ? null : "dev",
       value: BigInt(value.value), treasury: waiting ? 0n : BigInt(treasury.value),
       protectsLeft: Number(protects.value), conquests: Number(conquests.value), openingPrice: CONFIG.kingdom.openingPrice,
-      deadline: null, clockMs: null, pausedSince: null,
+      deadline: null, clockMs: null, pausedSince: null, payout: null,
     };
     const p = scene.portraits[Number(portrait.value)];
     const king: Identity | null = waiting || !p ? null : { key: "dev", house: HOUSES[Number(house.value)], portrait: p };

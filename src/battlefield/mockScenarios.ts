@@ -137,8 +137,10 @@ class MockKingdom {
     });
   }
 
-  // The server saw a move on the chain it did not make: scene fields only, the clock restarts
+  // The server saw a conquest on the chain it did not make: scene fields only, the clock restarts.
+  // The money moved as in any conquest: the cut went into the Treasury.
   observed(key: string): void {
+    this.treasury += conquestMoney(this.value, P).poolGets;
     this.previous = this.king; this.king = key; this.passCount++; this.protectsUsed = 0;
     this.deadline = this.h.now() + clockSecondsFor(this.passCount, bell) * 1000;
     this.send("deadline_changed", "observed_on_chain");
@@ -197,6 +199,28 @@ export const SCENARIOS: Scenario[] = [
       ["", 100, (k) => k.conquer(C)],
       ["", 100, (k) => k.conquer(D)],
       ["", 100, (k) => k.conquer(E)],
+    ]),
+  },
+  {
+    id: "protects", label: "Protects and walls",
+    play: (h) => script(h, [
+      ["Open (A)", 1000, (k) => k.open(A)],
+      ["Protect +5.00: a third wall drops in", 2500, (k) => k.protect(5n)],
+      ["Protect +10.00: 25.00, the castle and two more walls", 2500, (k) => k.protect(10n)],
+      ["Conquer (B)", 2500, (k) => k.conquer(B)],
+      ["B protects +1.00 during the conquest: it does not wait", 1200, (k) => k.protect(1n)],
+      ["Protect +10.00: 36.00, eight walls", 7000, (k) => k.protect(10n)],
+    ]),
+  },
+  {
+    id: "warnings", label: "Clock warnings and the end",
+    play: (h) => script(h, [
+      ["Open (A)", 1000, (k) => k.open(A)],
+      ["One minute left: the bell swings", 2500, (k) => k.jumpTo(61_000)],
+      ["30 seconds: dusk, protect closed", 4000, (k) => k.jumpTo(31_000)],
+      ["10 seconds: the heartbeat", 4500, (k) => k.jumpTo(11_000)],
+      ["Round over: the bell tolls", 4500, (k) => k.over()],
+      ["Settled", 4000, (k) => k.settle()],
     ]),
   },
   {

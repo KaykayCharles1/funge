@@ -853,7 +853,7 @@ export async function startKingdomMode() {
 function mountBattlefieldIfAsked() {
   if (!CONFIG.battlefield || new URLSearchParams(location.search).get("mode") !== "battlefield") return;
   import("./battlefield/index.ts")
-    .then((m) => m.mountBattlefield())
+    .then((m) => m.mountBattlefield({ myKeys })) // "you": the game wallet and the own wallet
     .catch((e) => console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e)));
 }
 
