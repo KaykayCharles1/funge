@@ -125,6 +125,9 @@ export function makeFxTextures(scene: Phaser.Scene): void {
       g.lineStyle(width, 0xffffff, alpha).beginPath().arc(80, 110, 92, Math.PI * 1.18, Math.PI * 1.82, false).strokePath();
     }
   });
+  once("fx_dust", 48, 48, () => {
+    for (let r = 24; r > 0; r -= 3) g.fillStyle(0xc9a272, 0.05 + (24 - r) * 0.025).fillCircle(24, 24, r);
+  });
   once("fx_glow", 128, 128, () => {
     for (let r = 64; r > 0; r -= 4) g.fillStyle(0xffffff, 0.035 + (64 - r) * 0.002).fillCircle(64, 64, r);
   });

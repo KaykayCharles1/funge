@@ -61,7 +61,11 @@ export function mountBattlefield(): void {
         held = on;
         if (!on && director?.state) director.snap(director.state);
       }, () => fees);
-      director.onChange = panel.stats;
+      director.onChange = (st) => {
+        panel.stats(st);
+        const s = director?.state;
+        if (!held && s) panel.sync(s, kingOf(s)); // the panel follows the round while it is not holding
+      };
     }
   });
   new Phaser.Game({
@@ -110,7 +114,7 @@ export function mountBattlefield(): void {
 
 // ---- Dev only (?mode=battlefield&dev=1): set the kingdom by hand, run mock scenarios, watch the queue. ----
 // Not player-facing. It sits above the field, so the page's mock-round bar (bottom right) never covers it.
-type DevPanel = { stats: (s: DirectorStats) => void };
+type DevPanel = { stats: (s: DirectorStats) => void; sync: (s: FieldState, king: Identity | null) => void };
 
 function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: boolean) => void, getFees: () => Fees | null): DevPanel {
   const box = document.createElement("div");
@@ -215,6 +219,19 @@ function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: bool
   apply();
 
   return {
+    sync: (s, king) => {
+      house.value = king ? String(HOUSES.indexOf(king.house)) : "waiting";
+      const i = king ? scene.portraits.findIndex((p) => p.id === king.portrait.id) : -1;
+      if (i >= 0) portrait.value = String(i);
+      value.value = String(s.value);
+      treasury.value = String(s.treasury);
+      protects.value = String(s.protectsLeft);
+      conquests.value = String(s.conquests);
+      valueOut.textContent = (Number(s.value) / 100).toFixed(2);
+      treasuryOut.textContent = (Number(s.treasury) / 100).toFixed(2);
+      protectsOut.textContent = String(s.protectsLeft);
+      conquestsOut.textContent = String(s.conquests);
+    },
     stats: (s) => {
       monitor.textContent = `playing: ${s.playing ?? "—"} · waiting: ${s.waiting} · dropped: ${s.dropped} · snaps: ${s.snaps} · last seq: ${s.lastSeq}`;
     },

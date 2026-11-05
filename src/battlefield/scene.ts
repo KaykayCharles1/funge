@@ -116,8 +116,7 @@ class Run {
   // onTop: over the HUD (coins flying into the Treasury chest)
   add<O extends Phaser.GameObjects.GameObject>(o: O, onTop = false): O {
     this.objs.push(o);
-    if (onTop) (o as unknown as Phaser.GameObjects.Components.Depth).setDepth(HUD_DEPTH + 10);
-    else this.sc.fxLayer.add(o);
+    (onTop ? this.sc.topLayer : this.sc.fxLayer).add(o);
     return o;
   }
   tween(cfg: Phaser.Types.Tweens.TweenBuilderConfig): Phaser.Tweens.Tween {
@@ -165,11 +164,14 @@ class Run {
 }
 
 type Soldier = { img: Phaser.GameObjects.Image; x: number; y: number; post: boolean }; // post: a guard or the bearer
+type Marcher = { img: Phaser.GameObjects.Image; base: number; x: number; y: number }; // an attacker and where it stops
 
 export class BattlefieldScene extends Phaser.Scene {
   hud!: Hud;
   portraits: Portrait[] = [];
   fxLayer!: Phaser.GameObjects.Layer; // scene effects, over the kingdom and under the HUD
+  topLayer!: Phaser.GameObjects.Layer; // over the HUD, drawn by the HUD camera (coins flying into the chest)
+  private hudCam!: Phaser.Cameras.Scene2D.Camera; // draws only the HUD, so the field can shake and zoom under it
   private world!: Phaser.GameObjects.Layer; // the kingdom
   private garrison: Soldier[] = [];
   private flagSpots: [number, number][] = []; // castle flags and the banner, for the banner change glow
@@ -189,19 +191,27 @@ export class BattlefieldScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cover(this.add.image(W / 2, H / 2, "field_day")).setDepth(-2);
+    const day = this.cover(this.add.image(W / 2, H / 2, "field_day")).setDepth(-2);
     makeBanners(this);
     makeFxTextures(this);
     this.portraits = portraitsOf(this);
     this.world = this.add.layer();
     this.fxLayer = this.add.layer().setDepth(HUD_DEPTH - 1);
+    this.topLayer = this.add.layer().setDepth(HUD_DEPTH + 10);
     this.hud = new Hud(this);
+    // Two cameras: the main one draws the field and the scenes (and shakes and zooms), the HUD one the HUD
+    const notHud = new Set<unknown>([day, this.world, this.fxLayer, this.topLayer]);
+    const hudObjects = this.children.list.filter((o) => !notHud.has(o));
+    this.hudCam = this.cameras.add(0, 0, W, H);
+    this.hudCam.ignore(day).ignore([this.world, this.fxLayer]);
+    this.cameras.main.ignore(hudObjects).ignore(this.topLayer);
     this.onReady();
 
     // The dusk field and the portraits come after the first frame
     this.events.once(Phaser.Scenes.Events.RENDER, () =>
       loadLater(this, () => {
         this.dusk = this.cover(this.add.image(W / 2, H / 2, "field_dusk")).setAlpha(this.duskWanted ? 1 : 0).setDepth(-1);
+        this.hudCam.ignore(this.dusk);
       }),
     );
   }
@@ -324,6 +334,10 @@ export class BattlefieldScene extends Phaser.Scene {
   // Stop every running scene and effect (a resync, a gap, or the queue was too long)
   cancelScenes(): void {
     for (const r of [...this.runs]) r.finish();
+    this.unfreeze();
+    const cam = this.cameras.main;
+    cam.resetFX();
+    cam.setZoom(1);
     for (const o of this.extras) o.destroy();
     this.extras.clear();
   }
@@ -369,7 +383,7 @@ export class BattlefieldScene extends Phaser.Scene {
   }
 
   // The conquest: face-off cards, the army marching in, the clash, loot to the Treasury, the new king crowned.
-  // With reduced motion it keeps its length but uses the calm quick parts (no march, no shake, no sparks).
+  // With reduced motion it keeps its length but uses the calm quick parts: no march, shake, zoom, spin or dust.
   playConquest(p: ConquestPlay): SceneRun {
     const quiet = reducedMotion();
     const look: Mode = quiet ? "quick" : p.mode;
@@ -379,7 +393,12 @@ export class BattlefieldScene extends Phaser.Scene {
     const k = total / conquestLength(look); // stretch the calm version to the same length
     const t1 = len.faceoff * k, t2 = t1 + len.march * k, t3 = t2 + len.clash * k;
     const dir = p.side === "left" ? 1 : -1;
-    const army: Phaser.GameObjects.Image[] = [];
+    const army: Marcher[] = [];
+    const rand = rng(p.after.conquests * 31 + (p.side === "left" ? 1 : 2));
+    const dust = quiet ? null : r.add(this.add.particles(0, 0, "fx_dust", {
+      speed: { min: 10, max: 40 }, angle: { min: 200, max: 340 }, lifespan: { min: 380, max: 620 },
+      scale: { start: 0.35, end: 0.9 }, alpha: { start: 0.55, end: 0 }, emitting: false,
+    }));
 
     // 1. Face-off: the challenger's card on the army's side, the old king's on the other, VS between
     if (len.faceoff > 0 && p.oldKing) {
@@ -395,68 +414,158 @@ export class BattlefieldScene extends Phaser.Scene {
       r.at(d * 0.8, () => r.tween({ targets: [challenger, defender, vs], alpha: 0, duration: d * 0.2 }));
     }
 
-    // 2. The army marches in along the road; the amount paid floats up where it enters
+    // 2. The army marches in along the road, each soldier at their own pace, the leader in front.
+    // At the end they spread into a wide front. The amount paid floats up where they enter.
     const path = ROAD[p.side];
     const end = path[path.length - 1];
     const count = look === "full" ? 7 : look === "short" ? 5 : 0;
-    const rand = rng(p.after.conquests * 31 + count);
     if (count > 0) {
       r.at(t1, () => {
         const d = len.march * k;
         this.float(r, T.paid(money(p.paid)), p.side === "left" ? 170 : W - 170, 370, p.newKing.house.text);
         for (let i = 0; i < count; i++) {
-          const spot: [number, number] = [end[0] - dir * ((i % 4) * 58 + 10), end[1] - 30 + Math.floor(i / 4) * 46 + (i % 2) * 10];
-          const route = [...path.slice(0, -1), spot];
+          const leader = i === 0;
+          // The front line spreads up and down the field from the road's end; the rest stand a step behind
+          const line = leader ? 0 : i <= 4 ? 1 : 2;
+          const slot = leader ? 0 : ((i - 1) % 4) - 1.5;
+          const spot: [number, number] = [
+            end[0] + dir * (leader ? 26 : 0) - dir * Math.max(0, line - 1) * 64 - dir * Math.abs(slot) * 10,
+            end[1] + slot * 44 + (line === 2 ? 22 : 0),
+          ];
+          const jitter = (rand() - 0.5) * 24;
+          const route = [...path.slice(0, -1).map(([x, y]): [number, number] => [x, y + jitter]), spot];
           const img = r.add(this.soldier(route[0][0], route[0][1], p.newKing.house, rand, dir > 0));
-          army.push(img);
+          if (leader) img.setScale(img.scale * 1.08);
+          const m: Marcher = { img, base: img.scale, x: spot[0], y: spot[1] };
+          army.push(m);
+          const delay = leader ? 0 : d * (0.04 + rand() * 0.2);
+          const dur = Math.min(d * 0.92 - delay, d * (leader ? 0.6 : 0.55 + rand() * 0.25));
+          const steps = 6 + Math.floor(rand() * 3);
           const pos = { p: 0 };
+          let lastStep = -1;
           r.tween({
-            targets: pos, p: 1, duration: d * 0.75, delay: i * d * 0.035, ease: "Sine.easeOut",
+            targets: pos, p: 1, duration: dur, delay, ease: "Sine.easeOut",
             onUpdate: () => {
               const [x, y] = along(route, pos.p);
-              img.setPosition(x, y - Math.abs(Math.sin(pos.p * 14)) * 6); // a marching bounce
+              const b = Math.abs(Math.sin(pos.p * steps * Math.PI)); // 0 on a footfall, 1 mid-stride
+              img.setPosition(x, y - b * 6).setScale(m.base * (1 - 0.04 * b), m.base * (1 + 0.06 * b)); // stretch in the air
+              const step = Math.floor(pos.p * steps);
+              if (step !== lastStep) {
+                lastStep = step;
+                dust?.emitParticleAt(x, y, 1);
+              }
+            },
+            onComplete: () => {
+              // Stopping: squash, then settle
+              img.setPosition(spot[0], spot[1]);
+              r.tween({ targets: img, scaleX: m.base * 1.12, scaleY: m.base * 0.86, duration: 90, yoyo: true, ease: "Quad.easeOut" });
+              dust?.emitParticleAt(spot[0], spot[1], 4);
             },
           });
         }
       });
     }
 
-    // 3. The clash: slashes and sparks where the lines meet; the nearest defenders fall and drop coins and gems
+    // 3. The clash. A beat of anticipation (lean back, crouch), then the lunge: a hit pause on the first impact,
+    // a punch-in, slashes and sparks. The nearest defenders spin back and puff away, dropping coins and gems.
     r.at(t2, () => {
       const d = len.clash * k;
+      const beat = d * 0.16;
       const dist = (s: Soldier) => Math.abs(s.x - end[0]) + Math.abs(s.y - end[1]);
       const fallen = this.garrison.filter((s) => !s.post).sort((a, b) => dist(a) - dist(b)).slice(0, look === "quick" ? 2 : 4);
-      if (!quiet) this.cameras.main.shake(Math.min(220, d * 0.25), 0.004);
+      if (!quiet) {
+        for (const m of army) {
+          r.tween({ targets: m.img, x: m.x - dir * 12, scaleX: m.base * 1.06, scaleY: m.base * 0.92, duration: beat, ease: "Quad.easeOut" });
+        }
+        for (const s of fallen) r.tween({ targets: s.img, y: s.img.y - 5, duration: beat, ease: "Quad.easeOut" });
+      }
+      // Two lunges: forward fast, back slower
+      for (const at of [beat, d * 0.5]) {
+        r.at(t2 + at, () => {
+          for (const m of army) {
+            r.tween({ targets: m.img, x: m.x + dir * 30, scaleX: m.base * 0.96, scaleY: m.base * 1.05, duration: d * 0.07, ease: "Quad.easeIn" });
+            r.tween({ targets: m.img, x: m.x, scaleX: m.base, scaleY: m.base, duration: d * 0.14, delay: d * 0.08, ease: "Quad.easeOut" });
+          }
+        });
+      }
+      r.at(t2 + beat, () => {
+        if (quiet) return;
+        this.freeze(60);
+        this.punch(1.05, d * 0.5);
+        this.cameras.main.shake(Math.min(200, d * 0.2), 0.004);
+      });
       fallen.forEach((s, i) => {
         const foe = army[i % Math.max(1, army.length)];
-        const mx = foe ? (foe.x + s.x) / 2 : s.x - dir * 30, my = (foe ? (foe.y + s.y) / 2 : s.y) - SOLDIER_H * 0.45;
-        if (foe) r.tween({ targets: foe, x: foe.x + dir * 22, duration: d * 0.12, yoyo: true, repeat: 1 });
-        r.at(t2 + d * (0.08 + i * 0.14), () => this.slash(r, mx, my, quiet));
-        r.at(t2 + d * (0.3 + i * 0.12), () => {
-          r.tween({ targets: s.img, angle: dir * 80, y: s.img.y + 10, alpha: 0.35, duration: d * 0.22 });
+        const mx = foe ? (foe.x + dir * 30 + s.x) / 2 : s.x - dir * 30, my = (foe ? (foe.y + s.y) / 2 : s.y) - SOLDIER_H * 0.45;
+        r.at(t2 + beat + d * (0.02 + i * 0.13), () => this.slash(r, mx, my, quiet));
+        r.at(t2 + beat + d * (0.08 + i * 0.12), () => {
           this.loot(r, s.img.x, s.img.y - 30, i === 0, d * 0.5);
+          this.defeat(r, s, dir, d * 0.4, quiet, dust);
         });
       });
-      if (fallen.length === 0) r.at(t2 + d * 0.2, () => this.slash(r, BASE_X, BASE_Y - 40, quiet));
-      r.at(t2 + d * 0.55, () => {
+      if (fallen.length === 0) r.at(t2 + beat, () => this.slash(r, BASE_X, BASE_Y - 40, quiet));
+      r.at(t2 + d * 0.6, () => {
         if (p.oldKing && p.refunded > 0n) this.float(r, T.refunded(money(p.refunded)), p.side === "left" ? W - 320 : 320, 300, p.oldKing.house.text);
         this.float(r, T.toTreasury(money(p.toTreasury)), W - 170, 160, C.gold);
       });
     });
 
-    // 4. The new king: the field takes the new house (banner, flags, garrison) with a glow, then the coronation card
+    // 4. The new king: the field takes the new house (banner, flags, garrison) with a glow and a punch-in,
+    // then the coronation card
     r.at(t3, () => {
       const d = len.crown * k;
-      for (const a of army) r.tween({ targets: a, alpha: 0, duration: d * 0.2 });
+      for (const m of army) r.tween({ targets: m.img, alpha: 0, duration: d * 0.2 });
       this.showState(p.after, p.newKing, p.nextCost);
       for (const [x, y] of this.flagSpots) {
         const glow = r.add(this.add.image(x, y, "fx_glow").setTint(p.newKing.house.text).setScale(0.2).setAlpha(0.9));
         r.tween({ targets: glow, scale: 1.1, alpha: 0, duration: d * 0.5, ease: "Cubic.easeOut" });
       }
+      if (!quiet) this.punch(1.03, d * 0.7);
       this.coronation(r, p.newKing, look === "quick" ? 0.5 : 0.78, d, quiet);
     });
 
     return { done: r.done, hurry: (ms) => r.hurry(ms) };
+  }
+
+  // A defender knocked back: a spin and a hop backwards, then a puff of dust. The calm version fades.
+  private defeat(r: Run, s: Soldier, dir: number, d: number, quiet: boolean, dust: Phaser.GameObjects.Particles.ParticleEmitter | null): void {
+    const img = s.img;
+    this.tweens.killTweensOf(img); // stop its idle bob
+    if (quiet) {
+      r.tween({ targets: img, alpha: 0, duration: d });
+      return;
+    }
+    const x0 = img.x, y0 = img.y, hop = { t: 0 };
+    r.tween({
+      targets: hop, t: 1, duration: d * 0.75, ease: "Quad.easeOut",
+      onUpdate: () => img.setPosition(x0 + dir * 70 * hop.t, y0 - Math.sin(hop.t * Math.PI) * 40).setAngle(dir * 360 * hop.t),
+      onComplete: () => {
+        dust?.emitParticleAt(img.x, img.y - 20, 10);
+        const pop = r.add(this.add.image(img.x, img.y - 30, "fx_glow").setScale(0.3).setAlpha(0.8));
+        r.tween({ targets: pop, scale: 0.9, alpha: 0, duration: 260 });
+        img.setVisible(false);
+      },
+    });
+    r.tween({ targets: img, scale: img.scale * 0.7, duration: d * 0.75 });
+  }
+
+  // Hit pause: the scene's clocks stop for a moment of real time
+  private freeze(ms: number): void {
+    this.time.timeScale = 0;
+    this.tweens.timeScale = 0;
+    window.setTimeout(() => this.unfreeze(), ms);
+  }
+  private unfreeze(): void {
+    this.time.timeScale = 1;
+    this.tweens.timeScale = 1;
+  }
+
+  // A small zoom into the field and back; the HUD camera does not move
+  private punch(zoom: number, ms: number): void {
+    const cam = this.cameras.main;
+    cam.zoomTo(zoom, ms * 0.25, "Sine.easeOut", true, (_c: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+      if (progress === 1) cam.zoomTo(1, ms * 0.75, "Sine.easeInOut", true);
+    });
   }
 
   // A king's card: the portrait in a frame of the house colour, the name below. Origin at the centre.
@@ -476,9 +585,10 @@ export class BattlefieldScene extends Phaser.Scene {
   }
 
   private coronation(r: Run, who: Identity, size: number, d: number, quiet: boolean): void {
-    const y = 330, cardH = 640 * size * 0.62 + 68;
-    const rays = r.add(this.add.image(W / 2, y, "fx_rays").setTint(who.house.text).setAlpha(0).setScale(0.9));
-    r.tween({ targets: rays, alpha: 0.85, duration: d * 0.2 });
+    const y = 350, cardH = 640 * size * 0.62 + 68;
+    // Gold rays, wide enough to show around the card on any sky
+    const rays = r.add(this.add.image(W / 2, y, "fx_rays").setTint(0xffd75a).setAlpha(0).setScale(size * 2));
+    r.tween({ targets: rays, alpha: 1, duration: d * 0.2 });
     if (!quiet) r.tween({ targets: rays, angle: 40, duration: d });
     const c = this.card(r, who, size).setPosition(W / 2, y).setScale(0.6).setAlpha(0);
     r.tween({ targets: c, scale: 1, alpha: 1, duration: d * 0.25, ease: "Back.easeOut" });

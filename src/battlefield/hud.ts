@@ -80,9 +80,9 @@ export class Hud {
     top(s.add.circle(BX, BY, BR + 10, C.navy, 0.86).setStrokeStyle(3, C.gold));
     this.ring = s.add.graphics();
     const bell = s.add.image(BX, BY, "bell").setDisplaySize(44, 50);
-    this.time = s.add.text(BX, BY + BR + 16, "", { fontFamily: FONT, fontSize: "22px", color: css(C.cream), fontStyle: "bold" })
+    this.time = s.add.text(BX, BY + BR + 14, "", { fontFamily: FONT, fontSize: "22px", color: css(C.cream), fontStyle: "bold" })
       .setOrigin(0.5, 0).setStroke(css(C.navy), 5);
-    this.conquests = s.add.text(BX, BY + BR + 44, "", { fontFamily: FONT, fontSize: "16px", color: css(C.cream) })
+    this.conquests = s.add.text(BX, BY + BR + 52, "", { fontFamily: FONT, fontSize: "16px", color: css(C.cream) })
       .setOrigin(0.5, 0).setStroke(css(C.navy), 5);
     top(this.ring, bell, this.time, this.conquests);
     this.drawRing();
