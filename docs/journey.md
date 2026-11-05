@@ -195,3 +195,12 @@
 ## Referee timer: hardening for deployment
 - Every console message passes through a cleaner that removes CashScript debug links and key-shaped text, because a debug link can contain private keys. A repeating warning from a failing network server is shown once a minute with a count.
 - The server's address, listening address and allowed page origins come from the environment, and it refuses to start in unsafe combinations (a network address without an allowed origin, a plain-http page, a wildcard). The page build refuses a plain-http server address.
+
+
+## Retiring the steal game (K9d)
+
+Kingdom had been running next to the old steal game for a while: the server loaded both game files, the page chose with a mode flag, and several fields only one of the two games used sat in the shared types as placeholders. Once Kingdom had been played start to finish with three wallets, Cashonize and a server restart in the middle of a round, there was no reason left to carry the old game.
+
+I deleted it instead of moving it to a legacy folder. Two git tags keep the old versions reachable (`v1-grab` for the block-timeout game, `v2-steal-timer` for the referee-clock steal game). The page lost its mode switch and now opens straight on the Kingdom. The server lost the steal validation, the fixed-reset clock, the old contract and game file, and the settings that only the steal game used. Every game now has a bell clock and Kingdom settings, so the optional fields became required and a whole class of "which kind of game is this" branches disappeared. The deploy script no longer borrowed its referee key from the old game file; it reads the chipnet test key directly.
+
+The old tests that had no Kingdom twin were carried over rather than dropped: sending the same move twice, slow network checks that must not make an in-time move late, the unconfirmed cap lifting on a new block, unknown-outcome and busy errors, a stale chain view, and a settled round. Everything passed after the cleanup, followed by a live chipnet round through the cleaned-up server.
