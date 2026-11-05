@@ -1,0 +1,3 @@
+# Art build (tools/build_assets.py). Install with: python -m pip install --user -r tools/requirements.txt
+pillow==13.0.0
+numpy==2.5.4

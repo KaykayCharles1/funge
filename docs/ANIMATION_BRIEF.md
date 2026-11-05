@@ -9,11 +9,11 @@ Painted-and-chibi fantasy. Palette: deep navy, teal, warm gold, crimson, cream, 
 default; dusk in the last 30 seconds. Words: "Treasury", "kingdom value", "conquer", "protect".
 
 ## Houses and people
-- Four houses and soldiers: violet (spearman, #8a55e0), crimson (swordsman, #d63a3c), emerald (archer,
-  #2fa655), sapphire (halberdier, #2f73e0).
+- Four houses and soldiers: violet (spearman, #8a55e0), crimson (swordsman, #d63a3c), obsidian (archer,
+  #4a4a58, silver highlight #d0d3de for outlines and text), sapphire (halberdier, #2f73e0).
 - Events carry only key hashes. Until a name feature exists, derive identity per round in identity.ts: the
   first time a key appears (compare the first 22 hex characters), give it the next free house in order, a
-  portrait picked by hash from assets/portraits/manifest.json, and the name stored with that portrait.
+  portrait picked by hash from public/assets/manifest.json, and the name stored with that portrait.
   Portrait outfit color does not need to match the house. The house color appears on the card header, banner,
   soldiers and HUD ring. Keep all of this in one file so chosen names and avatars can replace it later.
 - "You" is the connected wallet's key (find the accessor in src/wallet/). Highlight your kingdom, say
@@ -22,8 +22,9 @@ default; dusk in the last 30 seconds. Words: "Treasury", "kingdom value", "conqu
 
 ## What the scene shows (from the fields after each event)
 - Castle: keep while value < 2500 base units (25.00), the three-tower castle from 2500.
-- Walls: min(8, 2 + floor((value - 1000) / 500)) pieces; one drops in per protect.
-- Garrison: 6 + 2 * floor((value - 1000) / 500) soldiers of the king's house around the castle.
+- Walls: min(8, 2 + ceil((value - 1000) / 500)) pieces. The drop-in bounce plays only when the count rises;
+  every protect also plays the shield ring and the floating number.
+- Garrison: 6 + 2 * ceil((value - 1000) / 500) soldiers of the king's house around the castle.
 - Banner and castle flags: the king's house color. Chest and coin pile grow with the treasury (full at 6000).
 - HUD: bell with a ring (remaining time / clockSeconds), king plate (avatar, name, value), two shield icons
   (protectsLeft), "Next conquest costs" = value plus the fee (2%, read from the game file).

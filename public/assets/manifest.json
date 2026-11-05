@@ -1,0 +1,124 @@
+{
+  "portraits": [
+    {
+      "id": "king_01",
+      "title": "King",
+      "name": "Taren Valecrest",
+      "image": "portraits/king_01.webp",
+      "avatar": "portraits/king_01_avatar.webp",
+      "face": {
+        "x": 189,
+        "y": 138,
+        "size": 236
+      }
+    },
+    {
+      "id": "king_02",
+      "title": "Queen",
+      "name": "Maelis Emberwyn",
+      "image": "portraits/king_02.webp",
+      "avatar": "portraits/king_02_avatar.webp",
+      "face": {
+        "x": 179,
+        "y": 106,
+        "size": 236
+      }
+    },
+    {
+      "id": "king_03",
+      "title": "King",
+      "name": "Brannoc Ironhorn",
+      "image": "portraits/king_03.webp",
+      "avatar": "portraits/king_03_avatar.webp",
+      "face": {
+        "x": 148,
+        "y": 140,
+        "size": 246
+      }
+    },
+    {
+      "id": "king_04",
+      "title": "Queen",
+      "name": "Navira Solenne",
+      "image": "portraits/king_04.webp",
+      "avatar": "portraits/king_04_avatar.webp",
+      "face": {
+        "x": 200,
+        "y": 119,
+        "size": 236
+      }
+    },
+    {
+      "id": "king_05",
+      "title": "King",
+      "name": "Rhovan Ardell",
+      "image": "portraits/king_05.webp",
+      "avatar": "portraits/king_05_avatar.webp",
+      "face": {
+        "x": 169,
+        "y": 101,
+        "size": 246
+      }
+    },
+    {
+      "id": "king_06",
+      "title": "King",
+      "name": "Teodric Blueharrow",
+      "image": "portraits/king_06.webp",
+      "avatar": "portraits/king_06_avatar.webp",
+      "face": {
+        "x": 174,
+        "y": 120,
+        "size": 246
+      }
+    },
+    {
+      "id": "king_07",
+      "title": "King",
+      "name": "Ostmar Silverhold",
+      "image": "portraits/king_07.webp",
+      "avatar": "portraits/king_07_avatar.webp",
+      "face": {
+        "x": 159,
+        "y": 116,
+        "size": 266
+      }
+    },
+    {
+      "id": "king_08",
+      "title": "Queen",
+      "name": "Seraphine Pearlmoor",
+      "image": "portraits/king_08.webp",
+      "avatar": "portraits/king_08_avatar.webp",
+      "face": {
+        "x": 179,
+        "y": 119,
+        "size": 236
+      }
+    },
+    {
+      "id": "king_09",
+      "title": "King",
+      "name": "Torvald Ashenmoor",
+      "image": "portraits/king_09.webp",
+      "avatar": "portraits/king_09_avatar.webp",
+      "face": {
+        "x": 184,
+        "y": 120,
+        "size": 246
+      }
+    },
+    {
+      "id": "king_10",
+      "title": "Queen",
+      "name": "Amaranth Velloria",
+      "image": "portraits/king_10.webp",
+      "avatar": "portraits/king_10_avatar.webp",
+      "face": {
+        "x": 174,
+        "y": 119,
+        "size": 236
+      }
+    }
+  ]
+}

@@ -52,3 +52,6 @@ decisions.md
 
 
 server/data/
+
+# Original art (large PNGs). Only the WebP output in public/assets ships. Rebuild with tools/build_assets.py
+art-source/
