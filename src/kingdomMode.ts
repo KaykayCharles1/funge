@@ -853,7 +853,8 @@ export async function startKingdomMode() {
 function mountBattlefieldIfAsked() {
   if (!CONFIG.battlefield || new URLSearchParams(location.search).get("mode") !== "battlefield") return;
   import("./battlefield/index.ts")
-    .then((m) => m.mountBattlefield({ myKeys })) // "you": the game wallet and the own wallet
+    // "you" (both wallets), and the page's own state and handlers for the action bar (see battlefieldPage below)
+    .then((m) => m.mountBattlefield({ myKeys, page: battlefieldPage, run: battlefieldDo }))
     .catch((e) => console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e)));
 }
 
@@ -885,3 +886,56 @@ export async function playMockScenario(play: (h: Parameters<typeof playMockRound
 export function stopMockScenario(): void {
   if (import.meta.env.DEV && mockActive) stopMock();
 }
+
+// The battlefield's action bar (src/battlefield/actions.ts) shows this page's own state and calls this page's own
+// handlers. It holds no rules and no transaction code of its own: what is allowed, the price guard, the signing
+// with either wallet, the referee requests and the error texts all stay here, exactly as the old buttons use them.
+let bfActStartedAt = 0; // when the battlefield started a move, for "Approve in your wallet · time left"
+export function battlefieldPage() {
+  const protectBtn = (i: number) => document.getElementById(`kProt${i}`) as HTMLButtonElement | null;
+  const pusdText = document.getElementById("lwPusd")?.textContent ?? "";
+  const m = /^(\d+)\.(\d{2}) PUSD$/.exec(pusdText);
+  return {
+    round,
+    mock: mockActive,
+    ended: endedShown,
+    net,
+    act: actState(), // { enabled, label, hint } as the old main button shows it
+    actingPkh: actingPkh(),
+    previousKingIsMine: !!round?.kingdom?.previousKing && isMinePrefix(round.kingdom.previousKing),
+    kingIsMine: isMine(round?.kingdom?.holder ?? round?.king ?? null),
+    busy: acting,
+    external: actMode === "external",
+    signPrompt,
+    signLeftMs: acting && actMode === "external" ? Math.max(0, SIGN_TIMEOUT_MS - (Date.now() - bfActStartedAt)) : null,
+    note: note !== null && Date.now() < note.expires ? note.text : null,
+    // Each protect button exactly as the old page enabled it
+    protect: [0, 1, 2].map((i) => ({
+      amount: round?.kingdom?.protectAmounts[i] ?? null,
+      enabled: !document.getElementById("kProtectBox")?.classList.contains("hidden") && protectBtn(i)?.disabled === false,
+    })),
+    claiming,
+    claimNote,
+    wallet: {
+      game: getLocalWallet() !== null,
+      vault: vault.state(), // "none" | "locked" | "unlocked"
+      externalName: externalPkh() !== null ? getWalletState().walletName : null,
+      pusdText,
+      bchText: document.getElementById("lwBch")?.textContent ?? "",
+      pusd: m ? BigInt(m[1] + m[2]) : null, // game wallet PUSD in base units, when shown
+    },
+  };
+}
+export const battlefieldDo = {
+  act: () => {
+    bfActStartedAt = Date.now();
+    onAct();
+  },
+  protect: (i: number) => {
+    bfActStartedAt = Date.now();
+    onProtect(i);
+  },
+  claim: () => void onClaim(),
+  cancel: () => activeAct?.abort(new Error("Cancelled by you")),
+};
+

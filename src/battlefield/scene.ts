@@ -245,6 +245,11 @@ export class BattlefieldScene extends Phaser.Scene {
     this.flagSpots = [];
     this.walls = [];
     this.building = this.bannerImg = null;
+    if (state.status === "settled" && !king) {
+      // Settled, and the server no longer has the round's details: the round is simply finished
+      this.drawNotice(COPY.kingdom.finished, T.nextRound);
+      return;
+    }
     if (state.status === "waiting" || !king) {
       this.drawWaiting(state.openingPrice);
       return;
@@ -361,15 +366,20 @@ export class BattlefieldScene extends Phaser.Scene {
 
   // No king yet: a faint keep and a card
   private drawWaiting(openingPrice: bigint): void {
+    this.drawNotice(T.waitingTitle, T.waitingDetail(money(openingPrice)));
+  }
+
+  // A faint keep and a card with a title and a line under it
+  private drawNotice(title: string, detail: string): void {
     const keep = this.add.image(BASE_X, BASE_Y, "keep").setOrigin(0.5, 1).setAlpha(0.3);
     keep.setScale(BUILDING.keep.height / keep.height);
-    const cw = 520, ch = 112, cx = W / 2 - cw / 2, cy = 440;
+    const cw = 560, ch = 140, cx = W / 2 - cw / 2, cy = 430;
     const g = this.add.graphics().setDepth(1000);
     g.fillStyle(C.navy, 0.88).fillRoundedRect(cx, cy, cw, ch, 20);
     g.lineStyle(3, C.gold, 1).strokeRoundedRect(cx, cy, cw, ch, 20);
-    const t1 = this.add.text(W / 2, cy + 26, T.waitingTitle, { fontFamily: FONT, fontSize: "32px", color: css(C.cream), fontStyle: "bold" })
+    const t1 = this.add.text(W / 2, cy + 26, title, { fontFamily: FONT, fontSize: "32px", color: css(C.cream), fontStyle: "bold" })
       .setOrigin(0.5, 0).setDepth(1001);
-    const t2 = this.add.text(W / 2, cy + 72, T.waitingDetail(money(openingPrice)), { fontFamily: FONT, fontSize: "20px", color: css(C.gold) })
+    const t2 = this.add.text(W / 2, cy + 72, detail, { fontFamily: FONT, fontSize: "20px", color: css(C.gold), align: "center", wordWrap: { width: cw - 40 } })
       .setOrigin(0.5, 0).setDepth(1001);
     this.world.add([keep, g, t1, t2]);
   }
