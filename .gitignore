@@ -38,6 +38,7 @@ mnemonic*.txt
 *.pem
 .env
 .env.*
+.referee.*
 
 
 # Private notes
@@ -50,3 +51,4 @@ decisions.md
 # !tsconfig.json
 
 
+server/data/

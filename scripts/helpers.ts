@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { swapEndianness, hash160 } from "@bitauth/libauth";
-export { encodeCommitment, decodeCommitment } from "../src/lib/commitment.ts";
 
 // Compiled artifact (any-typed so Contract accepts it without extra config)
 export const loadArtifact = (name: string) =>

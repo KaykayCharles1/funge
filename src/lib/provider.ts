@@ -1,5 +1,6 @@
 import { ElectrumNetworkProvider } from "cashscript";
 import { CONFIG } from "../config.ts";
+import { warnThrottled } from "./safeLog.ts";
 
 type Net = NonNullable<ConstructorParameters<typeof ElectrumNetworkProvider>[0]>;
 type Response = Awaited<ReturnType<ElectrumNetworkProvider["performRequest"]>>;
@@ -84,7 +85,7 @@ export class FailoverProvider extends ElectrumNetworkProvider {
         lastError = e;
         const message = e instanceof Error ? e.message : String(e);
         if (!CONNECT_ONLY.test(message)) throw e; // anything else may mean the server did receive it
-        console.warn(`Electrum server #${index} could not connect; trying the next one`);
+        warnThrottled(`connect:${index}`, `Electrum ${this.hostnames[index]} could not connect; trying the next one`);
       }
     }
     throw lastError;
@@ -121,7 +122,7 @@ export class FailoverProvider extends ElectrumNetworkProvider {
               return;
             }
             failed++;
-            console.warn(`Electrum server #${index} failed (${message.split("\n")[0]})`);
+            warnThrottled(`fail:${index}`, `Electrum ${this.hostnames[index]} failed: ${message.split("\n")[0]}`);
             if (started < order.length) startNext();
             else if (failed >= order.length) {
               done = true;
