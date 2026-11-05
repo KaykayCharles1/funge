@@ -124,6 +124,15 @@ export const COPY = {
     trophyOther: "An immutable trophy NFT was sent to the winner.",
   },
 
+  // The animated battlefield (?mode=battlefield)
+  battlefield: {
+    treasury: "Treasury",
+    kingdomValue: "Kingdom value",
+    nextConquest: "Next conquest costs",
+    noKing: "No king yet",
+    currency: "PUSD",
+  },
+
   errors: {
     invalid: "The network did not accept that move. Nothing was sent. Please try again.",
     state_changed: "Someone moved first. Check the new state and try again.",

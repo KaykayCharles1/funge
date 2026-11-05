@@ -46,6 +46,9 @@ export const CONFIG = {
     
   // Minimum BCH (sats) on the state and pot outputs
   minSats: 1000n,
+
+  // The animated battlefield. When true, ?mode=battlefield shows it above the play page.
+  battlefield: true,
 };
 
 export const pusdCategory = () => CONFIG.pusdCategory[CONFIG.network];

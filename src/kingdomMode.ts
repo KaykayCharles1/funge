@@ -792,6 +792,7 @@ function kick() {
 }
 
 export async function startKingdomMode() {
+  mountBattlefieldIfAsked(); // battlefield block at the end of this file
   $("tagline").textContent = COPY.kingdom.tagline;
   $("refereeNotice").textContent = COPY.notice;
   show("refereeNotice", true);
@@ -845,4 +846,13 @@ export async function startKingdomMode() {
   renderAll();
   installMockButton();
   void tick();
+}
+
+// ---- Battlefield (docs/ANIMATION_BRIEF.md). Every battlefield hook in this file lives in this block. ----
+// Only ?mode=battlefield (with CONFIG.battlefield on) downloads it, so the normal page never loads Phaser.
+function mountBattlefieldIfAsked() {
+  if (!CONFIG.battlefield || new URLSearchParams(location.search).get("mode") !== "battlefield") return;
+  import("./battlefield/index.ts")
+    .then((m) => m.mountBattlefield())
+    .catch((e) => console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e)));
 }
