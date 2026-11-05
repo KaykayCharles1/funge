@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "node server/index.ts"
+    "server": "node server/index.ts",
+    "check:mock-money": "tsx scripts/check-mock-money.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

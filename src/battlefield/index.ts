@@ -45,7 +45,22 @@ export function mountBattlefield(opts: MountOptions): void {
   let book: IdentityBook | null = null;
   let director: Director | null = null;
   let held = false; // the dev panel is in charge
-  let seenSnapshot = false;
+  // The connection ribbon: "Connecting…", then the outage notice after 10 s. Only while nothing else is in
+  // charge: never over a mock round or scenario, never while the dev panel holds, gone at the first real snapshot.
+  let serverSeen = false; // a snapshot from the real server arrived
+  let mockOn = false; // a mock round or scenario is feeding the page
+  let waitFrom = performance.now();
+  let connShown: "connecting" | "outage" | null = null;
+  const connection = () => {
+    if (!director) return;
+    const want = serverSeen || mockOn || held ? null : performance.now() - waitFrom >= OUTAGE_AFTER_MS ? "outage" : "connecting";
+    if (want === connShown) return;
+    if (want === "outage") scene.hud.ribbon(COPY.network.unreachable, "alert");
+    else if (want === "connecting") scene.hud.ribbon(COPY.battlefield.connecting);
+    else if (connShown) scene.hud.ribbon(null); // only clears a ribbon it put up
+    connShown = want;
+  };
+  setInterval(connection, 500);
   let devMe: string | null = null; // dev panel: pretend to hold this key
   const isMe = (key: string | null) => !!key && (opts.myKeys().some((k) => sameKey(k, key)) || (devMe !== null && sameKey(devMe, key)));
   const kingOf = (s: FieldState): Identity | null => {
@@ -60,12 +75,18 @@ export function mountBattlefield(opts: MountOptions): void {
     scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
       if (!held) director?.tick();
     });
-    if (!seenSnapshot) scene.hud.ribbon(COPY.battlefield.connecting);
+    connection();
     if (import.meta.env.DEV && new URLSearchParams(location.search).get("dev") === "1") {
       const panel = devPanel(host, scene, (on) => {
         held = on;
+        connection();
         if (!on && director?.state) director.snap(director.state);
-      }, () => fees, (key) => (devMe = key));
+      }, () => fees, (key) => (devMe = key), () => {
+        // Back to the real round: wait for the server again
+        mockOn = false;
+        waitFrom = performance.now();
+        connection();
+      });
       director.onChange = (st) => {
         panel.stats(st);
         const s = director?.state;
@@ -84,13 +105,10 @@ export function mountBattlefield(opts: MountOptions): void {
     scene: [scene],
   });
 
-  // No snapshot for a while: the referee is not answering
-  setTimeout(() => {
-    if (!seenSnapshot && director && !held) scene.hud.ribbon(COPY.network.unreachable, "alert");
-  }, OUTAGE_AFTER_MS);
-
-  onSceneSnapshot((s) => {
-    seenSnapshot = true;
+  onSceneSnapshot((s, source) => {
+    if (source === "mock") mockOn = true;
+    else serverSeen = true;
+    connection();
     if (s.lastSeq === 0) book?.reset();
     if (director && !held) director.onSnapshot(s, CONFIG.kingdom.openingPrice);
   });
@@ -121,7 +139,10 @@ export function mountBattlefield(opts: MountOptions): void {
 // Not player-facing. It sits above the field, so the page's mock-round bar (bottom right) never covers it.
 type DevPanel = { stats: (s: DirectorStats) => void; sync: (s: FieldState, king: Identity | null) => void };
 
-function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: boolean) => void, getFees: () => Fees | null, setMe: (key: string | null) => void): DevPanel {
+function devPanel(
+  host: HTMLElement, scene: BattlefieldScene, setHeld: (on: boolean) => void, getFees: () => Fees | null,
+  setMe: (key: string | null) => void, onBack: () => void,
+): DevPanel {
   const box = document.createElement("div");
   box.className = "mx-auto mb-2 flex w-full max-w-5xl flex-col gap-3 rounded-xl bg-slate-800 p-3 text-xs text-slate-200 ring-1 ring-slate-600";
   host.before(box);
@@ -159,6 +180,7 @@ function devPanel(host: HTMLElement, scene: BattlefieldScene, setHeld: (on: bool
     back.addEventListener("click", () => {
       page.stopMockScenario();
       status.textContent = "";
+      onBack();
     });
     buttons.append(back, meBox);
   });
