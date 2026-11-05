@@ -130,7 +130,14 @@ export function mountActionBar(
       enabled = v.act.enabled && !mine;
       reason = v.act.hint;
       mainAction = run.act;
-      if (v.act.hint === COPY.grab.noWallet || v.act.hint === COPY.grab.locked) {
+      if (v.act.label === COPY.kingdom.roundOver) {
+        // The page's own clock says time is up (actState returns this label then). The referee may take a while
+        // to announce the end, so say so instead of showing a price that can no longer be paid.
+        label = COPY.kingdom.roundOver;
+        enabled = false;
+        mainAction = null;
+        reason = COPY.clock.confirming;
+      } else if (v.act.hint === COPY.grab.noWallet || v.act.hint === COPY.grab.locked) {
         // Needs a wallet: the button opens the wallet panel instead
         label = v.act.hint === COPY.grab.locked ? T.unlockWallet : T.createWallet;
         enabled = true;
