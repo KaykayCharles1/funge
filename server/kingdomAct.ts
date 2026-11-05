@@ -77,7 +77,14 @@ function validateOpen(ctx: ValidateCtx): Validated {
     return invalid("The new state must start at the opening value with no protects and no previous king.");
   }
   if (c.potAfter !== c.params.openingPrice) return invalid("The pot must hold exactly the opening price.");
-  return { newHolder: n.holderPkh, newPassCount: 1, sign: { fn: "open", newHolder: n.holderPkh } };
+  const delta = c.potAfter - c.potBefore;
+  return {
+    newHolder: n.holderPkh, newPassCount: 1, sign: { fn: "open", newHolder: n.holderPkh },
+    moved: {
+      actor: n.holderPkh, previousKing: null, paid: delta, refunded: 0n, toTreasury: delta, value: n.value, treasury: c.potAfter,
+      protectsLeft: c.params.protectsPerReign - n.protects, conquests: 0,
+    },
+  };
 }
 
 function validateConquer(ctx: ValidateCtx): Validated {
@@ -105,7 +112,14 @@ function validateConquer(ctx: ValidateCtx): Validated {
   }
   if (out2.token.amount < money.kingGets) return invalid("The dethroned king must be paid in full.");
   if (out2.valueSatoshis < 1000n) return invalid("The payout output needs at least 1000 satoshis.");
-  return { newHolder: n.holderPkh, newPassCount: n.passCount, sign: { fn: "conquer", newHolder: n.holderPkh } };
+  const toTreasury = c.potAfter - c.potBefore;
+  return {
+    newHolder: n.holderPkh, newPassCount: n.passCount, sign: { fn: "conquer", newHolder: n.holderPkh },
+    moved: {
+      actor: n.holderPkh, previousKing: s.holderPkh, paid: toTreasury + out2.token.amount, refunded: out2.token.amount, toTreasury,
+      value: n.value, treasury: c.potAfter, protectsLeft: c.params.protectsPerReign, conquests: n.passCount - 1,
+    },
+  };
 }
 
 function validateProtect(ctx: ValidateCtx): Validated {
@@ -131,6 +145,10 @@ function validateProtect(ctx: ValidateCtx): Validated {
   return {
     newHolder: s.holderPkh, newPassCount: s.passCount, sign: { fn: "protect", amount },
     protect: { amount, value: n.value, used: n.protects },
+    moved: {
+      actor: s.holderPkh, previousKing: isZero(s.previous) ? null : s.previous, paid: amount, refunded: 0n, toTreasury: amount,
+      value: n.value, treasury: c.potAfter, protectsLeft: c.params.protectsPerReign - n.protects, conquests: s.passCount - 1,
+    },
   };
 }
 

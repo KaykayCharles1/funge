@@ -5,6 +5,10 @@ let rttMs: number | null = null;
 
 // The server's clock, as best we can tell. The countdown must use this, never the device clock.
 export const serverNow = () => Date.now() + offsetMs;
+// Dev-only: the mock round player moves the clock forward to skip time, then moves it back.
+export const shiftClockForMock = (ms: number) => {
+  offsetMs += ms;
+};
 export const clockInfo = () => ({ offsetMs: Math.round(offsetMs), rttMs, synced: rttMs !== null });
 
 // Asks the server for its time a few times and keeps the answer with the shortest round trip

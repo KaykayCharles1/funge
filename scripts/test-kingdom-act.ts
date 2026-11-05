@@ -574,6 +574,63 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   console.log("ok: a stale chain view is refused; a settled round accepts nothing");
 }
 
+// ---------------------------------------------------------------- every event carries what a scene needs
+{
+  const s = await setup();
+  const id = GAME.gameId;
+  await executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE }));
+  await executeAct(s.deps, GAME, body(s.world, "protect", { amount: PARAMS.unit * 5n }));
+  await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: BOB }));
+  const r = s.manager.get(id);
+  const [opened, protectedEv, conquered2] = r.events;
+  const scene = (e: typeof opened) => e!.data;
+  // the envelope
+  for (const e of r.events) {
+    assert.equal(e.roundId, id);
+    assert.equal(typeof e.at, "number");
+    assert.equal(typeof e.seq, "number");
+  }
+  // open
+  assert.deepEqual(
+    { ...scene(opened), deadline: "x", txid: "x" },
+    { king: ALICE, previousKing: null, passCount: 1, conquests: 0, value: "1000", treasury: "1000", protectsLeft: 2,
+      deadline: "x", clockSeconds: 600, nextClockSeconds: 570, action: "open", txid: "x", actor: ALICE, paid: "1000", refunded: "0", toTreasury: "1000" },
+    "open event",
+  );
+  // protect +5.00 on a throne of 10.00: nothing is refunded, the clock numbers are the king's current ones
+  assert.deepEqual(
+    { ...scene(protectedEv), deadline: "x", txid: "x" },
+    { king: ALICE, previousKing: null, passCount: 1, conquests: 0, value: "1500", treasury: "1500", protectsLeft: 1,
+      deadline: "x", clockSeconds: 600, nextClockSeconds: 570, txid: "x", actor: ALICE, paid: "500", refunded: "0", toTreasury: "500", amount: "500", protectsUsed: 1 },
+    "protect event",
+  );
+  assert.equal(scene(protectedEv)!.deadline, scene(opened)!.deadline); // protect never moves the clock
+  // conquest of a throne worth 15.00: pays 15.30, the old king gets 13.80, the pool gets 1.50
+  assert.deepEqual(
+    { ...scene(conquered2), deadline: "x", txid: "x" },
+    { king: BOB, previousKing: ALICE, passCount: 2, conquests: 1, value: "1500", treasury: "1650", protectsLeft: 2,
+      deadline: "x", clockSeconds: 570, nextClockSeconds: 540, action: "conquer", txid: "x", actor: BOB, paid: "1530", refunded: "1380", toTreasury: "150" },
+    "conquest event",
+  );
+  // the events that no move causes carry the same picture
+  s.manager.pause(id, "network_busy");
+  s.manager.resume(id, "network_ok");
+  s.clock.set(s.manager.get(id).deadline! + GRACE);
+  s.manager.observe(id, { live: true, passCount: 2 });
+  const [paused, resumed, over] = r.events.slice(3);
+  for (const e of [paused, resumed, over]) {
+    const d = e!.data!;
+    assert.deepEqual([d.king, d.previousKing, d.passCount, d.conquests, d.value, d.treasury, d.protectsLeft, d.clockSeconds], [BOB, ALICE, 2, 1, "1500", "1650", 2, 570]);
+    assert.equal(typeof d.deadline, "number");
+  }
+  assert.deepEqual([paused!.type, resumed!.type, over!.type], ["clock_paused", "clock_resumed", "round_over"]);
+  // the wire shape of a stored old event: a missing roundId is filled in when events are sent out
+  const old = s.manager.get(id).events[0]!;
+  delete (old as { roundId?: string }).roundId;
+  assert.equal(s.manager.eventsAfter(id, 0).events[0]!.roundId, id);
+  console.log("ok: events carry the round id, who acted, previous king, paid, refunded, to treasury, value and treasury after, protects left, conquests, bell and deadline");
+}
+
 // ---------------------------------------------------------------- what the page is told
 {
   const s = await setup();

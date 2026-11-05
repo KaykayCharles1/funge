@@ -17,11 +17,13 @@ import { makeProvider } from "./lib/provider.ts";
 import { qrDataUrl } from "./lib/qr.ts";
 import { claim, getEvents, getRound, watchRound } from "./referee/api.ts";
 import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts";
-import { serverNow, syncClock } from "./referee/clock.ts";
+import { serverNow, shiftClockForMock, syncClock } from "./referee/clock.ts";
 import { kingdomAct, kingdomProtect } from "./referee/kingdomActions.ts";
 import { kingdomActExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
+import { playMockRound } from "./mockRound.ts";
+import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 
@@ -72,6 +74,10 @@ let chain: KingdomChainWatch | null = null;
 let chainBusy = false;
 let fallbackBusy = false;
 let fallbackNote = "";
+let mockActive = false; // the dev-only mock round is on screen: the real server is not asked about anything
+let mockShift = 0; // how far the mock moved the clock, so it can be put back
+let mockRun = 0; // changes when a mock is started or stopped, so an old script notices it was cancelled
+const warned = new Set<string>(); // "deadline:level" for each clock warning already raised
 
 const serverDown = () => failures >= 2 || net === "offline";
 
@@ -439,7 +445,7 @@ function renderActions() {
 // Open, conquer or protect with whichever wallet is playing. `amount` is the price the player agreed to (open, conquer)
 // or the protect amount. Nothing is spent beyond it: the helpers re-check the chain and refuse a changed price.
 async function run(kind: Kind, amount: bigint) {
-  if (acting) return;
+  if (acting || mockActive) return; // never spend anything while the mock round is showing
   const external = externalPkh();
   const local = getLocalWallet();
   if (external === null && !local) return;
@@ -619,15 +625,17 @@ async function loadHistory() {
 
 function applySnapshot(s: RoundSnapshot) {
   round = s;
+  emitSceneSnapshot(s, mockActive ? "mock" : "server");
   if (s.kingdom) lastLive = s;
   watcher?.setSeq(s.lastSeq); // the snapshot already includes every event up to here
   renderAll();
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-  if (s.status === "settled") void loadEnded();
+  if (s.status === "settled" && !mockActive) void loadEnded();
 }
 
 // Instant reaction to a pushed event, then the server's snapshot confirms it
 function onEvent(e: RefereeEvent) {
+  emitSceneEvent(e, mockActive ? "mock" : "server");
   feed.set(e.seq, e);
   const r = round;
   if (r) {
@@ -643,8 +651,98 @@ function onEvent(e: RefereeEvent) {
   kick();
 }
 
+// The page raises a "clock_warning" event when the countdown first reaches 60, 30 and 10 seconds. The server has no such
+// event: it only sets the deadline, and every device counts down on its own against the server's clock.
+const WARNING_LEVELS = [60, 30, 10];
+function checkClockWarnings() {
+  const r = round;
+  if (!r || r.status !== "open" || r.paused || r.deadline === null) return;
+  const rem = remainingMs();
+  if (rem === null || rem <= 0) return;
+  const level = WARNING_LEVELS.find((l, i) => rem <= l * 1000 && (WARNING_LEVELS[i + 1] === undefined || rem > WARNING_LEVELS[i + 1]! * 1000));
+  if (level === undefined) return;
+  const key = `${r.deadline}:${level}`;
+  if (warned.has(key)) return;
+  warned.add(key);
+  for (const higher of WARNING_LEVELS.filter((l) => l > level)) warned.add(`${r.deadline}:${higher}`); // a jump past a level raises one warning, not two
+  const k = r.kingdom ?? null;
+  emitSceneEvent(
+    {
+      seq: 0, roundId: r.gameId, at: serverNow(), type: "clock_warning", reason: `${level}s`,
+      data: {
+        level, remainingMs: Math.round(rem), deadline: r.deadline, king: r.king, previousKing: k?.previousKing ?? null,
+        passCount: r.passCount, conquests: Math.max(0, r.passCount - 1), value: k?.value ?? null, treasury: r.pot,
+        protectsLeft: k?.protectsLeft ?? 0, clockSeconds: k?.clockSeconds ?? null, nextClockSeconds: k?.nextClockSeconds ?? null,
+      },
+    },
+    mockActive ? "mock" : "client",
+  );
+}
+
+// Dev page only: replay a scripted round through the same handlers that real events use
+async function startMock(label: (t: string) => void) {
+  mockActive = true;
+  const me = ++mockRun;
+  clearTimeout(timer);
+  watcher?.close();
+  watcher = null;
+  feed.clear();
+  warned.clear();
+  round = null;
+  await playMockRound({
+    now: serverNow,
+    shiftClock: (ms) => {
+      mockShift += ms;
+      shiftClockForMock(ms);
+    },
+    onEvent,
+    onSnapshot: applySnapshot,
+    sleep,
+    cancelled: () => me !== mockRun,
+    label,
+  });
+}
+function stopMock() {
+  mockRun++;
+  shiftClockForMock(-mockShift);
+  mockShift = 0;
+  mockActive = false;
+  feed.clear();
+  warned.clear();
+  round = null;
+  renderAll();
+  kick();
+}
+function installMockButton() {
+  if (!import.meta.env.DEV) return; // not part of the production build
+  const bar = document.createElement("div");
+  bar.className = "fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-xs text-slate-200 ring-1 ring-slate-600";
+  const text = document.createElement("span");
+  text.textContent = "Dev: mock round";
+  const play = document.createElement("button");
+  play.id = "mockPlayBtn";
+  play.className = "rounded-lg bg-amber-500 px-3 py-1 font-semibold text-slate-900";
+  play.textContent = "Play mock round";
+  const stop = document.createElement("button");
+  stop.id = "mockStopBtn";
+  stop.className = "hidden rounded-lg bg-slate-600 px-3 py-1";
+  stop.textContent = "Back to the real round";
+  play.addEventListener("click", () => {
+    play.disabled = true;
+    show("mockStopBtn", true);
+    void startMock((t) => (text.textContent = t)).finally(() => (play.disabled = false));
+  });
+  stop.addEventListener("click", () => {
+    stopMock();
+    text.textContent = "Dev: mock round";
+    stop.classList.add("hidden");
+  });
+  bar.append(text, play, stop);
+  document.body.append(bar);
+}
+
 async function tick() {
-  if (running) return;
+  if (running || mockActive) return;
   running = true;
   clearTimeout(timer);
   let ok = false;
@@ -688,6 +786,7 @@ async function tick() {
 
 // Reload the round soon (after an event, or when the tab comes back)
 function kick() {
+  if (mockActive) return;
   clearTimeout(timer);
   timer = setTimeout(() => void tick(), 400);
 }
@@ -735,6 +834,7 @@ export async function startKingdomMode() {
     renderClock();
     renderPreview();
     renderActions();
+    checkClockWarnings();
   }, 250);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
@@ -743,5 +843,6 @@ export async function startKingdomMode() {
     }
   });
   renderAll();
+  installMockButton();
   void tick();
 }

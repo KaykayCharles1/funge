@@ -2,7 +2,19 @@ import { copyFile, mkdir, open, readFile, rename } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export type EventData = Record<string, string | number | boolean | null>;
-export type EventRecord = { seq: number; at: number; type: string; reason: string; data?: EventData };
+// roundId is the game's token category. Events saved before it was added get it filled in when they are sent out.
+export type EventRecord = { seq: number; roundId: string; at: number; type: string; reason: string; data?: EventData };
+
+// What a scene needs to know about the kingdom, kept as of the last move. Amounts are base-unit strings.
+export type SceneState = {
+  king: string | null; // key hash of the current king, null while waiting
+  previousKing: string | null; // the dethroned king's full key hash after a conquest, else the 22-hex prefix from the chain, else null
+  passCount: number;
+  conquests: number; // passCount minus the open
+  value: string;
+  treasury: string; // the pool
+  protectsLeft: number;
+};
 
 // Only what the chain cannot tell us. King, pass count and state coin are read from the chain.
 export type RoundRecord = {
@@ -12,6 +24,7 @@ export type RoundRecord = {
   paused: { since: number; reason: string } | null;
   nextSeq: number;
   seenPassCount?: number; // the pass count the timer has accounted for
+  scene?: SceneState; // the kingdom as of the last move or chain read
   events: EventRecord[];
 };
 

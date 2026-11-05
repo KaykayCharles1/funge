@@ -98,6 +98,7 @@ async function fails(p: Promise<unknown>, code: string) {
   assert.equal(last.type, "round_settled");
   assert.equal(last.reason, "claim");
   assert.equal(last.data?.txid, hex32(77));
+  assert.deepEqual([last.data?.king, last.data?.treasury, last.data?.payout, last.data?.winner], [KING, "0", "1330", KING]); // empty after the payout; payout is what the winner got
   await fails(settleRound(s.deps, GAME, "claim"), "round_over");
   console.log("ok: claim waits for deadline + grace, then settles once");
 }

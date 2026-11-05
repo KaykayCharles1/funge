@@ -41,6 +41,7 @@ Offline (no network, no coins):
     node scripts/test-bell.ts              the bell, protect lockout, clock events
     node scripts/test-kingdom-act.ts       move validation, races, timing, the round description
     node scripts/test-keeper.ts            automatic settlement
+    node scripts/test-mock-round.ts        the dev-only mock round (see docs/EVENTS.md)
     node scripts/test-protect-coins.ts     protect coin selection
     node scripts/test-store.ts             saved state and restarts
     node scripts/test-env.ts               server settings checks

@@ -45,8 +45,9 @@ export type KingdomSnapshot = {
 
 export type RefereeEvent = {
   seq: number;
-  at: number;
-  type: string; // deadline_changed, clock_paused, clock_resumed, round_over, round_settled
+  roundId: string; // the game's token category
+  at: number; // server time, epoch ms
+  type: string; // deadline_changed, protect_applied, clock_paused, clock_resumed, round_over, round_settled (and clock_warning, made by the page)
   reason: string;
   data?: Record<string, string | number | boolean | null>;
 };

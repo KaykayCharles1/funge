@@ -13,6 +13,7 @@ import type { LockRunner } from "./lock.ts";
 import type { RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
+import { sceneOf } from "./scene.ts";
 
 export type AppDeps = {
   games: ServerGame[];
@@ -118,7 +119,7 @@ export async function buildApp(deps: AppDeps) {
     if (!game) return reply.code(404).send({ error: "unknown_round" });
     try {
       const c = await chain.read(game);
-      const round = manager.observe(id, { live: c.live, passCount: c.passCount });
+      const round = manager.observe(id, { live: c.live, passCount: c.passCount, scene: sceneOf(game, c) });
       return describeRound(game, round, c, clock.now(), manager.bellInfo(id, c.passCount));
     } catch {
       return reply.code(503).send({ error: "chain_unavailable" });

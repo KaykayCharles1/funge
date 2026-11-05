@@ -8,6 +8,7 @@ import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
 import { KINGDOM_HANDLERS } from "./kingdomAct.ts";
+import { sceneAfter, sceneOf } from "./scene.ts";
 import type { LockRunner } from "./lock.ts";
 import { classifyKingdomAction, type RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
@@ -153,7 +154,7 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     const before = manager.get(id);
     const statusBefore = before.status;
     const deadlineBefore = before.deadline;
-    const round = manager.observe(id, { live: c.live, passCount: c.passCount });
+    const round = manager.observe(id, { live: c.live, passCount: c.passCount, scene: sceneOf(game, c) });
     // In time means: the request arrived before the deadline plus the grace, however long the checks above took
     const onTime = deadlineBefore !== null && arrivedAt < deadlineBefore + GRACE_SECONDS * 1000;
     if (round.status === "over" && !onTime) {
@@ -208,15 +209,21 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     // 7. Success: set the clock (or leave it alone, for protect) and publish the event
     deps.unconfirmed.record(id);
     let r: RoundRecord;
+    const m = checked.moved;
+    const scene = sceneAfter(checked.newPassCount, m);
+    const moveData = {
+      txid, king: checked.newHolder, actor: m.actor, previousKing: m.previousKing,
+      paid: m.paid.toString(), refunded: m.refunded.toString(), toTreasury: m.toTreasury.toString(),
+    };
     if (handler.fn === "protect") {
       if (!checked.protect) throw new Error("protect without its details");
       r = manager.applyProtect(id, {
-        txid, king: checked.newHolder, amount: checked.protect.amount.toString(),
+        ...moveData, amount: checked.protect.amount.toString(),
         value: checked.protect.value.toString(), protectsUsed: checked.protect.used,
-      });
+      }, scene);
     } else {
       if (classifyKingdomAction(handler.fn) === null) throw new Error("action has no deadline reset");
-      r = manager.applyKingdomAction(id, handler.fn, checked.newPassCount, { txid, king: checked.newHolder });
+      r = manager.applyKingdomAction(id, handler.fn, checked.newPassCount, moveData, scene);
     }
     chain.invalidate(id);
     return { txid, passCount: checked.newPassCount, king: checked.newHolder, deadline: r.deadline, serverNow: clock.now(), lastSeq: r.nextSeq - 1 };

@@ -45,9 +45,22 @@ export type SignCall =
   | { fn: "protect"; amount: bigint };
 
 export type ValidateCtx = { game: ServerGame; chain: ChainState; tx: Transaction; body: ActBody };
+// What a move did, worked out from the checked transaction. Goes into the event so a scene needs no other lookup.
+export type Moved = {
+  actor: string; // key hash of the player who moved
+  previousKing: string | null; // the dethroned king (conquest only)
+  paid: bigint; // PUSD the player paid in total
+  refunded: bigint; // PUSD paid out to the dethroned king
+  toTreasury: bigint; // PUSD added to the pool
+  value: bigint; // the kingdom's value after
+  treasury: bigint; // the pool after
+  protectsLeft: number;
+  conquests: number;
+};
 export type Validated = {
   newHolder: string;
   newPassCount: number;
+  moved: Moved;
   sign: SignCall;
   protect?: { amount: bigint; value: bigint; used: number }; // Kingdom protect only
 };

@@ -15,6 +15,7 @@ import { makeUnconfirmed } from "./unconfirmed.ts";
 import { createKeeper } from "./keeper.ts";
 import { installSafeConsole, warnThrottled } from "../src/lib/safeLog.ts";
 import { readServerEnv } from "./env.ts";
+import { sceneOf } from "./scene.ts";
 
 const network = CONFIG.network as Network;
 installSafeConsole();
@@ -69,7 +70,7 @@ try {
   setInterval(() => {
     for (const g of games) {
       const c = chain.last(g.gameId);
-      if (c) manager.observe(g.gameId, { live: c.live, passCount: c.passCount });
+      if (c) manager.observe(g.gameId, { live: c.live, passCount: c.passCount, scene: sceneOf(g, c) });
     }
   }, 1000);
   setInterval(() => manager.heartbeat(), HEARTBEAT_SECONDS * 1000);

@@ -1,9 +1,9 @@
 import { clockSecondsFor, nextClockSecondsFor, validateBell, type BellSettings } from "../src/lib/bell.ts";
 import { EVENT_HISTORY, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
 import type { Clock } from "./clock.ts";
-import type { EventData, EventRecord, RoundRecord, Store } from "./store.ts";
+import type { EventData, EventRecord, RoundRecord, SceneState, Store } from "./store.ts";
 
-export type ChainView = { live: boolean; passCount: number }; // live = the state coin still exists
+export type ChainView = { live: boolean; passCount: number; scene?: SceneState | null }; // live = the state coin still exists
 export type Listener = (gameId: string, event: EventRecord) => void;
 
 // What each contract function means for the clock. "protect" is real but never touches the clock.
@@ -67,8 +67,17 @@ export class RoundManager {
     return this.ensure(gameId);
   }
 
+  // Every event carries the kingdom as it stands (king, value, treasury, ...), the deadline and the current bell,
+  // so a scene can be drawn from the event alone. The fields a move adds itself win over these defaults.
   private publish(r: RoundRecord, type: string, reason: string, data?: EventData): EventRecord {
-    const ev: EventRecord = { seq: r.nextSeq++, at: this.clock.now(), type, reason, ...(data ? { data } : {}) };
+    const bell = r.seenPassCount ? this.bellInfo(r.gameId, r.seenPassCount) : null;
+    const full: EventData = {
+      ...(r.scene ?? {}),
+      deadline: r.deadline,
+      ...(bell && bell.clockSeconds !== null ? { clockSeconds: bell.clockSeconds, nextClockSeconds: bell.nextClockSeconds } : {}),
+      ...(data ?? {}),
+    };
+    const ev: EventRecord = { seq: r.nextSeq++, roundId: r.gameId, at: this.clock.now(), type, reason, data: full };
     r.events.push(ev);
     if (r.events.length > EVENT_HISTORY) r.events.splice(0, r.events.length - EVENT_HISTORY);
     this.store.save().catch((e) => console.error("state save failed:", e instanceof Error ? e.message : String(e)));
@@ -128,9 +137,10 @@ export class RoundManager {
     if (r.status === "settled") return r;
     if (!chain.live) {
       r.status = "settled";
-      this.publish(r, "round_settled", "chain");
+      this.publish(r, "round_settled", "chain", { treasury: "0", payout: null });
       return r;
     }
+    if (chain.scene) r.scene = chain.scene;
     const seen = r.seenPassCount ?? (r.status === "waiting" ? 0 : chain.passCount);
     if ((r.status === "waiting" || r.status === "open") && chain.passCount > seen) {
       // A move the timer has not accounted for (not made through /act): restart the clock from now
@@ -160,6 +170,7 @@ export class RoundManager {
     action: "open" | "conquer",
     passCount: number,
     data?: EventData,
+    scene?: SceneState,
   ): RoundRecord {
     const bell = this.bells.get(gameId);
     if (!bell) throw new Error("applyKingdomAction: this game has no bell");
@@ -169,6 +180,7 @@ export class RoundManager {
     r.status = "open";
     r.deadline = this.clock.now() + seconds * 1000;
     r.seenPassCount = passCount;
+    if (scene) r.scene = scene;
     this.publish(r, "deadline_changed", action, {
       deadline: r.deadline, action, passCount, clockSeconds: seconds, nextClockSeconds: nextClockSecondsFor(passCount, bell), ...(data ?? {}),
     });
@@ -187,9 +199,10 @@ export class RoundManager {
   }
 
   // Protect, after a successful broadcast. Informational: the clock, the status and the pass count stay as they are.
-  applyProtect(gameId: string, data?: EventData): RoundRecord {
+  applyProtect(gameId: string, data?: EventData, scene?: SceneState): RoundRecord {
     const r = this.ensure(gameId);
     if (r.status !== "open" || r.deadline === null || r.paused) throw new Error("applyProtect: the round is not running");
+    if (scene) r.scene = scene;
     this.publish(r, "protect_applied", "protect", { deadline: r.deadline, ...(data ?? {}) });
     return r;
   }
@@ -215,14 +228,17 @@ export class RoundManager {
     const r = this.ensure(gameId);
     const first = r.events[0];
     const resync = first !== undefined && after < first.seq - 1;
-    return { resync, lastSeq: r.nextSeq - 1, events: resync ? [] : r.events.filter((e) => e.seq > after) };
+    const events = resync ? [] : r.events.filter((e) => e.seq > after).map((e) => (e.roundId ? e : { ...e, roundId: gameId }));
+    return { resync, lastSeq: r.nextSeq - 1, events };
   }
 
     markSettled(gameId: string, txid: string, by: string, data?: EventData): RoundRecord {
     const r = this.ensure(gameId);
     if (r.status === "settled") return r;
     r.status = "settled";
-    this.publish(r, "round_settled", by, { txid, ...(data ?? {}) });
+    // After the payout the treasury is empty; "payout" is what the winner received (null when the settlement was not seen)
+    const payout = data && "pot" in data ? data.pot ?? null : null;
+    this.publish(r, "round_settled", by, { txid, treasury: "0", payout, ...(data ?? {}) });
     return r;
   }
 }

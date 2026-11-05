@@ -2,6 +2,7 @@ import { KEEPER_DELAY_SECONDS } from "../src/refereeParams.ts";
 import { ActError, mapBroadcastError, type ActDeps } from "./act.ts";
 import type { ChainState } from "./chain.ts";
 import type { ServerGame } from "./games.ts";
+import { sceneOf } from "./scene.ts";
 
 export type SettleResult = {
   txid: string;
@@ -26,7 +27,7 @@ export async function settleRound(deps: ActDeps, game: ServerGame, by: "claim" |
     } catch {
       throw new ActError("chain_unavailable", "Could not read the chain. Try again in a moment.");
     }
-    const round = manager.observe(id, { live: c.live, passCount: c.passCount });
+    const round = manager.observe(id, { live: c.live, passCount: c.passCount, scene: sceneOf(game, c) });
     if (round.status === "settled" || !c.live) throw new ActError("round_over", "The round is already settled.");
     if (round.status !== "over") throw new ActError("not_over", "The round is still running.");
     if (round.paused) throw new ActError("paused", "The clock is paused. Try again shortly.");

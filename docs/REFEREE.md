@@ -124,7 +124,7 @@ deadline is pushed out by the length of the pause and a `clock_resumed` event is
 
 ## The server, in outline
 - Round registry keyed by the game's token category: status, deadline, king, last action. `GET /rounds/:id` also describes the Kingdom: value, the exact price of the next conquest and how it splits, protects left and their allowed amounts, the current and next clock, and the previous king's short mark. All of it is computed on the server, so the page and the contract cannot disagree.
-- `GET /rounds/:id` returns state, deadline and serverNow. A WebSocket pushes deadline changes and events.
+- `GET /rounds/:id` returns state, deadline and serverNow. A WebSocket pushes deadline changes and events. Every event is self-contained (the kingdom after the change, the money moved, the deadline and the bell); `EVENTS.md` lists them all with examples.
 - `POST /rounds/:id/act` takes a move built by the player's wallet, checks it, adds the referee signature and broadcasts it. `POST /rounds/:id/claim` settles a finished round.
 - Both wallets use the same route: the game wallet signs its own coins in the browser; a WizardConnect wallet signs them in the wallet app. The wallet's signatures do not cover the contract input's unlocking script, so adding the referee signature afterwards keeps them valid.
 
