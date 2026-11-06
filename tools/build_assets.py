@@ -14,6 +14,7 @@ manifest.json: names and titles already in it are kept, so edit them there freel
 and face crops.
 """
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -192,6 +193,14 @@ def main() -> None:
             report.append(f"{kind}/{name:<12} {out.width:>5}x{out.height:<5} {n / 1024:7.1f} KB   green left {g * 100:5.2f}%")
 
     # manifest: keep names already there
+    # Sound: art-source/audio/*.mp3 is copied as it is (MP3 plays in every browser; keep the files small)
+    for src in sorted((SRC / "audio").glob("*.mp3")):
+        dst = OUT / "audio" / src.name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        total += dst.stat().st_size
+        report.append(f"audio/{src.stem:<16} {dst.stat().st_size / 1024:7.1f} KB")
+
     mpath = OUT / "manifest.json"
     old = {}
     if mpath.exists():

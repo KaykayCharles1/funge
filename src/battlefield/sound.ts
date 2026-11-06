@@ -1,5 +1,7 @@
-// The battlefield's sounds, made in code with Web Audio: no sound files. Bells, coins, a whoosh, drums, sword clashes,
-// a shield chime, a fanfare, a heartbeat, and the battle song that plays while one king attacks another's throne.
+// The battlefield's sounds. Most are made in code with Web Audio: bells, coins, a whoosh, drums, sword clashes, a shield
+// chime, a fanfare, a heartbeat and a battle march. Two are recorded tracks (public/assets/audio, from art-source/audio):
+//   waiting-theme.mp3  the medieval theme that loops while no war is on (before the first king, between wars, after one)
+//   war-start.mp3      the opening of a war, with the march underneath, until the new king is crowned
 // Off until the player's first tap or click (browsers allow audio only after one), then on unless they turned it off.
 
 const PREF_KEY = "funge:sound"; // "off" when the player muted it; remembered in this browser only
@@ -31,7 +33,79 @@ function writePref(on: boolean): void {
 }
 
 const on = () => unlocked && wanted && ctx !== null && master !== null;
-const changed = () => listeners.forEach((l) => l(isOn()));
+const changed = () => {
+  listeners.forEach((l) => l(isOn()));
+  syncTheme();
+};
+
+// ---- recorded tracks ----
+
+const TRACKS = { theme: "waiting-theme.mp3", war: "war-start.mp3" } as const;
+type Track = keyof typeof TRACKS;
+const THEME_GAIN = 0.35, WAR_GAIN = 0.9;
+const files = new Map<Track, Promise<ArrayBuffer | null>>(); // fetched as soon as the battlefield mounts
+const decoded = new Map<Track, Promise<AudioBuffer | null>>();
+
+// Start downloading the tracks (same site, so the page's security policy allows it)
+export function preloadTracks(base: string): void {
+  for (const [k, file] of Object.entries(TRACKS) as [Track, string][]) {
+    if (!files.has(k)) files.set(k, fetch(base + file).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null));
+  }
+}
+
+// A track ready to play, or null when it is missing or could not be read (the game simply plays without it)
+function track(k: Track): Promise<AudioBuffer | null> {
+  const c = ctx;
+  if (!c) return Promise.resolve(null);
+  let d = decoded.get(k);
+  if (!d) {
+    d = (files.get(k) ?? Promise.resolve(null)).then((ab) => (ab ? c.decodeAudioData(ab.slice(0)) : null)).catch(() => null);
+    decoded.set(k, d);
+  }
+  return d;
+}
+
+type Playing = { src: AudioBufferSourceNode; gain: GainNode };
+function play(buf: AudioBuffer, gain: number, loop: boolean, fadeIn: number): Playing {
+  const c = ctx!, t = c.currentTime;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(gain, t + fadeIn);
+  g.connect(music!);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.loop = loop;
+  src.connect(g);
+  src.start(t);
+  return { src, gain: g };
+}
+function fadeOut(p: Playing | null, secs: number): void {
+  if (!p || !ctx) return;
+  const t = ctx.currentTime;
+  p.gain.gain.cancelScheduledValues(t);
+  p.gain.gain.setValueAtTime(p.gain.gain.value, t);
+  p.gain.gain.linearRampToValueAtTime(0, t + secs);
+  p.src.stop(t + secs + 0.05);
+}
+
+// The waiting theme plays whenever sound is on and no war is being fought
+let theme: Playing | null = null;
+let themeStarting = false;
+let atWar = 0; // wars playing right now (a new one can start before the last one has faded)
+function syncTheme(): void {
+  const want = on() && atWar === 0;
+  if (!want) {
+    fadeOut(theme, 0.6);
+    theme = null;
+    return;
+  }
+  if (theme || themeStarting) return;
+  themeStarting = true;
+  void track("theme").then((buf) => {
+    themeStarting = false;
+    if (buf && !theme && on() && atWar === 0) theme = play(buf, THEME_GAIN, true, 1.5);
+  });
+}
 
 function setup(): void {
   if (ctx) return;
@@ -217,8 +291,15 @@ export const sfx = {
   battle(): () => void {
     if (!on()) return () => {};
     const c = ctx!;
+    atWar++;
+    syncTheme(); // the waiting theme fades out
+    let war: Playing | null = null;
+    let ended = false;
+    void track("war").then((buf) => {
+      if (buf && !ended && on()) war = play(buf, WAR_GAIN, false, 0.05);
+    });
     const out = c.createGain();
-    out.gain.value = 1;
+    out.gain.value = 0.45; // the march sits under the war-start track
     out.connect(music!);
     const beat = 60 / 132, bar = beat * 4;
     const D2 = 73.42, A2 = 110, F2 = 87.31, C3 = 130.81;
@@ -260,6 +341,13 @@ export const sfx = {
     return () => {
       if (stopped) return;
       stopped = true;
+      ended = true;
+      fadeOut(war, 0.35);
+      // The coronation's fanfare and coins play now; the waiting theme comes back a little after
+      window.setTimeout(() => {
+        atWar = Math.max(0, atWar - 1);
+        syncTheme();
+      }, 2500);
       window.clearInterval(timer);
       const t = c.currentTime;
       out.gain.setValueAtTime(out.gain.value, t);

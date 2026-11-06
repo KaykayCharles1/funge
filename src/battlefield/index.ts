@@ -15,7 +15,7 @@ import { H, H_COMPACT, W } from "./hud.ts";
 import { HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
-import { installUnlock } from "./sound.ts";
+import { installUnlock, preloadTracks } from "./sound.ts";
 
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
 const COMPACT_BELOW_PX = 700; // narrower than this (a phone): the HUD moves into bands above and below the field
@@ -43,6 +43,7 @@ export function mountBattlefield(opts: MountOptions): void {
   document.body.prepend(host);
   const loading = loadingScreen(host);
   installUnlock(); // sound starts with the player's first tap or click
+  preloadTracks(`${import.meta.env.BASE_URL}assets/audio/`); // the waiting theme and the war opening
 
   // The fee and cut come from the game file (the page reads the same file)
   let fees: Fees | null = null;
