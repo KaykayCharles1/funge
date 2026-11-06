@@ -227,4 +227,4 @@ export function pauseText(reason: string): string {
 export const notEnoughText = (price: string, have: string) =>
   `Not enough PUSD. The next move costs ${price} PUSD and this wallet has ${have}.`;
 export const splitCoinsText = (price: string) =>
-  `Your PUSD is split across several small coins. Combine them into one, then try again (next move: ${price} PUSD).`;
+  `Your PUSD is spread across too many small coins for one move. Combine some of them into one, then try again (next move: ${price} PUSD).`;

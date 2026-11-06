@@ -8,6 +8,7 @@ import { formatUnits } from "../lib/format.ts";
 import type { GameKingdom } from "../lib/game.ts";
 import { conquestMoney, decodeKingdomCommitment, encodeKingdomCommitment, previousOf, protectAmounts } from "../lib/kingdom.ts";
 import type { KingdomState } from "../lib/kingdom.ts";
+import { enoughBch, MAX_WALLET_INPUTS, pickPusd } from "../lib/protectCoins.ts";
 import { retry } from "../lib/retry.ts";
 import type { LocalWallet } from "../wallet/local.ts";
 import { act } from "./api.ts";
@@ -17,7 +18,6 @@ import type { ApiErrorCode, WalletInputClaim } from "./api.ts";
 // player's own coins are signed here, and the game server adds the referee signature to input 0 and broadcasts.
 
 const FEE_RATE = 2;
-const MIN_FEE_COIN_SATS = 6_000n; // a PUSD coin with less BCH than this needs a second coin for the fee
 const PAYOUT_SATS = 1_000n; // BCH that travels with the dethroned king's PUSD payout (the contract wants at least 1000)
 
 // The compiled contracts are passed in, so this file works in the browser (imported JSON) and in scripts (read from disk)
@@ -73,17 +73,19 @@ export async function readKingdomCoins(
   return { stateUtxo, potUtxo, state: decodeKingdomCommitment(stateFound.token.nft.commitment) };
 }
 
-// One PUSD coin that covers `need`, plus a plain BCH coin when that coin carries too little BCH for the fee
+// The PUSD coins that cover `need`: one coin when one is enough, otherwise several (a wallet's PUSD splits into small
+// coins with every refund and change). Plus a plain BCH coin when they carry too little BCH for the fee.
+// The contract and the referee accept any number of wallet inputs up to MAX_WALLET_INPUTS; the token change goes back.
 export function pickWalletCoins(coins: SpendableUtxo[], pusdCategory: string, need: bigint):
   { ok: true; inputs: SpendableUtxo[] } | { ok: false; code: "no_funds" | "needs_bch"; have: bigint } {
   const plain = coins.filter((u) => u.token && u.token.category === pusdCategory && !u.token.nft);
   const have = plain.reduce((sum, u) => sum + u.token!.amount, 0n);
-  const pusdCoin = plain.filter((u) => u.token!.amount >= need).sort((a, b) => (a.token!.amount < b.token!.amount ? 1 : -1))[0];
-  if (!pusdCoin) return { ok: false, code: "no_funds", have };
-  if (pusdCoin.satoshis >= MIN_FEE_COIN_SATS) return { ok: true, inputs: [pusdCoin] };
+  const pusd = pickPusd(plain, (u) => u.token!.amount, need, MAX_WALLET_INPUTS - 1); // room for a fee coin
+  if (!pusd) return { ok: false, code: "no_funds", have };
+  if (enoughBch(pusd.reduce((sum, u) => sum + u.satoshis, 0n), pusd.length)) return { ok: true, inputs: pusd };
   const bchCoin = coins.filter((u) => !u.token).sort((a, b) => (a.satoshis < b.satoshis ? 1 : -1))[0];
   if (!bchCoin) return { ok: false, code: "needs_bch", have };
-  return { ok: true, inputs: [pusdCoin, bchCoin] };
+  return { ok: true, inputs: [...pusd, bchCoin] };
 }
 
 export const claimsFor = (wallet: LocalWallet, inputs: SpendableUtxo[]): WalletInputClaim[] =>

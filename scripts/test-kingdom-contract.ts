@@ -355,6 +355,62 @@ async function main() {
   await expectFail("fallback: a waiting round", "Nobody has opened the round", async () => settleTx(setup(WAITING_STATE, 1000n), carol, "fallback").send());
   await expectFail("fallback: pool underpaid", "Whole pot must be paid", async () => settleTx(open2(), carol, "fallback", { payout: 1499n }).send());
 
+  // --- paid from several small PUSD coins (refunds, change): what the page's coin pickers now build ---
+  {
+    let h = setup();
+    await openTx(h, alice).send();
+    h = await refresh(h);
+    // bob holds 4 x 4.00 PUSD: no single coin pays 10.20, three together do
+    const small = [0, 1, 2, 3].map(() => h.provider.addUtxo(bob.lockHex, randomUtxo({ satoshis: 1_000n, token: { amount: 400n, category: PUSD_ID } })));
+    const fee = h.provider.addUtxo(bob.lockHex, randomUtxo({ satoshis: 100_000n }));
+    const money = conquestMoney(h.state.value, P);
+    const used = small.slice(0, 3);
+    const change = 1200n - money.payment;
+    const b = new TransactionBuilder({ provider: h.provider })
+      .addInput(h.stateUtxo, h.kingdom.unlock.conquer(bob.pkh, referee))
+      .addInput(h.potUtxo, h.pot.unlock.release());
+    for (const c of [...used, fee]) b.addInput(c, bob.tpl.unlockP2PKH());
+    const next: KingdomState = { passCount: 2, holderPkh: bob.pkhHex, value: h.state.value, protects: 0, previous: previousOf(alice.pkhHex) };
+    const inSats = h.stateUtxo.satoshis + h.potUtxo.satoshis + 3_000n + fee.satoshis;
+    const outSats = h.stateUtxo.satoshis + h.potUtxo.satoshis + DUST + DUST;
+    await b
+      .addOutput(stateOutput(h, encodeKingdomCommitment(next)))
+      .addOutput({ to: h.pot.tokenAddress, amount: h.potUtxo.satoshis, token: { amount: h.potAmount + money.poolGets, category: PUSD_ID } })
+      .addOutput({ to: alice.lock, amount: DUST, token: { amount: money.kingGets, category: PUSD_ID } })
+      .addOutput({ to: bob.lock, amount: DUST, token: { amount: change, category: PUSD_ID } })
+      .addOutput({ to: bob.lock, amount: inSats - outSats - FEE })
+      .send();
+    const aliceGot = await pusdAt(h, alice);
+    h = await refresh(h);
+    assert.equal(h.state.holderPkh, bob.pkhHex);
+    assert.equal(h.potAmount, 1100n);
+    assert.ok(aliceGot.includes(920n));
+    assert.ok((await pusdAt(h, bob)).includes(change), "bob's PUSD change comes back");
+    console.log("ok    conquer paid from three small PUSD coins plus a BCH coin: accepted, change back to the conqueror");
+
+    // the king protects +1 from two small coins at the king's address
+    const p1 = h.provider.addUtxo(bob.lockHex, randomUtxo({ satoshis: 1_000n, token: { amount: 60n, category: PUSD_ID } }));
+    const p2 = h.provider.addUtxo(bob.lockHex, randomUtxo({ satoshis: 1_000n, token: { amount: 50n, category: PUSD_ID } }));
+    const fee2 = h.provider.addUtxo(bob.lockHex, randomUtxo({ satoshis: 100_000n }));
+    const pnext: KingdomState = { ...h.state, value: h.state.value + 100n, protects: 1 };
+    const pIn = h.stateUtxo.satoshis + h.potUtxo.satoshis + 2_000n + fee2.satoshis;
+    const pOut = h.stateUtxo.satoshis + h.potUtxo.satoshis + DUST;
+    const pb = new TransactionBuilder({ provider: h.provider })
+      .addInput(h.stateUtxo, h.kingdom.unlock.protect(referee, 100n))
+      .addInput(h.potUtxo, h.pot.unlock.release());
+    for (const c of [p1, p2, fee2]) pb.addInput(c, bob.tpl.unlockP2PKH());
+    await pb
+      .addOutput(stateOutput(h, encodeKingdomCommitment(pnext)))
+      .addOutput({ to: h.pot.tokenAddress, amount: h.potUtxo.satoshis, token: { amount: h.potAmount + 100n, category: PUSD_ID } })
+      .addOutput({ to: bob.lock, amount: DUST, token: { amount: 10n, category: PUSD_ID } })
+      .addOutput({ to: bob.lock, amount: pIn - pOut - FEE })
+      .send();
+    h = await refresh(h);
+    assert.equal(h.state.value, 1100n);
+    assert.equal(h.potAmount, 1200n);
+    console.log("ok    protect +1 paid from two small PUSD coins at the king's address: accepted");
+  }
+
   console.log("\nAll Kingdom contract tests passed.");
 }
 

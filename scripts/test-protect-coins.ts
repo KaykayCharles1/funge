@@ -68,4 +68,65 @@ const ok = (name: string) => console.log(`ok    ${name}`);
   const r: any = pick([a, b]);
   assert.deepEqual(ids(r), [b.id]); ok("the largest suitable PUSD coin is used");
 }
+// ---- PUSD split across several small coins (refunds, change): combined, largest first ----
+{ // protect: no single coin covers it, two coins at the king address do; one of them is also the proof
+  const a = coin(KING, 1000n, { amount: 60n });
+  const b = coin(KING, 1000n, { amount: 50n });
+  const fee = coin(OTHER, 20000n);
+  const r: any = pick([b, a, fee]);
+  assert.ok(r.ok); assert.deepEqual(ids(r), [a.id, b.id, fee.id]); ok("protect: split PUSD at the king address is combined, proof first");
+}
+{ // protect: PUSD split elsewhere, a BCH coin at the king address is the proof and comes first
+  const proof = coin(KING, 9000n);
+  const a = coin(OTHER, 1000n, { amount: 70n });
+  const b = coin(OTHER, 1000n, { amount: 40n });
+  const r: any = pick([a, b, proof]);
+  assert.ok(r.ok); assert.deepEqual(ids(r), [proof.id, a.id, b.id]); ok("protect: split PUSD elsewhere, the king-address coin goes first");
+}
+{ // protect: only the coins that are needed are used, the largest first
+  const big = coin(KING, 9000n, { amount: 80n });
+  const mid = coin(KING, 1000n, { amount: 30n });
+  const small = coin(KING, 1000n, { amount: 5n });
+  const r: any = pick([small, mid, big]);
+  assert.ok(r.ok); assert.deepEqual(ids(r), [big.id, mid.id]); ok("protect: only as many coins as needed, largest first");
+}
+{ // protect: more small coins than one move may carry: no_funds, with the real total
+  const many = Array.from({ length: 12 }, () => coin(KING, 1000n, { amount: 10n })); // 12 x 10 = 120, but at most 8 PUSD coins
+  const r: any = pick([...many, coin(OTHER, 20000n)]);
+  assert.deepEqual([r.ok, r.code, r.have], [false, "no_funds", 120n]); ok("protect: too many tiny coins for one move: no_funds");
+}
+
+{ // game wallet (open, conquer, protect): the same rule through pickWalletCoins
+  const { pickWalletCoins } = await import("../src/referee/kingdomActions.ts");
+  const u = (sats: bigint, amount?: bigint) => coin(KING, sats, amount === undefined ? undefined : { amount }).utxo;
+  { // one coin covers it: exactly as before
+    const a = u(8000n, 3000n);
+    const r: any = pickWalletCoins([u(8000n, 1000n), a], PUSD, 2040n);
+    assert.ok(r.ok); assert.deepEqual(r.inputs, [a]); ok("wallet: one coin covers it, one coin used");
+  }
+  { // the case from the chipnet test: plenty of PUSD in total, no single coin covers 20.40
+    const coins = [u(1000n, 920n), u(1000n, 920n), u(1000n, 920n), u(1000n, 500n), u(20000n)];
+    const r: any = pickWalletCoins(coins, PUSD, 2040n);
+    assert.ok(r.ok);
+    assert.equal(r.inputs.filter((c: any) => c.token).reduce((s: bigint, c: any) => s + c.token.amount, 0n), 2760n);
+    assert.equal(r.inputs.length, 4); // three refunds of 9.20 cover 20.40, then a BCH coin for the fee
+    assert.equal(r.inputs[3].token, undefined);
+    ok("wallet: split refunds are combined (3 x 9.20 for 20.40), plus a BCH coin for the fee");
+  }
+  { // enough BCH on the PUSD coins themselves: no extra BCH coin
+    const r: any = pickWalletCoins([u(9000n, 1500n), u(9000n, 1500n), u(50000n)], PUSD, 2040n);
+    assert.ok(r.ok); assert.equal(r.inputs.length, 2); ok("wallet: no fee coin when the PUSD coins carry enough BCH");
+  }
+  { // not enough PUSD in total: no_funds with the total, so the page says how much is missing
+    const r: any = pickWalletCoins([u(1000n, 900n), u(1000n, 900n), u(20000n)], PUSD, 2040n);
+    assert.deepEqual([r.ok, r.code, r.have], [false, "no_funds", 1800n]); ok("wallet: not enough PUSD in total: no_funds");
+  }
+  { // never more wallet inputs than the referee accepts
+    const coins = [...Array.from({ length: 30 }, () => u(1000n, 100n)), u(90000n)];
+    const r: any = pickWalletCoins(coins, PUSD, 800n);
+    assert.ok(r.ok); assert.ok(r.inputs.length <= 10); ok("wallet: never more than 10 wallet inputs");
+    const tooMany: any = pickWalletCoins(coins, PUSD, 2000n); // would need 20 coins
+    assert.deepEqual([tooMany.ok, tooMany.code], [false, "no_funds"]); ok("wallet: more coins than one move may carry: no_funds");
+  }
+}
 console.log("All protect coin tests passed.");
