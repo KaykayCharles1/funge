@@ -6,6 +6,7 @@ import { COPY, pauseText } from "../copy.ts";
 import type { battlefieldDo, battlefieldPage } from "../kingdomMode.ts";
 import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
+import { isOn, onSoundChange, setSound } from "./sound.ts";
 
 const T = COPY.battlefield;
 export type PageView = ReturnType<typeof battlefieldPage>;
@@ -55,7 +56,25 @@ export function mountActionBar(
   const cancel = el("button", SMALL, T.cancel);
   cancel.type = "button";
   cancel.addEventListener("click", () => run.cancel());
-  top.append(chip, main, cancel);
+  // Sound: off until the first tap, then on unless the player turned it off (remembered in this browser)
+  const mute = el("button", `${SMALL} text-sm`);
+  mute.type = "button";
+  mute.setAttribute("aria-label", T.soundAria);
+  const showSound = (on: boolean) => {
+    mute.textContent = on ? `🔊 ${T.soundOn}` : `🔇 ${T.soundOff}`;
+    mute.setAttribute("aria-pressed", String(on));
+  };
+  // The page's first tap also unlocks sound (on the window, just after this button sees it), so remember what the
+  // button showed before the tap: a first tap on "Sound off" turns it on, not on-and-off again
+  let before = isOn();
+  for (const type of ["pointerdown", "keydown"] as const) mute.addEventListener(type, () => (before = isOn()));
+  mute.addEventListener("click", () => {
+    setSound(!before);
+    before = isOn();
+  });
+  onSoundChange(showSound);
+  showSound(isOn());
+  top.append(chip, main, cancel, mute);
 
   const prot = el("div", "flex flex-wrap items-center gap-2");
   const protTitle = el("span", "text-sm text-[#e0a93a]");

@@ -11,12 +11,14 @@ import { mountActionBar } from "./actions.ts";
 import type { PageDo, PageView } from "./actions.ts";
 import { Director } from "./director.ts";
 import type { DirectorStats, FieldState } from "./director.ts";
-import { H, W } from "./hud.ts";
+import { H, H_COMPACT, W } from "./hud.ts";
 import { HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
+import { installUnlock } from "./sound.ts";
 
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
+const COMPACT_BELOW_PX = 700; // narrower than this (a phone): the HUD moves into bands above and below the field
 
 let mounted = false;
 type Fees = { feePercent: bigint; cutPercent: bigint };
@@ -34,8 +36,13 @@ export function mountBattlefield(opts: MountOptions): void {
   mounted = true;
   const host = document.createElement("div");
   host.id = "battlefield";
-  host.className = "mx-auto aspect-video w-full max-w-5xl";
+  host.className = "relative mx-auto w-full max-w-5xl";
+  host.style.aspectRatio = `${W} / ${H}`;
+  // The page showed a placeholder while this code downloaded; the loading screen takes over from it
+  document.getElementById("battlefield-boot")?.remove();
   document.body.prepend(host);
+  const loading = loadingScreen(host);
+  installUnlock(); // sound starts with the player's first tap or click
 
   // The fee and cut come from the game file (the page reads the same file)
   let fees: Fees | null = null;
@@ -84,6 +91,8 @@ export function mountBattlefield(opts: MountOptions): void {
       if (!held) director?.tick();
     });
     connection();
+    loading.done();
+    layout();
     // The page may have sent its first snapshot while the art was still loading
     if (early && !held) director.onSnapshot(early, CONFIG.kingdom.openingPrice);
     early = null;
@@ -104,8 +113,8 @@ export function mountBattlefield(opts: MountOptions): void {
         if (!held && s) panel.sync(s, kingOf(s)); // the panel follows the round while it is not holding
       };
     }
-  });
-  new Phaser.Game({
+  }, (share) => loading.progress(share));
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: host,
     width: W,
@@ -114,6 +123,26 @@ export function mountBattlefield(opts: MountOptions): void {
     banner: false,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene: [scene],
+  });
+
+  // Phone or wide: the field box changes shape and the HUD moves into bands, when the width crosses the line
+  let compact = false;
+  function layout(): void {
+    const want = host.clientWidth > 0 && host.clientWidth < COMPACT_BELOW_PX;
+    if (want === compact || !director) return;
+    compact = want;
+    host.style.aspectRatio = `${W} / ${compact ? H_COMPACT : H}`;
+    scene.setCompact(compact);
+    game.scale.refresh();
+  }
+  let layoutQueued = false;
+  window.addEventListener("resize", () => {
+    if (layoutQueued) return;
+    layoutQueued = true;
+    requestAnimationFrame(() => {
+      layoutQueued = false;
+      layout();
+    });
   });
 
   // The action bar and the folded old page, under the field
@@ -325,6 +354,35 @@ function foldOldPage(): { open: () => void } {
       wallet.d.scrollIntoView({ behavior: "smooth", block: "start" });
       const first = wallet.body.querySelector<HTMLElement>("button:not([disabled]):not(.hidden), input:not(.hidden)");
       first?.focus({ preventScroll: true });
+    },
+  };
+}
+
+// A loading screen over the field box until the art is in: the title and a bar that fills as files arrive
+function loadingScreen(host: HTMLElement): { progress: (share: number) => void; done: () => void } {
+  const box = document.createElement("div");
+  box.className = "absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-2xl bg-[#0f1a33] text-[#f4ead2] transition-opacity duration-500";
+  box.setAttribute("role", "status");
+  const title = document.createElement("p");
+  title.className = "text-lg font-bold sm:text-2xl";
+  title.style.fontFamily = "Georgia, 'Times New Roman', serif";
+  title.textContent = COPY.battlefield.loading;
+  const track = document.createElement("div");
+  track.className = "h-3 w-2/3 max-w-md overflow-hidden rounded-full border-2 border-[#e0a93a] bg-[#2a3550]";
+  const bar = document.createElement("div");
+  bar.className = "h-full bg-[#e0a93a] transition-[width] duration-200";
+  bar.style.width = "5%";
+  track.append(bar);
+  box.append(title, track);
+  host.append(box);
+  return {
+    progress: (share) => {
+      bar.style.width = `${Math.max(5, Math.round(share * 100))}%`;
+    },
+    done: () => {
+      bar.style.width = "100%";
+      box.style.opacity = "0";
+      window.setTimeout(() => box.remove(), 600);
     },
   };
 }

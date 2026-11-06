@@ -852,6 +852,12 @@ export async function startKingdomMode() {
 // Only ?mode=battlefield (with CONFIG.battlefield on) downloads it, so the normal page never loads Phaser.
 function mountBattlefieldIfAsked() {
   if (!CONFIG.battlefield || new URLSearchParams(location.search).get("mode") !== "battlefield") return;
+  // A placeholder while the battlefield's code downloads; the battlefield's own loading screen replaces it
+  const boot = document.createElement("div");
+  boot.id = "battlefield-boot";
+  boot.className = "mx-auto flex aspect-video w-full max-w-5xl items-center justify-center rounded-2xl bg-[#0f1a33] text-lg font-bold text-[#f4ead2]";
+  boot.textContent = COPY.battlefield.loading;
+  document.body.prepend(boot);
   import("./battlefield/index.ts")
     // "you" (both wallets), and the page's own state and handlers for the action bar (see battlefieldPage below)
     .then((m) => m.mountBattlefield({ myKeys, page: battlefieldPage, run: battlefieldDo }))

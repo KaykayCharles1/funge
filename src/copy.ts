@@ -190,6 +190,10 @@ export const COPY = {
     roundDetails: "Round details",
     walletSection: "Wallet",
     actionsLabel: "Your moves",
+    loading: "Loading the battlefield…",
+    soundOn: "Sound on",
+    soundOff: "Sound off",
+    soundAria: "Turn the sound on or off",
     // When it persists, the battlefield shows network.unreachable (the old page's wording)
   },
 

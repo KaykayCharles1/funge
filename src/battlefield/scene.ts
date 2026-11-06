@@ -2,10 +2,11 @@
 import * as Phaser from "phaser";
 import { avatarKey, bannerKey, loadFirst, loadLater, makeBanners, makeFxTextures, portraitKey, portraitsOf } from "./assets.ts";
 import type { FieldState } from "./director.ts";
-import { C, css, FONT, H, Hud, HUD_DEPTH, money, reducedMotion, W } from "./hud.ts";
+import { BAND_TOP, C, css, FONT, H, H_COMPACT, Hud, HUD_DEPTH, money, reducedMotion, W } from "./hud.ts";
 import { displayName } from "./identity.ts";
 import type { House, Identity, Portrait } from "./identity.ts";
 import { COPY } from "../copy.ts";
+import { sfx } from "./sound.ts";
 
 const T = COPY.battlefield;
 export type SceneRun = { done: Promise<void>; hurry: (totalMs: number, label?: string) => void };
@@ -38,7 +39,7 @@ const PLACES: [number, number][] = [
   [-395, R1], [395, R1], [-245, R3], [245, R3], [-470, R2], [470, R2], [-395, R3], [395, R3], [-545, R1], [545, R1],
 ];
 const BEARER: [number, number] = [170, R2]; // the standard-bearer's place
-const TREASURY_AT = { x: W - 12 - 240 + 48, y: 52 }; // the chest in the HUD
+type Pt = { x: number; y: number };
 
 // The march in along the road, from the left or the right edge, ending at the front of the formation
 const ROAD = {
@@ -115,6 +116,7 @@ class Run implements Fx {
   private startedAt: number;
   private total: number;
   private finished = false;
+  private enders: (() => void)[] = [];
   private resolve!: () => void;
   readonly done: Promise<void>;
 
@@ -164,9 +166,15 @@ class Run implements Fx {
     for (const e of this.timers) e.timeScale = speed;
   }
 
+  // Run fn when the scene ends, however it ends (done, hurried to the end, or cancelled)
+  onEnd(fn: () => void): void {
+    this.enders.push(fn);
+  }
+
   finish(): void {
     if (this.finished) return;
     this.finished = true;
+    for (const fn of this.enders) fn();
     this.master.remove();
     for (const e of this.timers) e.remove();
     for (const t of this.tweens) t.remove();
@@ -194,16 +202,21 @@ export class BattlefieldScene extends Phaser.Scene {
   private dusk: Phaser.GameObjects.Image | null = null;
   private duskWanted = false;
   private skyFrozen = false;
+  private compactOn = false;
   private onReady: () => void;
+  private onProgress: (share: number) => void;
   private runs = new Set<Run>();
   private extras = new Set<Phaser.GameObjects.GameObject>(); // loose effects (protect flashes)
 
-  constructor(onReady: () => void) {
+  // onProgress: how much of the first load is done, 0..1, for the loading screen
+  constructor(onReady: () => void, onProgress: (share: number) => void = () => {}) {
     super("battlefield");
     this.onReady = onReady;
+    this.onProgress = onProgress;
   }
 
   preload(): void {
+    this.load.on(Phaser.Loader.Events.PROGRESS, (share: number) => this.onProgress(share));
     loadFirst(this.load);
   }
 
@@ -390,6 +403,18 @@ export class BattlefieldScene extends Phaser.Scene {
     this.runs.delete(run);
   }
 
+  // Phone or wide layout: on a phone the HUD moves into bands above and below the field, which keeps its size
+  // and its coordinates; only its place on the canvas moves down by the top band.
+  setCompact(on: boolean): void {
+    if (on === this.compactOn) return;
+    this.compactOn = on;
+    const h = on ? H_COMPACT : H;
+    this.scale.setGameSize(W, h); // FIT mode: setGameSize, not resize (that one is for the NONE mode)
+    this.cameras.main.setViewport(0, on ? BAND_TOP : 0, W, H);
+    this.hudCam.setSize(W, h);
+    this.hud.layout(on);
+  }
+
   // Stop every running scene and effect (a resync, a gap, or the queue was too long)
   cancelScenes(): void {
     for (const r of [...this.runs]) r.finish();
@@ -447,6 +472,7 @@ export class BattlefieldScene extends Phaser.Scene {
     const r = this.run(total);
     this.showState(p.after, p.king, p.nextCost);
     const pop = Math.min(520, total * 0.4);
+    sfx.drum();
     const b = this.building, bn = this.bannerImg;
     for (const o of this.world.getChildren()) {
       if (o === b || o === bn) continue;
@@ -468,7 +494,7 @@ export class BattlefieldScene extends Phaser.Scene {
     r.at(pop * 0.5, () => {
       this.loot(r, BASE_X - 40, BASE_Y - 80, true, total * 0.4);
       this.loot(r, BASE_X + 40, BASE_Y - 80, false, total * 0.4);
-      this.float(r, T.toTreasury(money(p.toTreasury)), W - 170, 160, C.gold);
+      this.floatTreasury(r, T.toTreasury(money(p.toTreasury)));
     });
     if (p.mode !== "quick") {
       const at = pop * 0.7;
@@ -482,6 +508,7 @@ export class BattlefieldScene extends Phaser.Scene {
   // Everything stays clear of the coronation card in the middle.
   playProtect(p: ProtectPlay): void {
     const fx = this.loose(), calm = reducedMotion();
+    sfx.shield();
     if (p.idle) {
       const had = this.walls.length;
       const wasCastle = this.building?.texture.key === "castle";
@@ -495,6 +522,7 @@ export class BattlefieldScene extends Phaser.Scene {
         }
         w.setY(y - 150);
         this.tweens.add({ targets: w, y, duration: 700, ease: "Bounce.easeOut", onComplete: () => this.dustAt(fx, w.x, y, 8) });
+        this.time.delayedCall(260, () => sfx.drum()); // the first bounce lands about here
       }
       const b = this.building;
       if (b && !wasCastle && b.texture.key === "castle" && !calm) {
@@ -540,11 +568,15 @@ export class BattlefieldScene extends Phaser.Scene {
     const card = this.world.getChildren().filter((o) => (o as unknown as Phaser.GameObjects.Components.Depth).depth === 2000);
     for (const o of card) (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0);
     const n = p.mode === "full" ? 16 : p.mode === "short" ? 10 : 5;
-    const to = { x: W / 2, y: 300 };
+    const to = this.toHud(W / 2, 300);
+    sfx.fanfare();
     for (let i = 0; i < n; i++) {
-      r.at(i * (total * 0.35 / n), () => this.loot(r, TREASURY_AT.x, TREASURY_AT.y + 20, i % 5 === 4, total * 0.35, to));
+      r.at(i * (total * 0.35 / n), () => {
+        const c = this.hud.chestAt();
+        this.loot(r, c.x, c.y + 20, i % 5 === 4, total * 0.35, to, true);
+      });
     }
-    if (!calm) r.at(total * 0.4, () => this.dustAt(r, to.x, to.y, 12, "fx_spark"));
+    if (!calm) r.at(total * 0.4, () => this.dustAt(r, W / 2, 300, 12, "fx_spark"));
     r.at(total * 0.45, () => {
       for (const o of card) r.tween({ targets: o, alpha: 1, duration: total * 0.25 });
     });
@@ -577,6 +609,14 @@ export class BattlefieldScene extends Phaser.Scene {
       speed: { min: 10, max: 40 }, angle: { min: 200, max: 340 }, lifespan: { min: 380, max: 620 },
       scale: { start: 0.35, end: 0.9 }, alpha: { start: 0.55, end: 0 }, emitting: false,
     }));
+    // The battle song plays while the challenger attacks, and gives way to the fanfare at the coronation.
+    // A quick conquest is too short for it: a drum instead.
+    if (p.mode === "quick") sfx.drum();
+    else {
+      const stopSong = sfx.battle();
+      r.onEnd(stopSong);
+      r.at(t3, stopSong);
+    }
 
     // 1. Face-off: the challenger's card on the army's side, the old king's on the other, VS between
     if (len.faceoff > 0 && p.oldKing) {
@@ -667,6 +707,7 @@ export class BattlefieldScene extends Phaser.Scene {
         });
       }
       r.at(t2 + beat, () => {
+        sfx.drum();
         if (quiet) return;
         this.freeze(60);
         this.punch(1.05, d * 0.5);
@@ -684,7 +725,7 @@ export class BattlefieldScene extends Phaser.Scene {
       if (fallen.length === 0) r.at(t2 + beat, () => this.slash(r, BASE_X, BASE_Y - 40, quiet));
       r.at(t2 + d * 0.6, () => {
         if (p.oldKing && p.refunded > 0n) this.float(r, T.refunded(money(p.refunded)), p.side === "left" ? W - 320 : 320, 300, p.oldKing.house.text);
-        this.float(r, T.toTreasury(money(p.toTreasury)), W - 170, 160, C.gold);
+        this.floatTreasury(r, T.toTreasury(money(p.toTreasury)));
       });
     });
 
@@ -709,6 +750,7 @@ export class BattlefieldScene extends Phaser.Scene {
   private defeat(r: Run, s: Soldier, dir: number, d: number, quiet: boolean, dust: Phaser.GameObjects.Particles.ParticleEmitter | null): void {
     const img = s.img;
     this.tweens.killTweensOf(img); // stop its idle bob
+    sfx.whoosh();
     if (quiet) {
       r.tween({ targets: img, alpha: 0, duration: d });
       return;
@@ -764,6 +806,7 @@ export class BattlefieldScene extends Phaser.Scene {
 
   private coronation(r: Run, who: Identity, size: number, d: number, quiet: boolean, title = T.newRuler(who.portrait.title)): void {
     const y = 380, cardH = 640 * size * 0.62 + 68;
+    sfx.fanfare();
     // Gold rays, wide enough to show around the card on any sky
     const rays = r.add(this.add.image(W / 2, y, "fx_rays").setTint(0xffd75a).setAlpha(0).setScale(size * 2));
     r.tween({ targets: rays, alpha: 1, duration: d * 0.2 });
@@ -780,6 +823,7 @@ export class BattlefieldScene extends Phaser.Scene {
   }
 
   private slash(r: Run, x: number, y: number, quiet: boolean): void {
+    sfx.clash();
     // A dark shadow under a bright stroke, so the slash reads on grass and sky alike
     const angle = -30 + Math.random() * 60;
     const shadow = r.add(this.add.image(x + 3, y + 4, "fx_slash").setAngle(angle).setScale(0.5).setTint(C.navy).setAlpha(0.6));
@@ -793,32 +837,52 @@ export class BattlefieldScene extends Phaser.Scene {
     sparks.explode(18);
   }
 
-  // Coins (and a gem) burst from a fallen soldier and fly in an arc to the Treasury chest
-  private loot(r: Fx, x: number, y: number, gem: boolean, d: number, to = TREASURY_AT): void {
+  // A point on the field in the HUD camera's coordinates (on a phone the field sits below the top band)
+  private toHud(x: number, y: number): Pt {
+    return { x, y: y + this.hud.fieldTop };
+  }
+
+  // Coins (and a gem) burst from a spot on the field and fly in an arc to the Treasury chest (or to `to`, in HUD
+  // coordinates). They fly over the HUD, so they are drawn by the HUD camera.
+  private loot(r: Fx, x: number, y: number, gem: boolean, d: number, to: Pt | null = null, fromHud = false): void {
+    const from = fromHud ? { x, y } : this.toHud(x, y);
+    const end = to ?? this.hud.chestAt();
     const items = gem ? ["coin", "coin", "gem"] : ["coin", "coin"];
     items.forEach((key, i) => {
-      const img = r.add(this.add.image(x, y, key).setDisplaySize(key === "gem" ? 30 : 26, 26), true);
+      const img = r.add(this.add.image(from.x, from.y, key).setDisplaySize(key === "gem" ? 30 : 26, 26), true);
       const pos = { t: 0 };
-      const cx = (x + to.x) / 2 + (Math.random() - 0.5) * 120, cy = Math.min(y, to.y) - 60 - Math.random() * 60;
+      const cx = (from.x + end.x) / 2 + (Math.random() - 0.5) * 120, cy = Math.min(from.y, end.y) - 60 - Math.random() * 60;
       r.tween({
         targets: pos, t: 1, duration: d, delay: i * 70, ease: "Sine.easeIn",
         onUpdate: () => {
           const t = pos.t, u = 1 - t;
-          img.setPosition(u * u * x + 2 * u * t * cx + t * t * to.x, u * u * y + 2 * u * t * cy + t * t * to.y);
+          img.setPosition(u * u * from.x + 2 * u * t * cx + t * t * end.x, u * u * from.y + 2 * u * t * cy + t * t * end.y);
         },
         onComplete: () => {
           img.setVisible(false);
-          if (to === TREASURY_AT) this.hud.bumpChest();
+          if (!to) this.hud.bumpChest();
+          else sfx.coin();
         },
       });
     });
   }
 
-  // A number that rises and fades
+  // A number that rises and fades, at a spot on the field
   private float(r: Fx, text: string, x: number, y: number, color: number): void {
-    const t = r.add(this.add.text(x, y, text, { fontFamily: FONT, fontSize: "28px", color: css(color), fontStyle: "bold" })
-      .setOrigin(0.5).setStroke(css(C.navy), 8).setShadow(0, 3, "#000000", 6, true, true), true);
-    r.tween({ targets: t, y: y - 50, duration: 1100, ease: "Sine.easeOut" });
+    this.floatAt(r, text, this.toHud(x, y), color);
+  }
+
+  // "+X to the Treasury", next to the chest wherever the HUD put it
+  private floatTreasury(r: Fx, text: string): void {
+    const c = this.hud.chestAt();
+    const p = this.hud.fieldTop === 0 ? { x: Math.min(c.x + 34, W - 170), y: c.y + 108 } : { x: c.x + 60, y: c.y - 120 };
+    this.floatAt(r, text, p, C.gold);
+  }
+
+  private floatAt(r: Fx, text: string, p: Pt, color: number): void {
+    const t = r.add(this.add.text(p.x, p.y, text, { fontFamily: FONT, fontSize: "28px", color: css(color), fontStyle: "bold" })
+      .setOrigin(0.5).setStroke(css(C.navy), 8).setShadow(0, 3, "#000000", 6, true, true).setScale(this.hud.fieldTop === 0 ? 1 : 1.6), true);
+    r.tween({ targets: t, y: p.y - 50, duration: 1100, ease: "Sine.easeOut" });
     r.tween({ targets: t, alpha: 0, duration: 300, delay: 900 });
   }
 

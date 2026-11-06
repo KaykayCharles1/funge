@@ -1,5 +1,6 @@
 // The HUD over the field: bell with its ring, king plate with two shields, Treasury, next conquest price,
-// and a ribbon for notices (connecting, outage).
+// a ribbon for notices, and popups. Each part is a group built around its own centre, so layout() can place and
+// scale it: over the field on a wide screen, in bands above and below the field on a phone.
 import type * as Phaser from "phaser";
 import { CONFIG } from "../config.ts";
 import { COPY } from "../copy.ts";
@@ -8,12 +9,18 @@ import { avatarKey } from "./assets.ts";
 import type { FieldState } from "./director.ts";
 import { displayName } from "./identity.ts";
 import type { Identity } from "./identity.ts";
+import { sfx } from "./sound.ts";
 
 export const W = 1280;
-export const H = 720;
-export const HUD_TOP = 92; // the top HUD row ends here: nothing on the field may reach above it
-export const HUD_BOTTOM = H - 70; // the price panel starts here
+export const H = 720; // the field
+export const HUD_TOP = 92; // wide layout: the top HUD row ends here, nothing on the field may reach above it
+export const HUD_BOTTOM = H - 70; // wide layout: the price panel starts here
 export const HUD_DEPTH = 5000; // the HUD draws over the field and the scenes
+
+// Phone layout: the HUD moves into bands above and below the field, at a size that stays readable
+export const BAND_TOP = 190;
+export const BAND_BOTTOM = 330;
+export const H_COMPACT = BAND_TOP + H + BAND_BOTTOM;
 
 export const C = {
   navy: 0x0f1a33,
@@ -33,17 +40,12 @@ export const money = (units: bigint) => formatUnits(units, CONFIG.pusdDecimals);
 
 const TREASURY_FULL = 6000n; // the chest and coin pile are full from here
 
-function panel(s: Phaser.Scene, x: number, y: number, w: number, h: number): void {
-  const g = s.add.graphics().setDepth(HUD_DEPTH);
-  g.fillStyle(C.navy, 0.86).fillRoundedRect(x, y, w, h, 16);
-  g.lineStyle(3, C.gold, 1).strokeRoundedRect(x, y, w, h, 16);
-}
-
-// Top row geometry
-const PY = 12, PH = HUD_TOP - PY;
-const PX = W / 2 - 270, PW = 540;
-const AX = PX + 48, AY = PY + PH / 2, AR = 32; // avatar
-const BX = 70, BY = 58, BR = 44; // bell ring
+// Sizes of the parts, around their own centres
+const PW = 540, PH = 80; // king plate
+const TW = 240, TH = 80; // Treasury
+const NW = 460, NH = 56; // next conquest price
+const BR = 44; // bell ring radius
+const AX = -PW / 2 + 48, AR = 32; // avatar, in the plate
 
 export type Urgency = 0 | 60 | 30 | 10; // 0: more than a minute left, or no clock
 type Popup = { box: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; until: number; tween: Phaser.Tweens.Tween | null };
@@ -56,8 +58,19 @@ function clockText(ms: number): string {
   return h > 0 ? `${h}:${two(m)}:${two(r)}` : `${m}:${two(r)}`;
 }
 
+function panel(s: Phaser.Scene, w: number, h: number): Phaser.GameObjects.Graphics {
+  const g = s.add.graphics();
+  g.fillStyle(C.navy, 0.86).fillRoundedRect(-w / 2, -h / 2, w, h, 16);
+  g.lineStyle(3, C.gold, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
+  return g;
+}
+
 export class Hud {
   private s: Phaser.Scene;
+  private bellGroup: Phaser.GameObjects.Container;
+  private plate: Phaser.GameObjects.Container;
+  private vault: Phaser.GameObjects.Container; // the Treasury
+  private price: Phaser.GameObjects.Container;
   private ring: Phaser.GameObjects.Graphics;
   private ringFrac = 1;
   private time: Phaser.GameObjects.Text;
@@ -76,6 +89,7 @@ export class Hud {
   private coins: Phaser.GameObjects.Image;
   private ribbonBox: Phaser.GameObjects.Graphics;
   private ribbonText: Phaser.GameObjects.Text;
+  private ribbonTone: "info" | "alert" = "info";
   private bell: Phaser.GameObjects.Image;
   private urgency: Urgency = 0;
   private urgencyFrozen = false;
@@ -86,61 +100,54 @@ export class Hud {
   private pops: Popup[] = [];
   private swing: Phaser.Tweens.Tween | null = null;
   private beat: Phaser.Tweens.Tween | null = null;
+  private compact = false;
+  fieldTop = 0; // where the field starts in the HUD's coordinates (0 wide, BAND_TOP on a phone)
 
   constructor(s: Phaser.Scene) {
     this.s = s;
-    const top = (...objs: Phaser.GameObjects.Components.Depth[]) => objs.forEach((o) => o.setDepth(HUD_DEPTH + 1));
+    const group = (children: Phaser.GameObjects.GameObject[]) => s.add.container(0, 0, children).setDepth(HUD_DEPTH + 1);
 
-    // Bell and ring, top left; the time and the conquest count below it
-    top(s.add.circle(BX, BY, BR + 10, C.navy, 0.86).setStrokeStyle(3, C.gold));
-    this.ring = s.add.graphics({ x: BX, y: BY }); // drawn around its own origin, so it can pulse in place
-    const bell = s.add.image(BX, BY - 22, "bell").setOrigin(0.5, 0.1).setDisplaySize(44, 50); // swings from its top
-    this.bell = bell;
-    this.time = s.add.text(BX, BY + BR + 14, "", { fontFamily: FONT, fontSize: "22px", color: css(C.cream), fontStyle: "bold" })
+    // Bell and ring; the time and the conquest count below it
+    this.ring = s.add.graphics(); // drawn around its own origin, so it can pulse in place
+    this.bell = s.add.image(0, -22, "bell").setOrigin(0.5, 0.1).setDisplaySize(44, 50); // swings from its top
+    this.time = s.add.text(0, BR + 14, "", { fontFamily: FONT, fontSize: "22px", color: css(C.cream), fontStyle: "bold" })
       .setOrigin(0.5, 0).setStroke(css(C.navy), 5);
-    this.conquests = s.add.text(BX, BY + BR + 52, "", { fontFamily: FONT, fontSize: "16px", color: css(C.cream) })
+    this.conquests = s.add.text(0, BR + 52, "", { fontFamily: FONT, fontSize: "16px", color: css(C.cream) })
       .setOrigin(0.5, 0).setStroke(css(C.navy), 5);
-    top(this.ring, bell, this.time, this.conquests);
+    this.tollRings = [0, 1, 2].map(() => s.add.circle(0, 0, BR, 0, 0).setStrokeStyle(4, C.gold).setAlpha(0));
+    this.bellGroup = group([s.add.circle(0, 0, BR + 10, C.navy, 0.86).setStrokeStyle(3, C.gold), this.ring, this.bell, this.time, this.conquests, ...this.tollRings]);
     this.drawRing();
 
-    // King plate, top centre, with a glow behind it for the end of the round
-    this.plateGlow = s.add.image(W / 2, PY + PH / 2, "fx_glow").setDisplaySize(PW + 120, PH + 90).setTint(C.gold).setAlpha(0).setDepth(HUD_DEPTH - 1);
-    panel(s, PX, PY, PW, PH);
+    // King plate, with a glow behind it for the end of the round
+    this.plateGlow = s.add.image(0, 0, "fx_glow").setDisplaySize(PW + 120, PH + 90).setTint(C.gold).setAlpha(0);
     this.avatarBack = s.add.graphics();
-    this.avatar = s.add.image(AX, AY, "crown").setVisible(false);
+    this.avatar = s.add.image(AX, 0, "crown").setVisible(false);
     this.avatarFront = s.add.graphics();
-    this.crown = s.add.image(AX, AY, "crown").setDisplaySize(40, 28).setAlpha(0.35);
-    this.name = s.add.text(PX + 94, PY + 10, T.noKing, { fontFamily: FONT, fontSize: "26px", color: css(C.cream), fontStyle: "bold" });
-    this.value = s.add.text(PX + 94, PY + 46, `${T.kingdomValue}  —`, { fontFamily: FONT, fontSize: "18px", color: css(C.gold) });
-    this.shields = [0, 1].map((i) => s.add.image(PX + PW - 82 + i * 46, AY, "shield").setDisplaySize(34, 41).setAlpha(0.35));
+    this.crown = s.add.image(AX, 0, "crown").setDisplaySize(40, 28).setAlpha(0.35);
+    this.name = s.add.text(-PW / 2 + 94, -PH / 2 + 10, T.noKing, { fontFamily: FONT, fontSize: "26px", color: css(C.cream), fontStyle: "bold" });
+    this.value = s.add.text(-PW / 2 + 94, -PH / 2 + 46, `${T.kingdomValue}  —`, { fontFamily: FONT, fontSize: "18px", color: css(C.gold) });
+    this.shields = [0, 1].map((i) => s.add.image(PW / 2 - 82 + i * 46, 0, "shield").setDisplaySize(34, 41).setAlpha(0.35));
     this.closedMarks = s.add.graphics().setVisible(false);
-    for (const sh of this.shields) {
-      this.closedMarks.lineStyle(5, C.crimson, 1).lineBetween(sh.x - 16, sh.y + 18, sh.x + 16, sh.y - 18);
-    }
-    top(this.avatarBack, this.avatar, this.avatarFront, this.crown, this.name, this.value, ...this.shields, this.closedMarks);
+    for (const sh of this.shields) this.closedMarks.lineStyle(5, C.crimson, 1).lineBetween(sh.x - 16, sh.y + 18, sh.x + 16, sh.y - 18);
+    this.plate = group([this.plateGlow, panel(s, PW, PH), this.avatarBack, this.avatar, this.avatarFront, this.crown, this.name, this.value, ...this.shields, this.closedMarks]);
 
-    // Treasury, top right
-    const tw = 240, tx = W - tw - 12;
-    panel(s, tx, PY, tw, PH);
-    this.chest = s.add.image(tx + 48, PY + PH / 2 + 2, "chest");
-    this.coins = s.add.image(tx + 48, PY + PH - 6, "coin_pile").setOrigin(0.5, 1);
-    const label = s.add.text(tx + 92, PY + 10, T.treasury, { fontFamily: FONT, fontSize: "16px", color: css(C.cream) });
-    this.treasury = s.add.text(tx + 92, PY + 32, "—", { fontFamily: FONT, fontSize: "30px", color: css(C.gold), fontStyle: "bold" });
-    top(this.chest, this.coins, label, this.treasury);
+    // Treasury
+    this.chest = s.add.image(-TW / 2 + 48, 2, "chest");
+    this.coins = s.add.image(-TW / 2 + 48, TH / 2 - 6, "coin_pile").setOrigin(0.5, 1);
+    const label = s.add.text(-TW / 2 + 92, -TH / 2 + 10, T.treasury, { fontFamily: FONT, fontSize: "16px", color: css(C.cream) });
+    this.treasury = s.add.text(-TW / 2 + 92, -TH / 2 + 32, "—", { fontFamily: FONT, fontSize: "30px", color: css(C.gold), fontStyle: "bold" });
+    this.vault = group([panel(s, TW, TH), this.chest, this.coins, label, this.treasury]);
 
-    // Next conquest price, bottom centre
-    const nw = 460, nh = H - 14 - HUD_BOTTOM;
-    panel(s, W / 2 - nw / 2, HUD_BOTTOM, nw, nh);
-    this.next = s.add.text(W / 2, HUD_BOTTOM + nh / 2, `${T.nextConquest}  —`, { fontFamily: FONT, fontSize: "23px", color: css(C.cream), fontStyle: "bold" })
-      .setOrigin(0.5);
-    top(this.next);
+    // Next conquest price
+    this.next = s.add.text(0, 0, `${T.nextConquest}  —`, { fontFamily: FONT, fontSize: "23px", color: css(C.cream), fontStyle: "bold" }).setOrigin(0.5);
+    this.price = group([panel(s, NW, NH), this.next]);
 
     // Ribbon for notices, across the middle of the field
     this.ribbonBox = s.add.graphics().setDepth(HUD_DEPTH + 2).setVisible(false);
-    this.ribbonText = s.add.text(W / 2, 250, "", { fontFamily: FONT, fontSize: "26px", color: css(C.cream), fontStyle: "bold", align: "center", wordWrap: { width: 700 } })
+    this.ribbonText = s.add.text(W / 2, 0, "", { fontFamily: FONT, fontSize: "26px", color: css(C.cream), fontStyle: "bold", align: "center", wordWrap: { width: 700 } })
       .setOrigin(0.5).setDepth(HUD_DEPTH + 3).setVisible(false);
 
-    // Popups under the king plate (two slots), the red edge, the bell's sound rings
+    // Popups at the top of the field (two slots), and the red edge
     for (let i = 0; i < 2; i++) {
       const box = s.add.graphics().setDepth(HUD_DEPTH + 4).setVisible(false);
       const text = s.add.text(W / 2, 0, "", { fontFamily: FONT, fontSize: "18px", color: css(C.cream), fontStyle: "bold" })
@@ -148,16 +155,48 @@ export class Hud {
       this.pops.push({ box, text, until: 0, tween: null });
     }
     this.edge = s.add.graphics().setDepth(HUD_DEPTH + 6).setAlpha(0);
-    this.edge.lineStyle(18, C.crimson, 1).strokeRect(9, 9, W - 18, H - 18);
-    this.tollRings = [0, 1, 2].map(() => s.add.circle(BX, BY, BR, 0, 0).setStrokeStyle(4, C.gold).setAlpha(0).setDepth(HUD_DEPTH + 1));
 
+    this.layout(false);
     this.drawAvatar(null);
     this.setTreasure(0n);
   }
 
+  // ---- Layout ----
+
+  // Wide: the HUD sits over the field. Compact (phone): bands above and below the field, the parts scaled up.
+  layout(compact: boolean): void {
+    this.compact = compact;
+    if (!compact) {
+      this.fieldTop = 0;
+      this.bellGroup.setPosition(70, 58).setScale(1);
+      this.plate.setPosition(W / 2, 12 + PH / 2).setScale(1);
+      this.vault.setPosition(W - 12 - TW / 2, 12 + TH / 2).setScale(1);
+      this.price.setPosition(W / 2, HUD_BOTTOM + NH / 2).setScale(1);
+      this.conquests.setVisible(true);
+    } else {
+      this.fieldTop = BAND_TOP;
+      const bottom = BAND_TOP + H;
+      // Top band: the king plate. Bottom band: the bell (and time, conquests) on the left; the Treasury over the price on the right.
+      this.plate.setPosition(W / 2, BAND_TOP / 2).setScale(2.1);
+      this.bellGroup.setPosition(130, bottom + 105).setScale(1.9);
+      this.vault.setPosition(770, bottom + 95).setScale(2);
+      this.price.setPosition(770, bottom + 262).setScale(1.9);
+    }
+    const fieldH = H;
+    this.edge.clear().lineStyle(18, C.crimson, 1).strokeRect(9, this.fieldTop + 9, W - 18, fieldH - 18);
+    for (const [row, p] of this.pops.entries()) this.placePop(p, row);
+    if (this.ribbonBox.visible) this.ribbon(this.ribbonText.text, this.ribbonTone);
+  }
+
+  // Where the Treasury chest is, in the HUD's coordinates (coins fly there)
+  chestAt(): { x: number; y: number } {
+    const v = this.vault;
+    return { x: v.x + this.chest.x * v.scaleX, y: v.y + this.chest.y * v.scaleY };
+  }
+
   // ---- Popups ----
 
-  // A short message under the king plate that fades after a few seconds. At most two show; a third pushes
+  // A short message at the top of the field that fades after a few seconds. At most two show; a third pushes
   // out the oldest. highlight: about the player's own kingdom.
   popup(text: string, highlight = false): void {
     const now = this.s.time.now;
@@ -178,9 +217,11 @@ export class Hud {
   }
 
   private placePop(p: Popup, row: number): void {
-    const y = HUD_TOP + 22 + row * 36;
-    p.box.setPosition(W / 2, y);
-    p.text.setPosition(W / 2, y);
+    // Under the king plate on a wide screen; at the top of the field on a phone (the plate is above the field)
+    const scale = this.compact ? 1.6 : 1;
+    const y = (this.compact ? this.fieldTop + 30 : HUD_TOP + 22) + row * 36 * scale;
+    p.box.setPosition(W / 2, y).setScale(scale);
+    p.text.setPosition(W / 2, y).setScale(scale);
   }
 
   // ---- The bell and the clock's last minute ----
@@ -190,6 +231,7 @@ export class Hud {
     if (level === this.urgency && frozen === this.urgencyFrozen) return;
     const s = this.s, calm = reducedMotion();
     if (level !== this.urgency) {
+      const rising = level !== 0 && (this.urgency === 0 || level < this.urgency);
       this.swing?.remove();
       this.beat?.remove();
       this.swing = this.beat = null;
@@ -198,18 +240,21 @@ export class Hud {
       if (level > 0 && !calm) {
         this.swing = s.tweens.add({ targets: this.bell, angle: { from: -10, to: 10 }, duration: level <= 10 ? 500 : 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       }
-      if (level === 10 && !calm) {
-        // Lub-dub, once a second
+      if (level === 10) {
+        // Lub-dub, once a second (the sound plays with reduced motion too)
         const pulse = { t: 0 };
         this.beat = s.tweens.add({
           targets: pulse, t: 1, duration: 1000, repeat: -1,
+          onRepeat: () => sfx.heartbeat(),
           onUpdate: () => {
+            if (calm) return;
             const t = pulse.t;
             const bump = (c: number, w: number, h: number) => Math.max(0, 1 - Math.abs(t - c) / w) * h;
             this.ring.setScale(1 + bump(0.1, 0.1, 0.14) + bump(0.32, 0.09, 0.09));
           },
         });
       }
+      if (rising && (level === 60 || level === 30) && !frozen) sfx.bell();
       this.closedMarks.setVisible(level === 30 || level === 10);
       this.urgency = level;
       this.drawRing();
@@ -227,6 +272,7 @@ export class Hud {
     const s = this.s, calm = reducedMotion();
     this.swing?.remove();
     this.swing = null;
+    sfx.toll(3);
     if (!calm) s.tweens.add({ targets: this.bell, angle: { from: -24, to: 24 }, duration: 260, yoyo: true, repeat: 2, ease: "Sine.easeInOut", onComplete: () => this.bell.setAngle(0) });
     this.tollRings.forEach((r, i) => {
       s.tweens.killTweensOf(r);
@@ -277,26 +323,30 @@ export class Hud {
 
   // The bell: time left and the ring. remainingMs null: no clock running.
   setClock(remainingMs: number | null, totalMs: number | null): void {
-    this.time.setText(remainingMs === null ? "" : clockText(remainingMs));
+    const text = remainingMs === null ? "" : clockText(remainingMs);
+    if (this.time.text !== text) this.time.setText(text);
     const frac = remainingMs === null || !totalMs ? 1 : remainingMs / totalMs;
     if (Math.abs(frac - this.ringFrac) > 0.001) this.setRing(frac);
   }
 
-  // A notice across the field, or null to hide it. "alert" draws it in crimson.
+  // A notice across the middle of the field, or null to hide it. "alert" draws it in crimson.
   ribbon(text: string | null, tone: "info" | "alert" = "info"): void {
     const on = text !== null;
     this.ribbonBox.setVisible(on);
     this.ribbonText.setVisible(on);
     if (!on) return;
-    this.ribbonText.setText(text);
-    const w = Math.max(420, this.ribbonText.width + 80), h = this.ribbonText.height + 30;
+    this.ribbonTone = tone;
+    const scale = this.compact ? 1.5 : 1, y = this.fieldTop + 250;
+    this.ribbonText.setText(text).setPosition(W / 2, y).setScale(scale);
+    const w = Math.max(420, this.ribbonText.displayWidth + 80 * scale), h = this.ribbonText.displayHeight + 30 * scale;
     this.ribbonBox.clear()
-      .fillStyle(tone === "alert" ? C.crimson : C.navy, 0.92).fillRoundedRect(W / 2 - w / 2, 250 - h / 2, w, h, 14)
-      .lineStyle(3, C.gold, 1).strokeRoundedRect(W / 2 - w / 2, 250 - h / 2, w, h, 14);
+      .fillStyle(tone === "alert" ? C.crimson : C.navy, 0.92).fillRoundedRect(W / 2 - w / 2, y - h / 2, w, h, 14)
+      .lineStyle(3, C.gold, 1).strokeRoundedRect(W / 2 - w / 2, y - h / 2, w, h, 14);
   }
 
   // A coin landed in the chest
   bumpChest(): void {
+    sfx.coin();
     const c = this.chest, [sx, sy] = this.chestScale;
     this.s.tweens.killTweensOf(c);
     c.setScale(sx, sy);
@@ -317,13 +367,13 @@ export class Hud {
     this.crown.setVisible(!king);
     this.avatar.setVisible(!!king);
     if (!king) {
-      back.fillStyle(C.empty, 1).fillCircle(AX, AY, AR);
-      front.lineStyle(4, C.cream, 0.5).strokeCircle(AX, AY, AR);
+      back.fillStyle(C.empty, 1).fillCircle(AX, 0, AR);
+      front.lineStyle(4, C.cream, 0.5).strokeCircle(AX, 0, AR);
       return;
     }
-    back.fillStyle(king.house.color, 1).fillCircle(AX, AY, AR);
+    back.fillStyle(king.house.color, 1).fillCircle(AX, 0, AR);
     this.avatar.setTexture(avatarKey(king.portrait)).setDisplaySize(AR * 2 - 6, AR * 2 - 6);
-    front.lineStyle(4, king.house.text, 1).strokeCircle(AX, AY, AR);
+    front.lineStyle(4, king.house.text, 1).strokeCircle(AX, 0, AR);
   }
 
   // Share of the bell left, 0..1. Drawn clockwise from the top.
