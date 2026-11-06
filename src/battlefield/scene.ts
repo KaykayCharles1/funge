@@ -3,7 +3,7 @@ import * as Phaser from "phaser";
 import { avatarKey, bannerKey, loadFirst, loadLater, makeBanners, makeFxTextures, portraitKey, portraitsOf } from "./assets.ts";
 import type { FieldState } from "./director.ts";
 import { BAND_TOP, C, css, FONT, H, H_COMPACT, Hud, HUD_DEPTH, money, reducedMotion, W } from "./hud.ts";
-import { displayName } from "./identity.ts";
+import { displayName, HOUSES } from "./identity.ts";
 import type { House, Identity, Portrait } from "./identity.ts";
 import { COPY } from "../copy.ts";
 import { sfx } from "./sound.ts";
@@ -40,6 +40,7 @@ const PLACES: [number, number][] = [
 ];
 const BEARER: [number, number] = [170, R2]; // the standard-bearer's place
 type Pt = { x: number; y: number };
+const HOUSE_FOR_STRESS = HOUSES[1]!; // dev stress test only
 
 // The march in along the road, from the left or the right edge, ending at the front of the formation
 const ROAD = {
@@ -884,6 +885,25 @@ export class BattlefieldScene extends Phaser.Scene {
       .setOrigin(0.5).setStroke(css(C.navy), 8).setShadow(0, 3, "#000000", 6, true, true).setScale(this.hud.fieldTop === 0 ? 1 : 1.6), true);
     r.tween({ targets: t, y: p.y - 50, duration: 1100, ease: "Sine.easeOut" });
     r.tween({ targets: t, alpha: 0, duration: 300, delay: 900 });
+  }
+
+  // Everything drawn: the field's, the scenes' and the HUD's objects (dev panel)
+  objectCount(): number {
+    const layers = new Set<unknown>([this.world, this.fxLayer, this.topLayer]);
+    const loose = this.children.list.filter((o) => !layers.has(o)).length;
+    return loose + this.world.getChildren().length + this.fxLayer.getChildren().length + this.topLayer.getChildren().length;
+  }
+
+  // Dev stress test: n more bobbing soldiers in loose rows on the field; the next redraw removes them
+  stress(n: number): void {
+    const house = HOUSE_FOR_STRESS;
+    const rand = rng(n);
+    for (let i = 0; i < n; i++) {
+      const x = 120 + (i % 10) * 104, y = 470 + Math.floor(i / 10) * 44;
+      const img = this.soldier(x, y, house, rand, i % 2 === 0);
+      this.world.add(img);
+      this.tweens.add({ targets: img, y: y - 3, duration: 700 + rand() * 300, delay: rand() * 800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
   }
 
   // ---- Sky ----

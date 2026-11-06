@@ -122,6 +122,10 @@ export function mountBattlefield(opts: MountOptions): void {
     height: H,
     backgroundColor: "#0f1a33",
     banner: false,
+    // No input in the canvas: every control is in the HTML bar. Phaser's input would capture the mouse wheel and
+    // touch drags over the field, so the page could not scroll while the pointer or a finger was on it.
+    // Each part is named: Phaser reads input.mouse, input.touch, ... and takes a missing one as "on".
+    input: { mouse: false, touch: false, keyboard: false, gamepad: false },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene: [scene],
   });
@@ -206,7 +210,12 @@ function devPanel(
   const info = el("div", "flex flex-wrap gap-4 font-mono");
   const status = el("span", "text-slate-300");
   const monitor = el("span", "text-amber-300", "playing: — · waiting: 0");
-  info.append(status, monitor);
+  // Frames per second, as Phaser counts them (A8: 60 fps with 60 sprites)
+  const fps = el("span", "text-emerald-300", "");
+  info.append(status, monitor, fps);
+  setInterval(() => {
+    fps.textContent = `fps ${scene.game.loop.actualFps.toFixed(0)} · objects ${scene.objectCount()}`;
+  }, 500);
   box.append(buttons, info);
   void Promise.all([import("./mockScenarios.ts"), import("../kingdomMode.ts")]).then(([{ SCENARIOS }, page]) => {
     for (const sc of SCENARIOS) {
@@ -230,7 +239,10 @@ function devPanel(
       status.textContent = "";
       onBack();
     });
-    buttons.append(back, meBox);
+    // Stress test: 40 more bobbing soldiers on the field (gone at the next redraw)
+    const stress = el("button", "rounded-lg bg-slate-600 px-3 py-1", "+40 soldiers");
+    stress.addEventListener("click", () => scene.stress(40));
+    buttons.append(back, stress, meBox);
   });
 
   // Manual state
