@@ -457,7 +457,12 @@ export class BattlefieldScene extends Phaser.Scene {
     return {
       add: <O extends Phaser.GameObjects.GameObject>(o: O, onTop = false): O => {
         this.extras.add(o);
-        o.once(Phaser.GameObjects.Events.DESTROY, () => this.extras.delete(o));
+        // When it goes, its tweens go too: after slow frames a tween can outlive the 4 s below, and a tween
+        // writing to a destroyed object throws inside Phaser's loop
+        o.once(Phaser.GameObjects.Events.DESTROY, () => {
+          this.extras.delete(o);
+          this.tweens.killTweensOf(o);
+        });
         (onTop ? this.topLayer : this.fxLayer).add(o);
         this.time.delayedCall(4000, () => o.destroy());
         return o;

@@ -200,6 +200,15 @@ export class Hud {
   // out the oldest. highlight: about the player's own kingdom.
   popup(text: string, highlight = false): void {
     const now = this.s.time.now;
+    // A popup past its time is gone, even if its fade has not finished: tweens step with capped frame times,
+    // so after slow frames (a background tab, a slow phone) the fade can lag behind the clock and two would overlap
+    for (const p of this.pops) {
+      if (p.until > now) continue;
+      p.tween?.remove();
+      p.tween = null;
+      p.box.setVisible(false);
+      p.text.setVisible(false);
+    }
     let slot = this.pops.find((p) => p.until <= now);
     if (!slot) slot = this.pops.reduce((a, b) => (a.until < b.until ? a : b));
     // The newest sits on top
