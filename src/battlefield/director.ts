@@ -5,7 +5,8 @@
 import { COPY, pauseText } from "../copy.ts";
 import type { RefereeEvent, RoundSnapshot, RoundStatus } from "../referee/api.ts";
 import { serverNow } from "../referee/clock.ts";
-import { money } from "./hud.ts";
+import { CLOCK_CAP_SECONDS } from "../refereeParams.ts";
+import { clockText, money } from "./hud.ts";
 import type { Urgency } from "./hud.ts";
 import { displayName } from "./identity.ts";
 import type { Identity } from "./identity.ts";
@@ -24,7 +25,7 @@ export type FieldState = {
   conquests: number;
   openingPrice: bigint;
   deadline: number | null; // server time, ms
-  clockMs: number | null; // the bell length the current king got
+  capMs: number; // the most the clock can show (clockCapSeconds): the ring's full circle
   pausedSince: number | null; // server time the clock froze, or null
   payout: bigint | null; // what the winner received, once settled (null when unknown)
 };
@@ -50,7 +51,7 @@ export function stateFromSnapshot(s: RoundSnapshot, openingPrice: bigint): Field
     conquests: Math.max(0, s.passCount - 1),
     openingPrice: big(k?.openingPrice, openingPrice),
     deadline: s.deadline,
-    clockMs: k?.clockSeconds ? k.clockSeconds * 1000 : null,
+    capMs: (k?.clockCapSeconds ?? CLOCK_CAP_SECONDS) * 1000,
     pausedSince: s.paused ? s.paused.since : null,
     payout: null,
   };
@@ -61,7 +62,6 @@ export function stateFromEvent(e: RefereeEvent, before: FieldState): FieldState 
   const d = e.data ?? {};
   const status: RoundStatus =
     e.type === "round_settled" ? "settled" : e.type === "round_over" ? "over" : d.king ? "open" : before.status;
-  const clockSeconds = num(d.clockSeconds, null);
   return {
     roundId: e.roundId,
     status,
@@ -72,7 +72,7 @@ export function stateFromEvent(e: RefereeEvent, before: FieldState): FieldState 
     conquests: num(d.conquests, before.conquests) ?? 0,
     openingPrice: before.openingPrice,
     deadline: num(d.deadline, before.deadline),
-    clockMs: clockSeconds !== null ? clockSeconds * 1000 : before.clockMs,
+    capMs: (num(d.clockCapSeconds, null) ?? before.capMs / 1000) * 1000,
     pausedSince: e.type === "clock_paused" ? e.at : e.type === "clock_resumed" ? null : before.pausedSince,
     payout: e.type === "round_settled" ? (d.payout === null || d.payout === undefined ? null : big(d.payout)) : before.payout,
   };
@@ -80,7 +80,7 @@ export function stateFromEvent(e: RefereeEvent, before: FieldState): FieldState 
 
 const EMPTY: FieldState = {
   roundId: "", status: "waiting", king: null, value: 0n, treasury: 0n, protectsLeft: 0, conquests: 0, openingPrice: 0n,
-  deadline: null, clockMs: null, pausedSince: null, payout: null,
+  deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null,
 };
 
 type Kind = "open" | "conquer" | "over" | "settle";
@@ -159,7 +159,7 @@ export class Director {
     if (s.lastSeq < this.lastSeq) return; // older than what we have
     // Same events as ours: take the clock from it (pauses, a pushed deadline), redraw only when idle
     const l = this.latest!;
-    this.latest = { ...l, deadline: state.deadline, pausedSince: state.pausedSince, clockMs: state.clockMs ?? l.clockMs };
+    this.latest = { ...l, deadline: state.deadline, pausedSince: state.pausedSince, capMs: state.capMs };
     if (this.idle()) this.draw(this.latest);
     this.skyFromSnapshot(s);
   }
@@ -212,13 +212,13 @@ export class Director {
   tick(): void {
     const s = this.latest, hud = this.scene.hud;
     if (!s || s.status !== "open" || s.deadline === null) {
-      hud.setClock(null, null);
+      hud.setClock(null, 0);
       hud.setUrgency(0, false);
       return;
     }
     const paused = s.pausedSince !== null;
     const rem = Math.max(0, paused ? s.deadline - s.pausedSince! : s.deadline - serverNow());
-    hud.setClock(rem, s.clockMs);
+    hud.setClock(rem, s.capMs);
     hud.setUrgency(rem <= 10_000 ? 10 : rem <= 30_000 ? 30 : rem <= 60_000 ? 60 : (0 as Urgency), paused);
     this.scene.freezeSky(paused);
   }
@@ -241,9 +241,13 @@ export class Director {
     }
     if (e.type === "deadline_changed" && e.reason === "conquer") {
       const who = this.name(after.king), old = this.name(before.king);
-      if (me(before.king)) hud.popup(T.popConqueredYours(who), true);
-      else if (me(after.king)) hud.popup(T.popYouConquered(old), true);
-      else hud.popup(T.popConquered(who, old));
+      // The time this conquest added to the clock (smaller when the cap cut it): in the popup and floating by the bell
+      const added = typeof d.addedSeconds === "number" ? T.clockAdded(clockText(d.addedSeconds * 1000)) : null;
+      const pop = (text: string, mine = false) => hud.popup(added ? T.popWithAdded(text, added) : text, mine);
+      if (me(before.king)) pop(T.popConqueredYours(who), true);
+      else if (me(after.king)) pop(T.popYouConquered(old), true);
+      else pop(T.popConquered(who, old));
+      if (added) hud.floatAdded(added);
     }
     if (e.type === "deadline_changed" && e.reason === "observed_on_chain") {
       // Someone moved on the chain directly: no scene, snap to the event's state

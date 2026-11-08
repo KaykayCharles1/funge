@@ -26,7 +26,7 @@ default; dusk in the last 30 seconds. Words: "Treasury", "kingdom value", "conqu
   every protect also plays the shield ring and the floating number.
 - Garrison: 6 + 2 * ceil((value - 1000) / 500) soldiers of the king's house around the castle.
 - Banner and castle flags: the king's house color. Chest and coin pile grow with the treasury (full at 6000).
-- HUD: bell with a ring (remaining time / clockSeconds), king plate (avatar, name, value), two shield icons
+- HUD: bell with a ring (remaining time / clockCapSeconds, so a full ring is 10:00), king plate (avatar, name, value), two shield icons
   (protectsLeft), "Next conquest costs" = value plus the fee (2%, read from the game file).
 - Money is in base units with 2 decimals. Format it with one helper.
 
@@ -35,7 +35,7 @@ default; dusk in the last 30 seconds. Words: "Treasury", "kingdom value", "conqu
 |---|---|---|---|
 | open | "First king" coronation card, banner rises, castle pops, coins to chest (1.8 s) | 1 s | 0.4 s |
 | protect_applied | A wall piece drops in with a bounce, shield ring, a shield dims, floating "-amount", coins to chest (0.9 s). Never blocks other scenes. | - | - |
-| conquer | Face-off cards with VS (1.4 s), army marches in (1.8 s), clash with slashes, fallen soldiers drop coins and gems (1.5 s), "New king" card (1.6 s). Floating numbers: paid, refunded, toTreasury. | 3.5 s | 1.2 s |
+| conquer | Face-off cards with VS (1.4 s), army marches in (1.8 s), clash with slashes, fallen soldiers drop coins and gems (1.5 s), "New king" card (1.6 s). Floating numbers: paid, refunded, toTreasury. The time added (`addedSeconds`) floats as "+m:ss" by the bell and ends the popup. A conquest that lifts the clock above 30 s brings the day back and reopens protect; the warnings fire again for the new deadline. | 3.5 s | 1.2 s |
 | observed_on_chain | Banner flash, snap to the event's state | - | - |
 | clock_warning 60s | Bell begins a slow swing | - | - |
 | clock_warning 30s | Sky crossfades to dusk (2 s), red edge pulse, protect disabled | - | - |

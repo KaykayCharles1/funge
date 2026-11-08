@@ -51,7 +51,7 @@ export type Urgency = 0 | 60 | 30 | 10; // 0: more than a minute left, or no clo
 type Popup = { box: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; until: number; tween: Phaser.Tweens.Tween | null };
 const POP_MS = 3500;
 
-function clockText(ms: number): string {
+export function clockText(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
   const two = (n: number) => String(n).padStart(2, "0");
@@ -96,6 +96,9 @@ export class Hud {
   private closedMarks: Phaser.GameObjects.Graphics; // over the shields when protect is closed
   private edge: Phaser.GameObjects.Graphics; // red pulse around the field
   private tollRings: Phaser.GameObjects.Arc[]; // sound rings from the bell
+  private added: Phaser.GameObjects.Text; // "+1:00" floating by the bell after a conquest
+  private addedTween: Phaser.Tweens.Tween | null = null;
+  private shieldsShown = { open: false, left: 0 };
   private plateGlow: Phaser.GameObjects.Image;
   private pops: Popup[] = [];
   private swing: Phaser.Tweens.Tween | null = null;
@@ -115,7 +118,9 @@ export class Hud {
     this.conquests = s.add.text(0, BR + 52, "", { fontFamily: FONT, fontSize: "16px", color: css(C.cream) })
       .setOrigin(0.5, 0).setStroke(css(C.navy), 5);
     this.tollRings = [0, 1, 2].map(() => s.add.circle(0, 0, BR, 0, 0).setStrokeStyle(4, C.gold).setAlpha(0));
-    this.bellGroup = group([s.add.circle(0, 0, BR + 10, C.navy, 0.86).setStrokeStyle(3, C.gold), this.ring, this.bell, this.time, this.conquests, ...this.tollRings]);
+    this.added = s.add.text(BR + 18, -6, "", { fontFamily: FONT, fontSize: "26px", color: css(C.gold), fontStyle: "bold" })
+      .setOrigin(0, 0.5).setStroke(css(C.navy), 6).setAlpha(0);
+    this.bellGroup = group([s.add.circle(0, 0, BR + 10, C.navy, 0.86).setStrokeStyle(3, C.gold), this.ring, this.bell, this.time, this.conquests, ...this.tollRings, this.added]);
     this.drawRing();
 
     // King plate, with a glow behind it for the end of the round
@@ -266,6 +271,7 @@ export class Hud {
       if (rising && (level === 60 || level === 30) && !frozen) sfx.bell();
       this.closedMarks.setVisible(level === 30 || level === 10);
       this.urgency = level;
+      this.paintShields(); // protect closes at 30 s, and opens again when a conquest lifts the clock
       this.drawRing();
     }
     this.urgencyFrozen = frozen;
@@ -288,6 +294,14 @@ export class Hud {
       r.setRadius(BR).setAlpha(0);
       s.tweens.add({ targets: r, radius: BR * (calm ? 1.4 : 2.4), alpha: { from: 0.9, to: 0 }, duration: 700, delay: i * 520 });
     });
+  }
+
+  // The time a conquest added, floating up beside the bell and fading
+  floatAdded(text: string): void {
+    const s = this.s, t = this.added, calm = reducedMotion();
+    this.addedTween?.remove();
+    t.setText(text).setY(-6).setAlpha(1);
+    this.addedTween = s.tweens.add({ targets: t, y: calm ? -6 : -40, alpha: 0, delay: 1400, duration: 1200, ease: "Sine.easeIn" });
   }
 
   // A red pulse around the edge of the field (30 seconds left)
@@ -322,7 +336,8 @@ export class Hud {
     this.drawAvatar(open ? king : null);
     this.name.setText(open ? displayName(king.portrait) : T.noKing);
     this.value.setText(`${T.kingdomValue}  ${open ? money(state.value) : "—"}`);
-    this.shields.forEach((sh, i) => sh.setAlpha(open && i < state.protectsLeft && this.urgency !== 30 && this.urgency !== 10 ? 1 : 0.3));
+    this.shieldsShown = { open, left: state.protectsLeft };
+    this.paintShields();
     this.conquests.setText(open && state.conquests > 0 ? T.conquests(state.conquests) : "");
     this.treasury.setText(state.status === "waiting" ? "—" : money(state.treasury));
     const canConquer = open && state.status === "open"; // no price once the bell has rung
@@ -330,11 +345,17 @@ export class Hud {
     this.setTreasure(state.treasury);
   }
 
-  // The bell: time left and the ring. remainingMs null: no clock running.
-  setClock(remainingMs: number | null, totalMs: number | null): void {
+  // Lit shields: the protects left, dimmed while protect is closed (the last 30 s)
+  private paintShields(): void {
+    const { open, left } = this.shieldsShown;
+    this.shields.forEach((sh, i) => sh.setAlpha(open && i < left && this.urgency !== 30 && this.urgency !== 10 ? 1 : 0.3));
+  }
+
+  // The bell: time left and the ring, whose full circle is the cap (10:00). remainingMs null: no clock running.
+  setClock(remainingMs: number | null, capMs: number): void {
     const text = remainingMs === null ? "" : clockText(remainingMs);
     if (this.time.text !== text) this.time.setText(text);
-    const frac = remainingMs === null || !totalMs ? 1 : remainingMs / totalMs;
+    const frac = remainingMs === null || capMs <= 0 ? 1 : remainingMs / capMs;
     if (Math.abs(frac - this.ringFrac) > 0.001) this.setRing(frac);
   }
 

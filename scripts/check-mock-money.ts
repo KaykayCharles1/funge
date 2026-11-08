@@ -2,14 +2,20 @@
 // (src/battlefield/mockScenarios.ts) and the page's own mock round (src/mockRound.ts).
 // For each event: paid = refunded + toTreasury, the conquest money from conquestMoney (fee and cut), the protect
 // amounts and limits, the value and Treasury after each step, the snapshot pot, the payout and the winner.
+// And the clock rule: the open sets the cap, each conquest min(cap, max(min, left + add)), a protect nothing.
 // Run: npm run check:mock-money
 import { CONFIG } from "../src/config.ts";
 import { conquestMoney } from "../src/lib/kingdom.ts";
+import { clockAfterConquestMs, clockAfterOpenMs, wholeSeconds } from "../src/lib/kingdomClock.ts";
+import { CLOCK_PRESETS } from "../src/refereeParams.ts";
 import { SCENARIOS as EXTRA } from "../src/battlefield/mockScenarios.ts";
 import { playMockRound } from "../src/mockRound.ts";
 import type { RefereeEvent, RoundSnapshot } from "../src/referee/api.ts";
 
 const SCENARIOS = [...EXTRA, { id: "mockRound.ts", label: "", play: playMockRound }];
+const CLOCK = CLOCK_PRESETS.standard;
+// The "Clock rule" scenario: conquests at 9:30, 8:00, 2:00 and 0:10 left
+const CLOCK_RULE = { added: [30, 60, 60, 60], clock: [600, 540, 180, 70] };
 
 const P = CONFIG.kingdom;
 let failures = 0;
@@ -23,6 +29,8 @@ for (const sc of SCENARIOS) {
   let clock = 1_780_000_000_000;
   let value = 0n, treasury = 0n, king: string | null = null, lastSeq = 0, protects = 0;
   const events: RefereeEvent[] = [];
+  let deadline: number | null = null, paused: number | null = null;
+  const added: number[] = [], clocks: number[] = [];
   await sc.play({
     now: () => clock,
     shiftClock: (ms) => (clock += ms),
@@ -30,6 +38,23 @@ for (const sc of SCENARIOS) {
       events.push(e);
       const d = e.data ?? {};
       const tag = `seq ${e.seq} ${e.type}/${e.reason}`;
+      // The clock rule (pauses never overlap a move in the scenarios)
+      if (e.type === "deadline_changed" && e.reason !== "observed_on_chain" && sc.id !== "gap") {
+        const left = deadline === null ? 0 : Math.max(0, deadline - e.at);
+        const ms = e.reason === "open" ? clockAfterOpenMs(CLOCK) : clockAfterConquestMs(left, CLOCK);
+        if (d.deadline !== e.at + ms) fail(sc.id, `${tag}: deadline ${d.deadline}, the clock rule gives ${e.at + ms}`);
+        if (d.clockSeconds !== wholeSeconds(ms)) fail(sc.id, `${tag}: clockSeconds ${d.clockSeconds}, should be ${wholeSeconds(ms)}`);
+        if (e.reason === "conquer") {
+          if (d.addedSeconds !== wholeSeconds(ms - left)) fail(sc.id, `${tag}: addedSeconds ${d.addedSeconds}, should be ${wholeSeconds(ms - left)}`);
+          added.push(Number(d.addedSeconds));
+          clocks.push(Number(d.clockSeconds));
+        }
+      }
+      if (e.type === "protect_applied" && d.deadline !== deadline) fail(sc.id, `${tag}: a protect moved the deadline`);
+      if (e.type !== "clock_warning" && d.clockCapSeconds !== CLOCK.capSeconds) fail(sc.id, `${tag}: clockCapSeconds ${d.clockCapSeconds}`);
+      if (e.type === "clock_paused") paused = e.at;
+      if (e.type === "clock_resumed" && paused !== null && deadline !== null && d.deadline !== deadline + (e.at - paused)) fail(sc.id, `${tag}: the pause was not added to the deadline`);
+      if (typeof d.deadline === "number") deadline = d.deadline;
       if (e.type === "deadline_changed" && e.reason === "open") {
         if (B(d.paid) !== P.openingPrice) fail(sc.id, `${tag}: paid ${d.paid}, opening price is ${P.openingPrice}`);
         value = P.openingPrice; treasury = P.openingPrice; protects = 0;
@@ -70,7 +95,10 @@ for (const sc of SCENARIOS) {
     cancelled: () => false,
     label: () => {},
   });
-  console.log(`${sc.id}: ${events.length} events, Treasury at the end ${treasury}`);
+  if (sc.id === "clock" && JSON.stringify({ added, clock: clocks }) !== JSON.stringify(CLOCK_RULE)) {
+    fail(sc.id, `added ${added.join(", ")} and clocks ${clocks.join(", ")}, should be ${CLOCK_RULE.added.join(", ")} and ${CLOCK_RULE.clock.join(", ")}`);
+  }
+  console.log(`${sc.id}: ${events.length} events, Treasury at the end ${treasury}${added.length ? `, added ${added.map((a) => `+${a}s`).join(" ")}` : ""}`);
 }
 console.log(failures ? `${failures} problem(s)` : "all scenarios follow the money rules");
 process.exit(failures ? 1 : 0);

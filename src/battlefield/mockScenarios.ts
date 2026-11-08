@@ -245,6 +245,21 @@ export const SCENARIOS: Scenario[] = [
     ]),
   },
   {
+    // The clock rule: each conquest adds 1:00 to the time left, at most the 10:00 cap. Each jump and its conquest
+    // happen in the same step, so the time left is exact.
+    id: "clock", label: "Clock rule",
+    play: (h) => script(h, [
+      ["Open (A): the clock starts at 10:00", 1000, (k) => k.open(A)],
+      ["9:30 left, B conquers: +0:30 (the cap), 10:00", 3000, (k) => { k.jumpTo(570_000); k.conquer(B); }],
+      ["8:00 left, C conquers: +1:00, 9:00", 7000, (k) => { k.jumpTo(480_000); k.conquer(C); }],
+      ["2:00 left, D conquers: +1:00, 3:00", 7000, (k) => { k.jumpTo(120_000); k.conquer(D); }],
+      ["30 seconds: dusk, protect closed", 7000, (k) => k.jumpTo(31_000)],
+      ["0:10 left, E conquers: +1:00, 1:10, day again, protect open", 4500, (k) => { k.jumpTo(10_000); k.conquer(E); }],
+      ["One minute left again: the warnings re-arm", 7000, (k) => k.jumpTo(61_000)],
+      ["30 seconds again: dusk", 4000, (k) => k.jumpTo(31_000)],
+    ]),
+  },
+  {
     id: "pause", label: "Network busy pause",
     play: (h) => script(h, [
       ["Open (A)", 1000, (k) => k.open(A)],

@@ -1,13 +1,14 @@
 import { getHealth } from "./api.ts";
 
 let offsetMs = 0; // server time minus this device's time
+let mockShiftMs = 0; // dev only: time the mock round player skipped (kept apart, so a clock sync cannot undo it)
 let rttMs: number | null = null;
 
 // The server's clock, as best we can tell. The countdown must use this, never the device clock.
-export const serverNow = () => Date.now() + offsetMs;
+export const serverNow = () => Date.now() + offsetMs + mockShiftMs;
 // Dev-only: the mock round player moves the clock forward to skip time, then moves it back.
 export const shiftClockForMock = (ms: number) => {
-  offsetMs += ms;
+  mockShiftMs += ms;
 };
 export const clockInfo = () => ({ offsetMs: Math.round(offsetMs), rttMs, synced: rttMs !== null });
 

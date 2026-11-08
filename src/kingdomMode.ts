@@ -7,6 +7,7 @@ import potJson from "../contracts/FungePot.json";
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { CONFIG } from "./config.ts";
+import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS } from "./refereeParams.ts";
 import { COPY, errorText, pauseText } from "./copy.ts";
 import { findEndedKingdom } from "./endedKingdom.ts";
 import type { EndedKingdom } from "./endedKingdom.ts";
@@ -204,7 +205,8 @@ function renderClock() {
       ready = true;
     } else {
       title = COPY.kingdom.running;
-      detail = COPY.kingdom.runningDetail;
+      const ks = r.kingdom ?? null;
+      detail = COPY.kingdom.runningDetail(mmss(ks?.conquestAddSeconds ?? CONQUEST_ADD_SECONDS), mmss(ks?.clockCapSeconds ?? CLOCK_CAP_SECONDS));
       text = fmtClock(rem);
       urgent = rem < 30_000;
     }
@@ -328,7 +330,6 @@ function renderPreview() {
   let protects = "";
   let walls = false;
   let protectClock = "";
-  let nextClock = "";
   if (r && r.status === "settled") {
     preview = COPY.kingdom.finished;
   } else if (r && k) {
@@ -355,9 +356,6 @@ function renderPreview() {
         }
       }
     }
-    if ((r.status === "waiting" || r.status === "open") && k.nextClockSeconds !== null) {
-      nextClock = COPY.kingdom.nextClock(mmss(k.nextClockSeconds));
-    }
   }
   $("kPreview").textContent = preview;
   show("kPreview", preview !== "");
@@ -367,8 +365,6 @@ function renderPreview() {
   show("kWalls", walls);
   $("kProtectClock").textContent = protectClock;
   show("kProtectClock", protectClock !== "");
-  $("kNextClock").textContent = nextClock;
-  show("kNextClock", nextClock !== "");
 }
 
 // The main button: open (first player), conquer, or take back the throne
@@ -525,7 +521,8 @@ function describe(e: RefereeEvent): string | null {
     if (e.type === "deadline_changed") {
       const clock = typeof d.clockSeconds === "number" ? mmss(d.clockSeconds) : "";
       if (e.reason === "open") return COPY.kingdom.feedOpened(who, clock);
-      if (e.reason === "conquer") return COPY.kingdom.feedConquered(who, Number(d.passCount), clock);
+      const added = typeof d.addedSeconds === "number" ? mmss(d.addedSeconds) : "";
+      if (e.reason === "conquer") return COPY.kingdom.feedConquered(who, Number(d.passCount), clock, added);
       return null;
     }
     if (e.type === "protect_applied") {
@@ -673,6 +670,7 @@ function checkClockWarnings() {
         level, remainingMs: Math.round(rem), deadline: r.deadline, king: r.king, previousKing: k?.previousKing ?? null,
         passCount: r.passCount, conquests: Math.max(0, r.passCount - 1), value: k?.value ?? null, treasury: r.pot,
         protectsLeft: k?.protectsLeft ?? 0, clockSeconds: k?.clockSeconds ?? null, nextClockSeconds: k?.nextClockSeconds ?? null,
+        clockCapSeconds: k?.clockCapSeconds ?? null, conquestAddSeconds: k?.conquestAddSeconds ?? null, conquestMinSeconds: k?.conquestMinSeconds ?? null,
       },
     },
     mockActive ? "mock" : "client",

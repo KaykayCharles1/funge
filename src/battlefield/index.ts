@@ -2,6 +2,7 @@
 // so Phaser is only downloaded on this page.
 import * as Phaser from "phaser";
 import { CONFIG } from "../config.ts";
+import { CLOCK_CAP_SECONDS } from "../refereeParams.ts";
 import { COPY } from "../copy.ts";
 import { conquestMoney } from "../lib/kingdom.ts";
 import type { GameKingdom } from "../lib/game.ts";
@@ -298,14 +299,14 @@ function devPanel(
       roundId: "dev", status: waiting ? "waiting" : "open", king: waiting ? null : "dev",
       value: BigInt(value.value), treasury: waiting ? 0n : BigInt(treasury.value),
       protectsLeft: Number(protects.value), conquests: Number(conquests.value), openingPrice: CONFIG.kingdom.openingPrice,
-      deadline: null, clockMs: null, pausedSince: null, payout: null,
+      deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null,
     };
     const p = scene.portraits[Number(portrait.value)];
     const king: Identity | null = waiting || !p ? null : { key: "dev", house: HOUSES[Number(house.value)], portrait: p };
     const fees = getFees();
     scene.cancelScenes();
     scene.hud.ribbon(null);
-    scene.hud.setClock(null, null);
+    scene.hud.setClock(null, 0);
     scene.showState(state, king, fees && king ? conquestMoney(state.value, fees).payment : null);
   }
   for (const e of [hold, house, portrait, value, treasury, protects, conquests]) e.addEventListener("input", apply);

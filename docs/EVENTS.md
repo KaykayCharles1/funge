@@ -141,7 +141,7 @@ The pool was paid out. `claim`: the king pressed the button. `keeper`: the serve
 If only the opener played, `winner` is the opener and `conquests` is `0` (the page says "No challengers, pool returned").
 
 ### `clock_warning` (made by the page, not the server)
-The server only sets deadlines; each device counts down on its own against the server's clock. The page raises one `clock_warning` the first time the countdown reaches 60, 30 and 10 seconds for a given deadline (a jump past a level raises one warning for the level it lands on). `seq` is `0`, `reason` is `"60s"`, `"30s"` or `"10s"`. The 30-second one is also the moment protect closes.
+The server only sets deadlines; each device counts down on its own against the server's clock. The page raises one `clock_warning` the first time the countdown reaches 60, 30 and 10 seconds for a given deadline (a jump past a level raises one warning for the level it lands on). `seq` is `0`, `reason` is `"60s"`, `"30s"` or `"10s"`. The 30-second one is also the moment protect closes. A conquest gives a new deadline, so the warnings fire again when the new countdown reaches each level. It also carries `clockCapSeconds`, `conquestAddSeconds` and `conquestMinSeconds` (from the snapshot, `null` when the server does not send them).
 
 ```json
 {
