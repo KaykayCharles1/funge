@@ -1,6 +1,7 @@
 // The battlefield scene: the field (day, dusk on top), the kingdom in the clearing, the HUD, and the scenes.
 import * as Phaser from "phaser";
 import { avatarKey, bannerKey, loadFirst, loadLater, makeBanners, makeFxTextures, portraitKey, portraitsOf } from "./assets.ts";
+import { isCancelled } from "./director.ts";
 import type { FieldState } from "./director.ts";
 import { BAND_TOP, C, css, FONT, H, H_COMPACT, Hud, HUD_DEPTH, money, reducedMotion, W } from "./hud.ts";
 import { displayName, HOUSES } from "./identity.ts";
@@ -363,6 +364,7 @@ export class BattlefieldScene extends Phaser.Scene {
   // The winner's card: portrait, "Wins X" (or "No challengers"), and a summary. Returns its objects.
   private winnerCard(king: Identity, state: FieldState, size: number, y: number): Phaser.GameObjects.GameObject[] {
     const alone = state.conquests === 0;
+    const cancelled = isCancelled(state);
     const pw = 512 * size * 0.62, ph = 640 * size * 0.62;
     const w = Math.max(pw + 60, 420), h = ph + 150;
     const g = this.add.graphics();
@@ -372,7 +374,7 @@ export class BattlefieldScene extends Phaser.Scene {
     const full = this.textures.exists(portraitKey(king.portrait));
     const img = this.add.image(W / 2, y - h / 2 + 24 + ph / 2, full ? portraitKey(king.portrait) : avatarKey(king.portrait)).setDisplaySize(pw, full ? ph : pw);
     const name = this.add.text(W / 2, y + h / 2 - 104, displayName(king.portrait), { fontFamily: FONT, fontSize: "24px", color: css(C.cream), fontStyle: "bold" }).setOrigin(0.5);
-    const head = alone ? T.noChallengers : state.payout !== null ? T.wins(money(state.payout)) : T.winsNoAmount;
+    const head = cancelled ? T.roundCancelled : alone ? T.noChallengers : state.payout !== null ? T.wins(money(state.payout)) : T.winsNoAmount;
     const wins = this.add.text(W / 2, y + h / 2 - 66, head, { fontFamily: FONT, fontSize: alone ? "22px" : "30px", color: css(C.gold), fontStyle: "bold" }).setOrigin(0.5);
     const sum = this.add.text(W / 2, y + h / 2 - 30, T.summary(state.conquests + 1, state.conquests), { fontFamily: FONT, fontSize: "17px", color: css(C.cream) }).setOrigin(0.5);
     return [g, img, name, wins, sum];
@@ -575,7 +577,9 @@ export class BattlefieldScene extends Phaser.Scene {
     for (const o of card) (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0);
     const n = p.mode === "full" ? 16 : p.mode === "short" ? 10 : 5;
     const to = this.toHud(W / 2, 300);
-    sfx.fanfare();
+    // A cancel: the coins go back from the chest to the king's card, with a calm falling call instead of the fanfare
+    if (p.state.cancelled) sfx.cancel();
+    else sfx.fanfare();
     for (let i = 0; i < n; i++) {
       r.at(i * (total * 0.35 / n), () => {
         const c = this.hud.chestAt();

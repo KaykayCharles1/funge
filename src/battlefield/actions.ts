@@ -17,7 +17,7 @@ const BTN = "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rou
   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed";
 const MAIN = `${BTN} bg-[#e0a93a] text-[#0f1a33] enabled:hover:bg-amber-300 disabled:bg-[#2a3550] disabled:text-[#f4ead2]/60`;
 const SMALL = `${BTN} border-2 border-[#e0a93a] bg-[#0f1a33] enabled:hover:bg-[#1f2b4d] disabled:border-[#2a3550] disabled:text-[#f4ead2]/40`;
-const DONE = new Set<string>([COPY.kingdom.doneOpen, COPY.kingdom.doneConquer, COPY.kingdom.doneProtect]);
+const DONE = new Set<string>([COPY.kingdom.doneOpen, COPY.kingdom.doneConquer, COPY.kingdom.doneProtect, COPY.kingdom.doneCancel]);
 const short = (units: string) => money(BigInt(units)).replace(/\.00$/, ""); // "500" -> "5"
 
 function clockText(ms: number): string {
@@ -88,9 +88,21 @@ export function mountActionBar(
   });
   prot.append(protTitle, ...protBtns);
 
+  // Cancel round: the king only, while nobody has conquered. "Get your X PUSD back" under it.
+  const cancelRow = el("div", "flex flex-wrap items-center gap-2");
+  const cancelRound = el("button", `${SMALL} flex-col items-start gap-0 text-left`);
+  cancelRound.type = "button";
+  const cancelTitle = el("span", "", T.cancelRoundBtn);
+  const cancelLine = el("span", "text-xs font-normal text-[#f4ead2]/80");
+  cancelRound.append(cancelTitle, cancelLine);
+  cancelRound.addEventListener("click", () => {
+    if (!cancelRound.disabled) run.cancelRound();
+  });
+  cancelRow.append(cancelRound);
+
   const status = el("p", "min-h-6 text-sm");
   status.setAttribute("aria-live", "polite");
-  bar.append(top, prot, status);
+  bar.append(top, prot, cancelRow, status);
 
   let mainAction: (() => void) | null = null;
   main.addEventListener("click", () => {
@@ -186,6 +198,16 @@ export function mountActionBar(
     set(status, text ? (ok ? `✓ ${text}` : text) : "");
     status.classList.toggle("text-emerald-300", ok);
     status.classList.toggle("text-rose-300", !ok && v.note !== null && !v.busy);
+
+    // Cancel round: shown and enabled exactly when the page offers it
+    const c = v.cancelRound;
+    toggle(cancelRow, !c.show);
+    if (c.show && c.pool !== null) {
+      const pool = money(BigInt(c.pool));
+      set(cancelLine, T.cancelRoundLine(pool));
+      cancelRound.setAttribute("aria-label", T.cancelRoundAria(pool));
+    }
+    cancelRound.disabled = !c.enabled || v.busy;
 
     // Protect: enabled exactly when the page enables it; the reason is said in words
     const open = r?.status === "open";

@@ -158,6 +158,15 @@ class MockKingdom {
     });
   }
 
+  // The king cancels before anyone challenged: the whole pool goes back (round_settled, reason cancel)
+  cancel(): void {
+    const payout = this.treasury;
+    this.treasury = 0n; this.status = "settled";
+    this.send("round_settled", "cancel", {
+      txid: fakeTx(this.seq + 1), winner: this.king, payout: str(payout), pot: str(payout), cancelled: true,
+    });
+  }
+
   // The server saw a conquest on the chain it did not make: scene fields only, the clock follows the same rule.
   // The money moved as in any conquest: the cut went into the Treasury.
   observed(key: string): void {
@@ -283,6 +292,14 @@ export const SCENARIOS: Scenario[] = [
       ["Open (A)", 1000, (k) => k.open(A)],
       ["Round over", 3000, (k) => k.over()],
       ["Settled: pool returned", 2500, (k) => k.settle()],
+    ]),
+  },
+  {
+    id: "cancel", label: "Cancel round",
+    play: (h) => script(h, [
+      ["Open (A)", 1000, (k) => k.open(A)],
+      ["Protect +5.00", 2500, (k) => k.protect(5n)],
+      ["A cancels: 15.00 goes back from the chest", 3000, (k) => k.cancel()],
     ]),
   },
   {

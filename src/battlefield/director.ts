@@ -28,7 +28,12 @@ export type FieldState = {
   capMs: number; // the most the clock can show (clockCapSeconds): the ring's full circle
   pausedSince: number | null; // server time the clock froze, or null
   payout: bigint | null; // what the winner received, once settled (null when unknown)
+  cancelled: boolean | null; // settled by the king's "Cancel round" (null: not known, as after a page load)
 };
+
+// A finished round says "Round cancelled. Pool returned", never "Wins X", when the king cancelled it, or when we
+// cannot tell and it had one king (the trophy of a cancel and of an unchallenged round look the same)
+export const isCancelled = (s: FieldState): boolean => s.cancelled === true || (s.cancelled === null && s.conquests === 0);
 
 const big = (v: unknown, fallback = 0n): bigint => {
   try {
@@ -54,6 +59,7 @@ export function stateFromSnapshot(s: RoundSnapshot, openingPrice: bigint): Field
     capMs: (k?.clockCapSeconds ?? CLOCK_CAP_SECONDS) * 1000,
     pausedSince: s.paused ? s.paused.since : null,
     payout: null,
+    cancelled: null,
   };
 }
 
@@ -75,12 +81,13 @@ export function stateFromEvent(e: RefereeEvent, before: FieldState): FieldState 
     capMs: (num(d.clockCapSeconds, null) ?? before.capMs / 1000) * 1000,
     pausedSince: e.type === "clock_paused" ? e.at : e.type === "clock_resumed" ? null : before.pausedSince,
     payout: e.type === "round_settled" ? (d.payout === null || d.payout === undefined ? null : big(d.payout)) : before.payout,
+    cancelled: e.type === "round_settled" ? e.reason === "cancel" || d.cancelled === true : before.cancelled,
   };
 }
 
 const EMPTY: FieldState = {
   roundId: "", status: "waiting", king: null, value: 0n, treasury: 0n, protectsLeft: 0, conquests: 0, openingPrice: 0n,
-  deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null,
+  deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null, cancelled: null,
 };
 
 type Kind = "open" | "conquer" | "over" | "settle";
@@ -150,9 +157,9 @@ export class Director {
     const restarted = s.lastSeq === 0 && this.lastSeq > 0; // the round's history starts over (a fresh mock run)
     if (newRound || restarted || s.lastSeq > this.lastSeq) {
       // First frame, a new round, or events we never saw (a resync): start from the snapshot
-      const keep = !newRound && !restarted && this.latest ? this.latest.payout : null;
+      const keep = !newRound && !restarted && this.latest ? this.latest : null;
       this.lastSeq = s.lastSeq;
-      this.snap({ ...state, payout: keep });
+      this.snap({ ...state, payout: keep ? keep.payout : null, cancelled: keep ? keep.cancelled : null });
       this.skyFromSnapshot(s);
       return;
     }
@@ -280,7 +287,10 @@ export class Director {
     if (e.type === "round_over") hud.popup(T.popOver);
     if (e.type === "round_settled") {
       const amount = after.payout !== null ? money(after.payout) : "—";
-      hud.popup(after.conquests === 0 ? T.noChallengers : T.popWins(this.name(after.king), amount), me(after.king));
+      const text = after.cancelled
+        ? me(after.king) ? T.popCancelledYou : T.popCancelled(this.name(after.king))
+        : after.conquests === 0 ? T.noChallengers : T.popWins(this.name(after.king), amount);
+      hud.popup(text, me(after.king));
     }
   }
 

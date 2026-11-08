@@ -64,7 +64,9 @@ export const COPY = {
     timeout: "Timed out waiting for your wallet. Nothing was sent.",
     disconnected: "Your wallet disconnected. Nothing was sent.",
     failed: "Could not prepare the move. Nothing was sent. Please try again.",
-    noKingCoin: "Your wallet has no coin at your king address. Send a small amount of BCH to it, then try again.",  
+    noKingCoin: "Your wallet has no coin at your king address. Send a small amount of BCH to it, then try again.",
+    approveCancel: (pool: string, fee: string) => `Approve in your wallet: cancel the round and get ${pool} PUSD back (network fee about ${fee} sats).`,
+    promptCancel: (pool: string) => `Cancel the Funge round and get ${pool} PUSD back`,  
   },
   
   // The Kingdom page. Change the wording here only.
@@ -98,6 +100,7 @@ export const COPY = {
     feedResumed: "The clock continues.",
     feedOver: "Time is up.",
     feedSettled: "The round was settled and the pool paid out.",
+    feedCancelled: (who: string) => `${who} cancelled the round before anyone challenged. The pool went back.`,
     someone: "Someone",
     youCap: "You",
     openBtn: (price: string) => `Open the kingdom · ${price} PUSD`,
@@ -109,6 +112,7 @@ export const COPY = {
     doneOpen: "Done! You opened the kingdom and you are the king.",
     doneConquer: "Done! You hold the throne.",
     doneProtect: "Done! Your walls are stronger.",
+    doneCancel: "Round cancelled. Your pool is on its way back to you.",
     protectTitle: "Protect your throne",
     protectBtn: (amount: string) => `+${amount}`,
     protectHint: "A protect adds PUSD to the pool and raises the throne value. It does not change the clock.",
@@ -116,8 +120,9 @@ export const COPY = {
     overSomeone: (pool: string, who: string) => `Time ran out. The last king (${who}) wins the pool of ${pool} PUSD.`,
     wonTitle: "You won the pool!",
     otherWonTitle: "The kingdom has a winner",
-    aloneMine: "No challengers: your pool came back",
-    aloneOther: "No challengers: the pool went back to the only king",
+    // A finished round with one king (cancelled, or nobody challenged): the trophy cannot tell which, so one wording
+    aloneMine: "Round cancelled. Pool returned",
+    aloneOther: "Round cancelled. Pool returned",
     endedKings: "Kings crowned",
     trophyGame: "An immutable trophy NFT is in your game wallet. To see it in another wallet, restore your seed phrase there.",
     trophyMine: "An immutable trophy NFT was sent to your wallet.",
@@ -163,6 +168,13 @@ export const COPY = {
     popResumed: "The clock runs again",
     popOver: "The round is over",
     popWins: (who: string, amount: string) => `${who} wins ${amount} PUSD`,
+    // Cancel round: the king ends the round before anyone challenged and takes the whole pool back
+    cancelRoundBtn: "Cancel round",
+    cancelRoundLine: (amount: string) => `Get your ${amount} PUSD back`,
+    cancelRoundAria: (amount: string) => `Cancel the round and get your ${amount} PUSD back`,
+    roundCancelled: "Round cancelled. Pool returned",
+    popCancelled: (who: string) => `${who} cancelled the round. Pool returned`,
+    popCancelledYou: "You cancelled the round. Pool returned",
     // The time a conquest added to the clock: floats by the bell and follows the conquest popup
     clockAdded: (time: string) => `+${time}`,
     popWithAdded: (text: string, added: string) => `${text} · ${added}`,
@@ -217,10 +229,11 @@ export const COPY = {
     server_unreachable: "Could not reach the game server. Nothing was sent.",
     not_open: "Nobody has opened this round yet.",
     protect_locked: "Protect is closed for the last 30 seconds of the clock.",
-    not_king: "Only the king can protect the kingdom.",
+    not_king: "Only the king can do that.",
     already_king: "You already hold this throne.",
     walls_at_maximum: "The walls are at their maximum.",
     no_protects_left: "No protects left in this reign.",
+    not_cancellable: "Someone has already conquered the throne, so the round can no longer be cancelled.",
   } satisfies Record<ApiErrorCode, string>,
 } as const;
 

@@ -280,6 +280,15 @@ export const sfx = {
     horn(A4, t + 0.16, 0.18, 0.12);
     for (const f of [D4, FS4, A4, D5]) horn(f, t + 0.34, 0.9, 0.08); // a bright D major chord
   },
+  // A cancelled round: the same horn as the fanfare, falling and soft (the pool goes back, nobody won)
+  cancel(): void {
+    if (!on()) return;
+    const t = now();
+    const D4 = 293.66, A4 = 440, D5 = 587.33;
+    horn(D5, t, 0.22, 0.09);
+    horn(A4, t + 0.2, 0.22, 0.09);
+    horn(D4, t + 0.4, 0.8, 0.08);
+  },
   heartbeat(): void {
     if (!on()) return;
     const t = now();

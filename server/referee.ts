@@ -44,7 +44,9 @@ export function makeReferee(
       const { state } = need(game.gameId);
       const template = keyring.templateFor(game.gameId); // ALL | UTXOS (Step 3)
       const unlocker =
-        call.fn === "protect"
+        call.fn === "settle"
+          ? state.unlock.settle(template)
+          : call.fn === "protect"
           ? state.unlock.protect(template, call.amount)
           : call.fn === "open"
             ? state.unlock.open(hexToBin(call.newHolder), template)

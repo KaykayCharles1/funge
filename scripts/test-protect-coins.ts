@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { hexToBin } from "@bitauth/libauth";
-import { pickProtectCoins } from "../src/lib/protectCoins.ts";
+import { pickCancelCoins, pickProtectCoins } from "../src/lib/protectCoins.ts";
 
 const KING = "11".repeat(20);
 const OTHER = "22".repeat(20);
@@ -128,5 +128,23 @@ const ok = (name: string) => console.log(`ok    ${name}`);
     const tooMany: any = pickWalletCoins(coins, PUSD, 2000n); // would need 20 coins
     assert.deepEqual([tooMany.ok, tooMany.code], [false, "no_funds"]); ok("wallet: more coins than one move may carry: no_funds");
   }
+}
+// ---------- cancel: one coin at the king's address is the proof; it must never carry an NFT
+{
+  const c = (coins: any[]) => pickCancelCoins(coins, KING, PUSD) as any;
+  const bch = coin(KING, 20_000n), pusd = coin(KING, 20_000n, { amount: 500n });
+  let r = c([pusd, bch, coin(OTHER, 90_000n)]);
+  assert.ok(r.ok); assert.deepEqual(ids(r), [bch.id]); ok("cancel: a plain BCH coin at the king address, alone");
+  r = c([pusd, coin(OTHER, 90_000n)]);
+  assert.ok(r.ok); assert.deepEqual(ids(r), [pusd.id]); ok("cancel: a PUSD coin at the king address works too (its PUSD comes back)");
+  const small = coin(KING, 2_000n), fee = coin(OTHER, 30_000n);
+  r = c([small, fee]);
+  assert.ok(r.ok); assert.deepEqual(ids(r), [small.id, fee.id]); ok("cancel: too little BCH on the proof coin: a fee coin goes second");
+  r = c([coin(KING, 2_000n)]);
+  assert.deepEqual([r.ok, r.code], [false, "needs_bch"]); ok("cancel: no BCH for the fee: needs_bch");
+  r = c([coin(KING, 9_000n, { nft: true }), coin(OTHER, 9_000n)]);
+  assert.deepEqual([r.ok, r.code], [false, "no_king_coin"]); ok("cancel: the trophy is never spent as the proof: no_king_coin");
+  r = c([]);
+  assert.deepEqual([r.ok, r.code], [false, "no_king_coin"]); ok("cancel: an empty wallet: no_king_coin");
 }
 console.log("All protect coin tests passed.");

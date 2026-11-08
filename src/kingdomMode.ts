@@ -19,8 +19,8 @@ import { qrDataUrl } from "./lib/qr.ts";
 import { claim, getEvents, getRound, watchRound } from "./referee/api.ts";
 import type { RefereeEvent, RoundSnapshot, WatchStatus } from "./referee/api.ts";
 import { serverNow, shiftClockForMock, syncClock } from "./referee/clock.ts";
-import { kingdomAct, kingdomProtect } from "./referee/kingdomActions.ts";
-import { kingdomActExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
+import { kingdomAct, kingdomCancel, kingdomProtect } from "./referee/kingdomActions.ts";
+import { kingdomActExternal, kingdomCancelExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
 import { playMockRound } from "./mockRound.ts";
@@ -47,7 +47,7 @@ const SIGN_TIMEOUT_MS = 180_000; // how long we wait for the player to approve i
 const artifacts = { pot: potJson as any, kingdom: kingdomJson as any };
 
 type Outcome = { ok: true } | { ok: false; code: string; text: string };
-type Kind = "open" | "conquer" | "protect";
+type Kind = "open" | "conquer" | "protect" | "cancel";
 
 let game: GameKingdom;
 let provider: ElectrumNetworkProvider;
@@ -460,7 +460,12 @@ async function run(kind: Kind, amount: bigint) {
       signPrompt = text;
       renderActions();
     };
-    if (kind === "protect") {
+    if (kind === "cancel") {
+      out =
+        external !== null
+          ? await kingdomCancelExternal({ game, provider, walletPkhHex: external, artifacts, signal: controller.signal, onPrompt })
+          : await kingdomCancel({ game, provider, wallet: local!, artifacts });
+    } else if (kind === "protect") {
       out =
         external !== null
           ? await kingdomProtectExternal({ game, provider, walletPkhHex: external, amount, artifacts, signal: controller.signal, onPrompt })
@@ -474,7 +479,8 @@ async function run(kind: Kind, amount: bigint) {
           : await kingdomAct({ game, provider, wallet: local!, action: kind, expectedPay: amount, artifacts });
     }
     if (out.ok) {
-      const text = kind === "open" ? COPY.kingdom.doneOpen : kind === "conquer" ? COPY.kingdom.doneConquer : COPY.kingdom.doneProtect;
+      const text = kind === "open" ? COPY.kingdom.doneOpen : kind === "conquer" ? COPY.kingdom.doneConquer
+        : kind === "cancel" ? COPY.kingdom.doneCancel : COPY.kingdom.doneProtect;
       note = { text, expires: Date.now() + 8_000 };
       setTimeout(() => void refreshBalances(provider), 2_000);
       setTimeout(() => void refreshBalances(provider), 8_000);
@@ -512,6 +518,24 @@ function onProtect(i: number) {
   void run("protect", BigInt(amount));
 }
 
+// Cancel round: only the king, only while the round runs and nobody has conquered yet, never after the deadline.
+// The referee decides for certain (and the conquest-or-cancel race); this only says when to offer it.
+function cancelState(): { show: boolean; enabled: boolean; pool: string | null } {
+  const r = round;
+  const k = r?.kingdom ?? null;
+  const king = k ? (k.holder ?? r?.king ?? null) : null;
+  const acts = actingPkh();
+  const show = !!r && !!k && r.status === "open" && r.passCount === 1 && !endedShown && acts !== null && king === acts;
+  if (!show || !r) return { show: false, enabled: false, pool: null };
+  const enabled = !acting && !mockActive && !r.paused && !timeUp() && net !== "offline" && Date.now() >= coolUntil;
+  return { show, enabled, pool: r.pot };
+}
+
+function onCancelRound() {
+  if (acting || !cancelState().enabled) return;
+  void run("cancel", 0n);
+}
+
 // One friendly line for each thing the server tells us. Events we have no wording for are not shown.
 function describe(e: RefereeEvent): string | null {
   const d = e.data ?? {};
@@ -534,7 +558,7 @@ function describe(e: RefereeEvent): string | null {
   if (e.type === "clock_paused") return COPY.kingdom.feedPaused;
   if (e.type === "clock_resumed") return COPY.kingdom.feedResumed;
   if (e.type === "round_over") return COPY.kingdom.feedOver;
-  if (e.type === "round_settled") return COPY.kingdom.feedSettled;
+  if (e.type === "round_settled") return e.reason === "cancel" ? COPY.kingdom.feedCancelled(who) : COPY.kingdom.feedSettled;
   return null;
 }
 
@@ -918,6 +942,7 @@ export function battlefieldPage() {
       amount: round?.kingdom?.protectAmounts[i] ?? null,
       enabled: !document.getElementById("kProtectBox")?.classList.contains("hidden") && protectBtn(i)?.disabled === false,
     })),
+    cancelRound: cancelState(), // { show, enabled, pool }: the king's "Cancel round" while nobody has conquered
     claiming,
     claimNote,
     wallet: {
@@ -940,6 +965,10 @@ export const battlefieldDo = {
     onProtect(i);
   },
   claim: () => void onClaim(),
+  cancelRound: () => {
+    bfActStartedAt = Date.now();
+    onCancelRound();
+  },
   cancel: () => activeAct?.abort(new Error("Cancelled by you")),
 };
 

@@ -278,6 +278,23 @@ async function main() {
     console.log("ok    settle with only the opener: the pool returns to the opener");
   }
 
+  // --- cancel: the same settle, with a coin of the king's as input 2 (the proof) and its change back ---
+  {
+    const s = setup(kingState(alice, { value: 1500n, protects: 1 }), 1500n);
+    const holderLock = p2pkhLock(hexToBin(s.state.holderPkh));
+    const kingCoin = s.provider.addUtxo(alice.lockHex, randomUtxo({ satoshis: 50_000n }));
+    await new TransactionBuilder({ provider: s.provider })
+      .addInput(s.stateUtxo, s.kingdom.unlock.settle(referee))
+      .addInput(s.potUtxo, s.pot.unlock.release())
+      .addInput(kingCoin, alice.tpl.unlockP2PKH())
+      .addOutput({ to: holderLock, amount: DUST, token: { amount: 1500n, category: PUSD_ID } })
+      .addOutput({ to: holderLock, amount: DUST, token: { amount: 0n, category: GAME_ID, nft: { capability: "none", commitment: s.stateUtxo.token!.nft!.commitment } } })
+      .addOutput({ to: alice.lock, amount: s.stateUtxo.satoshis + s.potUtxo.satoshis + kingCoin.satoshis - 2n * DUST - FEE })
+      .send();
+    assert.ok((await pusdAt(s, alice)).includes(1500n));
+    console.log("ok    cancel: settle with the king's own coin as input 2 pays the king the whole pool (no contract change)");
+  }
+
   // --- open: adversarial ---
   await expectFail("open: underpay by one unit", "Opening price not paid", async () => openTx(setup(), alice, { pay: P.openingPrice - 1n }).send());
   await expectFail("open: wrong value in the new state", "Bad new commitment",

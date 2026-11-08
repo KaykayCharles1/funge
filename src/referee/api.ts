@@ -58,7 +58,7 @@ export type RefereeEvent = {
 export type ApiErrorCode =
   | "invalid" | "state_changed" | "too_late" | "round_over" | "not_over" | "paused" | "network_busy"
   | "chain_unavailable" | "outcome_unknown" | "unknown_round" | "internal" | "rate_limited" | "server_unreachable"
-  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left";
+  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left" | "not_cancellable";
 
 export type ApiFailure = { ok: false; error: ApiErrorCode; message: string; serverNow: number | null };
 
@@ -69,7 +69,7 @@ export type WalletInputClaim = {
   lockingBytecode: string;
   token?: { amount: string; category: string; nft?: { capability: "none" | "mutable" | "minting"; commitment: string } };
 };
-export type ActRequest = { action: "open" | "conquer" | "protect"; txHex: string; walletInputs: WalletInputClaim[] };
+export type ActRequest = { action: "open" | "conquer" | "protect" | "cancel"; txHex: string; walletInputs: WalletInputClaim[] };
 export type ActSuccess = {
   ok: true; txid: string; passCount: number; king: string; deadline: number | null; serverNow: number; lastSeq: number;
 };
@@ -81,7 +81,7 @@ export type ClaimSuccess = {
 const KNOWN: string[] = [
   "invalid", "state_changed", "too_late", "round_over", "not_over", "paused", "network_busy",
   "chain_unavailable", "outcome_unknown", "unknown_round", "internal",
-  "not_open", "protect_locked", "not_king", "already_king", "walls_at_maximum", "no_protects_left",
+  "not_open", "protect_locked", "not_king", "already_king", "walls_at_maximum", "no_protects_left", "not_cancellable",
 ];
 const base = () => CONFIG.referee.url.replace(/\/$/, "");
 

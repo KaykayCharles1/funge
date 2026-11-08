@@ -8,7 +8,7 @@ import { formatUnits } from "../lib/format.ts";
 import type { GameKingdom } from "../lib/game.ts";
 import { conquestMoney, decodeKingdomCommitment, encodeKingdomCommitment, previousOf, protectAmounts } from "../lib/kingdom.ts";
 import type { KingdomState } from "../lib/kingdom.ts";
-import { enoughBch, MAX_WALLET_INPUTS, pickPusd } from "../lib/protectCoins.ts";
+import { enoughBch, MAX_WALLET_INPUTS, pickCancelCoins, pickPusd } from "../lib/protectCoins.ts";
 import { retry } from "../lib/retry.ts";
 import type { LocalWallet } from "../wallet/local.ts";
 import { act } from "./api.ts";
@@ -286,6 +286,90 @@ export function addProtectOutputs(
 export function protectUnlocker(state: Contract, amount: bigint) {
   const placeholder = new SignatureTemplate(crypto.getRandomValues(new Uint8Array(32)));
   return state.unlock.protect(placeholder, amount);
+}
+
+// ---------- cancel ----------
+
+// Whether this player may cancel: the king, after the open, before any conquest. The referee checks the clock.
+export function planCancel(s: KingdomState, pkhHex: string): { ok: true } | KingdomFailure {
+  if (s.passCount < 1) return fail("not_cancellable", errorText("not_cancellable")) as KingdomFailure;
+  if (s.passCount > 1) return fail("not_cancellable", errorText("not_cancellable")) as KingdomFailure;
+  if (s.holderPkh !== pkhHex) return fail("not_king", errorText("not_king")) as KingdomFailure;
+  return { ok: true };
+}
+
+// The unlocking script for input 0 in a cancel: the contract's settle. The referee signature is a throwaway; the
+// server replaces it.
+export function cancelUnlocker(state: Contract) {
+  return state.unlock.settle(new SignatureTemplate(crypto.getRandomValues(new Uint8Array(32))));
+}
+
+// Outputs 0 and 1 of a cancel, as the contract's settle wants them: the whole pool and the trophy, both to the king
+export function addCancelOutputs(
+  builder: TransactionBuilder,
+  o: { game: GameKingdom; stateUtxo: SpendableUtxo; potUtxo: SpendableUtxo; s: KingdomState },
+): void {
+  const { game, stateUtxo, potUtxo, s } = o;
+  const king = p2pkhLock(hexToBin(s.holderPkh));
+  builder
+    .addOutput({ to: king, amount: PAYOUT_SATS, token: { amount: potUtxo.token?.amount ?? 0n, category: game.pusdCategory } })
+    .addOutput({
+      to: king, amount: PAYOUT_SATS,
+      token: { amount: 0n, category: game.gameCategory, nft: { capability: "none", commitment: stateUtxo.token!.nft!.commitment } },
+    });
+}
+
+// The king ends the round before anyone challenged: the whole pool comes back, with the trophy. A coin at the king's
+// address is input 2 (the proof, as for protect); its change comes back.
+export async function kingdomCancel(opts: {
+  game: GameKingdom;
+  provider: ElectrumNetworkProvider;
+  wallet: LocalWallet;
+  artifacts: KingdomArtifacts;
+}): Promise<KingdomOutcome> {
+  const { game, provider, wallet, artifacts } = opts;
+  const { pot, state, matches } = kingdomContracts(game, provider, artifacts);
+  if (!matches) return fail("mismatch", COPY.grab.mismatch);
+
+  let live: Awaited<ReturnType<typeof readKingdomCoins>>;
+  let walletCoins: SpendableUtxo[];
+  try {
+    [live, walletCoins] = await Promise.all([
+      readKingdomCoins(game, provider),
+      retry(() => provider.getUtxosForLockingBytecode(wallet.lock)),
+    ]);
+  } catch {
+    return fail("chain_unavailable", errorText("chain_unavailable"));
+  }
+  if (!live) return fail("no_round", COPY.grab.noRound);
+  const { stateUtxo, potUtxo, state: s } = live;
+  const planned = planCancel(s, wallet.pkhHex);
+  if (!planned.ok) return planned;
+
+  const picked = pickCancelCoins(walletCoins.map((utxo) => ({ utxo, lock: wallet.lock })), s.holderPkh, game.pusdCategory);
+  if (!picked.ok) return fail("needs_bch", COPY.grab.needsBch);
+  const inputs = picked.inputs.map((c) => c.utxo);
+
+  let txHex: string;
+  try {
+    const builder = new TransactionBuilder({ provider })
+      .addInput(stateUtxo, cancelUnlocker(state))
+      .addInput(potUtxo, pot.unlock.release());
+    for (const coin of inputs) builder.addInput(coin, wallet.unlockP2PKH());
+    addCancelOutputs(builder, { game, stateUtxo, potUtxo, s });
+    builder
+      .addTokenChangeOutputIfNeeded({ category: game.pusdCategory, to: wallet.tokenAddress })
+      .addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate: FEE_RATE });
+    txHex = builder.build();
+  } catch (e) {
+    console.error(e);
+    return fail("build_failed", COPY.grab.buildFailed);
+  }
+
+  const res = await act(game.gameCategory, { action: "cancel", txHex, walletInputs: claimsFor(wallet, inputs) });
+  if (res.ok) return { ok: true, txid: res.txid, passCount: res.passCount };
+  if (res.message) console.error(`cancel refused (${res.error}): ${res.message}`);
+  return fail(res.error, errorText(res.error));
 }
 
 // The king pays 1, 5 or 10 PUSD into the pool and raises the kingdom's value. The wallet's PUSD coin is the first wallet

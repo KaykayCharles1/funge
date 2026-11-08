@@ -299,7 +299,7 @@ function devPanel(
       roundId: "dev", status: waiting ? "waiting" : "open", king: waiting ? null : "dev",
       value: BigInt(value.value), treasury: waiting ? 0n : BigInt(treasury.value),
       protectsLeft: Number(protects.value), conquests: Number(conquests.value), openingPrice: CONFIG.kingdom.openingPrice,
-      deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null,
+      deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null, cancelled: null,
     };
     const p = scene.portraits[Number(portrait.value)];
     const king: Identity | null = waiting || !p ? null : { key: "dev", house: HOUSES[Number(house.value)], portrait: p };

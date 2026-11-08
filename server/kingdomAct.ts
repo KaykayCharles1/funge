@@ -17,7 +17,9 @@ function requireOpen(ctx: ValidateCtx): void {
   if (ctx.chain.kingdom && ctx.chain.kingdom.passCount < 1) throw new ActError("not_open", "Nobody has opened this round yet.");
 }
 
-function common(ctx: ValidateCtx) {
+// The inputs every move shares: the state coin (0), the pot coin (1), then the player's own coins, each one
+// as claimed, signed, and spent once
+function inputs(ctx: ValidateCtx) {
   const { game, chain, tx, body } = ctx;
   const params = game.kingdom;
   const state = chain.kingdom;
@@ -44,6 +46,12 @@ function common(ctx: ValidateCtx) {
     seen.add(key);
     if (inp.unlockingBytecode.length === 0) invalid(`Wallet input ${i} is not signed.`);
   });
+  return { params, state, stateCoin, potCoin };
+}
+
+function common(ctx: ValidateCtx) {
+  const { game, tx } = ctx;
+  const { params, state, potCoin } = inputs(ctx);
 
   // outputs: the state goes back to the state contract, the pot back to the pot contract
   const out0 = tx.outputs[0];
@@ -152,7 +160,44 @@ function validateProtect(ctx: ValidateCtx): Validated {
   };
 }
 
+// Cancel: the king ends the round before anyone challenged and takes the whole pool back. The transaction is the
+// contract's settle (pool and trophy to the holder); the king proves consent with a coin at their own address as the
+// first wallet input (input 2), as for protect. The clock rules (open, before the deadline, not paused) are in act.ts.
+function validateCancel(ctx: ValidateCtx): Validated {
+  const k = ctx.chain.kingdom;
+  if (k && k.passCount < 1) throw new ActError("not_cancellable", "Nobody has opened this round yet.");
+  // Checked before the coins: after a conquest the state coin has moved on, and the answer is "too late to cancel"
+  if (k && k.passCount > 1) throw new ActError("not_cancellable", "Someone has conquered the throne: the round can no longer be cancelled.");
+  const { state, stateCoin, potCoin } = inputs(ctx);
+  const first = ctx.body.walletInputs[0]!;
+  if (first.lockingBytecode.toLowerCase() !== p2pkhHex(state.holderPkh)) throw new ActError("not_king", "Only the king can cancel the round.");
+
+  const { game, tx } = ctx;
+  const holder = p2pkhHex(state.holderPkh);
+  const pot = potCoin.token?.amount ?? 0n;
+  const out0 = tx.outputs[0], out1 = tx.outputs[1];
+  if (!out0 || !out1) return invalid("The transaction needs at least two outputs.");
+  if (binToHex(out0.lockingBytecode) !== holder || !out0.token || binToHex(out0.token.category) !== game.pusdCategory || out0.token.nft) {
+    return invalid("Output 0 must pay the pool to the king in plain PUSD.");
+  }
+  if (out0.token.amount !== pot) return invalid("The whole pool must go to the king.");
+  const trophy = out1.token?.nft;
+  if (binToHex(out1.lockingBytecode) !== holder || !out1.token || !trophy || trophy.capability !== "none" ||
+      binToHex(out1.token.category) !== game.gameId || out1.token.amount !== 0n ||
+      binToHex(trophy.commitment) !== stateCoin.token?.nft?.commitment) {
+    return invalid("Output 1 must give the trophy to the king.");
+  }
+  return {
+    newHolder: state.holderPkh, newPassCount: state.passCount, sign: { fn: "settle" }, cancel: { payout: pot },
+    moved: {
+      actor: state.holderPkh, previousKing: null, paid: 0n, refunded: 0n, toTreasury: 0n,
+      value: state.value, treasury: 0n, protectsLeft: ctx.game.kingdom.protectsPerReign - state.protects, conquests: 0,
+    },
+  };
+}
+
 export const KINGDOM_HANDLERS: Record<string, ActionHandler> = {
+  cancel: { fn: "cancel", validate: validateCancel },
   open: { fn: "open", validate: validateOpen },
   conquer: { fn: "conquer", validate: validateConquer },
   protect: { fn: "protect", validate: validateProtect },

@@ -69,14 +69,14 @@ dust in the two contracts.
    chain, not trusted from the app); the move is legal for its kind (the exact payments, the new king and value, the dethroned king's payout, the protect rules); protect is also refused in the last 30 seconds; the wallet inputs are signed.
 4. The server signs the contract input and inserts the signature (to be proven in Step 3), then broadcasts the
    transaction itself and replies with the transaction id, or a typed error: `too_late`, `state_changed`,
-   `round_over`, `invalid`, and for Kingdom rules `not_open`, `protect_locked`, `already_king`, `walls_at_maximum`, `no_protects_left`, `not_king`.
+   `round_over`, `invalid`, and for Kingdom rules `not_open`, `protect_locked`, `already_king`, `walls_at_maximum`, `no_protects_left`, `not_king`, `not_cancellable`.
 5. Only on success, still under the lock: for an open the deadline becomes now + the cap. For a conquest the server measures the time left at this
    instant and the deadline becomes now + min(CAP, max(MIN, left + ADD)): in effect the old deadline + 1:00, at most the cap from now, and 1:00 from now if the
    move landed inside the grace. Slow checks or a slow wallet neither add nor take time. A protect leaves the deadline alone. An event is pushed to every
    connected player.
 
 ## Which action is it?
-The `action` field of the request names the move: `open`, `conquer` or `protect`. Anything else, including the old `pass`, `steal` and `settle`, is refused as `invalid`. Settle is never sent by a player: it goes through the claim route or the keeper. A new move type is one new handler in `server/kingdomAct.ts` plus one line in the clock rules in `server/rounds.ts`.
+The `action` field of the request names the move: `open`, `conquer`, `protect` or `cancel`. Anything else, including the old `pass`, `steal` and `settle`, is refused as `invalid`. Settle is never sent by a player: it goes through the claim route or the keeper. A new move type is one new handler in `server/kingdomAct.ts` plus one line in the clock rules in `server/rounds.ts`.
 
 ## Settling
 - **Round over:** at the deadline plus the grace, once the round lock is free, the server marks the round over and
@@ -153,3 +153,20 @@ deadline is pushed out by the length of the pause and a `clock_resumed` event is
 
 ## Later, optional
 - **Public audit trail:** the server's timestamp in an `OP_RETURN` output of each action transaction. The player's wallet signs every output, so the app must get the timestamp from the server *before* it signs, which needs a small "prepare" call.
+## Cancel round
+The king may end a round before anyone has challenged it and take the whole pool back. It goes through the same
+`POST /rounds/:id/act` route, with `action: "cancel"`.
+- **The transaction** is the contract's `settle`: the state coin (input 0) and the pot (input 1), output 0 the whole pool to
+  the king in plain PUSD, output 1 the trophy to the king. The page adds one coin at the king's address as input 2 (the
+  king's proof, as for protect), signed by the king's wallet; its change goes back to the king. No contract change: settle
+  has no time lock. The referee signs input 0 with `settle` and broadcasts.
+- **Allowed** only for the current king, while the round is open with zero conquests (pass count 1), not paused, and
+  before the deadline itself (no grace). The referee answers `not_cancellable` before the open or after a conquest,
+  `not_king` when input 2 is not at the king's address, `too_late` at or after the deadline, `paused` while paused, and
+  `invalid` for a wrong shape (the pool not whole, sent elsewhere, no trophy, an unsigned coin).
+- **The race** with a conquest is decided by the per-round lock: the first one through wins. A conquest after a cancel
+  gets `round_over`; a cancel after a conquest gets `not_cancellable`.
+- **On success** the round is settled at once and `round_settled` is published with reason `cancel`, `cancelled: true`
+  and `payout` = the pool (see `EVENTS.md`). The keeper has nothing left to do.
+- **The trophy** is minted as with any settle. A finished round whose trophy has pass count 1 (cancelled, or nobody
+  challenged) says "Round cancelled. Pool returned", never "Wins X".

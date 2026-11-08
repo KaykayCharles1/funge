@@ -6,7 +6,7 @@ import { CONFIG } from "../config.ts";
 import { COPY, errorText } from "../copy.ts";
 import { formatUnits } from "../lib/format.ts";
 import type { GameKingdom } from "../lib/game.ts";
-import { pickProtectCoins } from "../lib/protectCoins.ts";
+import { pickCancelCoins, pickProtectCoins } from "../lib/protectCoins.ts";
 import { toRelaySafe } from "../lib/relay.ts";
 import { retry } from "../lib/retry.ts";
 import { findWalletCoins } from "../lib/walletCoins.ts";
@@ -14,8 +14,8 @@ import type { WalletCoin } from "../lib/walletCoins.ts";
 import { act } from "./api.ts";
 import type { WalletInputClaim } from "./api.ts";
 import {
-  addKingdomOutputs, addProtectOutputs, coinFailure, kingdomContracts, pickWalletCoins, planKingdomAction, planProtect,
-  protectUnlocker, readKingdomCoins, stateUnlocker,
+  addCancelOutputs, addKingdomOutputs, addProtectOutputs, cancelUnlocker, coinFailure, kingdomContracts, pickWalletCoins,
+  planCancel, planKingdomAction, planProtect, protectUnlocker, readKingdomCoins, stateUnlocker,
 } from "./kingdomActions.ts";
 import type { KingdomArtifacts, KingdomErrorCode } from "./kingdomActions.ts";
 
@@ -72,7 +72,7 @@ async function signWithWallet(
 // The signed transaction goes to the game server, which adds the referee signature to input 0 and broadcasts
 async function sendSigned(
   game: GameKingdom,
-  action: "open" | "conquer" | "protect",
+  action: "open" | "conquer" | "protect" | "cancel",
   signedHex: string,
   walletInputs: WalletCoin[],
 ): Promise<KingdomExternalOutcome> {
@@ -212,4 +212,60 @@ export async function kingdomProtectExternal(opts: {
   const signed = await signWithWallet(built.request, signal);
   if (!signed.ok) return signed;
   return sendSigned(game, "protect", signed.signedHex, walletInputs);
+}
+// The king cancels the round with the player's own wallet (WizardConnect): the whole pool and the trophy come back.
+// The wallet signs one coin at the king's address (input 2, the king's proof); its change comes back.
+export async function kingdomCancelExternal(opts: {
+  game: GameKingdom;
+  provider: ElectrumNetworkProvider;
+  walletPkhHex: string;
+  artifacts: KingdomArtifacts;
+  signal: AbortSignal;
+  onPrompt: (text: string) => void;
+}): Promise<KingdomExternalOutcome> {
+  const { game, provider, walletPkhHex, artifacts, signal, onPrompt } = opts;
+  const fmt = (n: bigint) => formatUnits(n, CONFIG.pusdDecimals);
+
+  const { pot, state, matches } = kingdomContracts(game, provider, artifacts);
+  if (!matches) return fail("mismatch", COPY.grab.mismatch);
+
+  let live: Awaited<ReturnType<typeof readKingdomCoins>>;
+  let coins: WalletCoin[];
+  try {
+    [live, coins] = await Promise.all([readKingdomCoins(game, provider), retry(() => findWalletCoins(provider))]);
+  } catch {
+    return fail("chain_unavailable", errorText("chain_unavailable"));
+  }
+  if (!live) return fail("no_round", COPY.grab.noRound);
+  const { stateUtxo, potUtxo, state: s } = live;
+
+  const planned = planCancel(s, walletPkhHex);
+  if (!planned.ok) return planned;
+
+  const picked = pickCancelCoins(coins, s.holderPkh, game.pusdCategory);
+  if (!picked.ok) return picked.code === "no_king_coin" ? fail("no_king_coin", COPY.external.noKingCoin) : fail("needs_bch", COPY.grab.needsBch);
+  const walletInputs = picked.inputs; // the coin at the king's address is first
+  const first = walletInputs[0]!;
+  const pool = fmt(potUtxo.token?.amount ?? 0n);
+
+  let built: ReturnType<typeof signRequest>;
+  try {
+    const builder = new TransactionBuilder({ provider })
+      .addInput(stateUtxo, cancelUnlocker(state))
+      .addInput(potUtxo, pot.unlock.release());
+    for (const c of walletInputs) builder.addInput(c.utxo, placeholderP2PKHUnlocker(c.address));
+    addCancelOutputs(builder, { game, stateUtxo, potUtxo, s });
+    builder
+      .addTokenChangeOutputIfNeeded({ category: game.pusdCategory, to: first.tokenAddress })
+      .addBchChangeOutputIfNeeded({ to: first.lock, feeRate: FEE_RATE });
+    built = signRequest(builder, walletInputs, COPY.external.promptCancel(pool));
+  } catch (e) {
+    console.error(String(e instanceof Error ? e.message : e).split("WARNING")[0]!.slice(0, 200));
+    return fail("build_failed", COPY.external.failed);
+  }
+  onPrompt(COPY.external.approveCancel(pool, String(built.feeSats)));
+
+  const signed = await signWithWallet(built.request, signal);
+  if (!signed.ok) return signed;
+  return sendSigned(game, "cancel", signed.signedHex, walletInputs);
 }

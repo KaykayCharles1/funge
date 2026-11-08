@@ -74,11 +74,12 @@ async function setup(opts: { state?: KingdomState; pot?: bigint; cap?: number } 
   const world = {
     state, potAmount: opts.pot ?? 0n, stateTxid: hex32(1), potTxid: hex32(1), next: 10,
     broadcasts: [] as string[], signs: [] as SignRecord[], fail: null as Error | null,
+    live: true, paidOut: null as { to: string; amount: bigint } | null,
   };
   const view = (): ChainState => {
     const k = world.state;
     return {
-      live: true, passCount: k.passCount, holderPkh: k.passCount > 0 ? k.holderPkh : null, potAmount: world.potAmount,
+      live: world.live, passCount: k.passCount, holderPkh: k.passCount > 0 ? k.holderPkh : null, potAmount: world.potAmount,
       stateTxid: world.stateTxid, stateVout: 0, stale: false, kingdom: k,
       stateUtxo: { txid: world.stateTxid, vout: 0, satoshis: 2000n,
         token: { amount: 0n, category: GAME.gameId, nft: { capability: "mutable", commitment: encodeKingdomCommitment(k) } } },
@@ -97,6 +98,13 @@ async function setup(opts: { state?: KingdomState; pot?: bigint; cap?: number } 
       if (world.fail) throw world.fail;
       world.broadcasts.push(hex);
       const tx = decodeTransaction(hexToBin(hex)) as Transaction;
+      if (!tx.outputs[0]!.token?.nft) {
+        // a settle: the pool goes to output 0's owner and the state coin is gone
+        world.paidOut = { to: binToHex(tx.outputs[0]!.lockingBytecode), amount: tx.outputs[0]!.token!.amount };
+        world.live = false;
+        world.potAmount = 0n;
+        return hex32(world.next++);
+      }
       world.state = decodeKingdomCommitment(binToHex(tx.outputs[0]!.token!.nft!.commitment));
       world.potAmount = tx.outputs[1]!.token!.amount;
       world.stateTxid = hex32(world.next++);
@@ -183,6 +191,35 @@ function body(world: World, kind: "open" | "conquer" | "protect", o: Common & Ex
     action: o.action ?? kind,
     txHex: o.garbage ? "00" : binToHex(encodeTransaction(tx)),
     walletInputs: [{ txid: walletTxid, vout: 0, satoshis: "50000", lockingBytecode: walletLock, token: { amount: "5000", category: GAME.pusdCategory } }],
+  };
+}
+
+type CancelOpts = { payer?: string; payTo?: string; amountDelta?: bigint; noTrophy?: boolean; stateTxid?: string; unsigned?: boolean };
+function cancelBody(world: World, o: CancelOpts = {}) {
+  const cur = world.state;
+  const payer = o.payer ?? cur.holderPkh;
+  const holder = hexToBin(p2pkh(o.payTo ?? cur.holderPkh));
+  const walletTxid = hex32(201);
+  const outputs: Transaction["outputs"] = [
+    { lockingBytecode: holder, valueSatoshis: 1000n, token: { amount: world.potAmount + (o.amountDelta ?? 0n), category: hexToBin(GAME.pusdCategory) } },
+    o.noTrophy
+      ? { lockingBytecode: holder, valueSatoshis: 1000n }
+      : { lockingBytecode: holder, valueSatoshis: 1000n,
+          token: { amount: 0n, category: hexToBin(GAME.gameId), nft: { capability: "none", commitment: hexToBin(encodeKingdomCommitment(cur)) } } },
+    { lockingBytecode: hexToBin(p2pkh(payer)), valueSatoshis: 40000n },
+  ];
+  const tx: Transaction = {
+    version: 2, locktime: 0,
+    inputs: [
+      input(o.stateTxid ?? world.stateTxid, Uint8Array.of(0)),
+      input(world.potTxid, Uint8Array.of(0), 1),
+      input(walletTxid, o.unsigned ? new Uint8Array(0) : new Uint8Array(100).fill(7)),
+    ],
+    outputs,
+  };
+  return {
+    action: "cancel", txHex: binToHex(encodeTransaction(tx)),
+    walletInputs: [{ txid: walletTxid, vout: 0, satoshis: "50000", lockingBytecode: p2pkh(payer) }],
   };
 }
 
@@ -636,6 +673,94 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   delete (old as { roundId?: string }).roundId;
   assert.equal(s.manager.eventsAfter(id, 0).events[0]!.roundId, id);
   console.log("ok: events carry the round id, who acted, previous king, paid, refunded, to treasury, value and treasury after, protects left, conquests, the clock (cap, +1:00, minimum, seconds after the move, seconds added) and deadline");
+}
+
+// ---------------------------------------------------------------- cancel
+{
+  // allowed with 0 conquests: the king gets back everything paid in (the open 10.00 and a protect of 5.00)
+  const s = await setup();
+  await executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE }));
+  await executeAct(s.deps, GAME, body(s.world, "protect", { amount: 500n }));
+  const paidIn = 1000n + 500n;
+  s.clock.advance(200_000);
+  const res = await executeAct(s.deps, GAME, cancelBody(s.world));
+  assert.equal(res.king, ALICE);
+  assert.deepEqual(s.world.signs.at(-1), { fn: "settle" });
+  assert.deepEqual(s.world.paidOut, { to: p2pkh(ALICE), amount: paidIn }); // the payout equals what the king paid in
+  const r = s.manager.get(GAME.gameId);
+  assert.equal(r.status, "settled");
+  const ev = r.events.at(-1)!;
+  assert.deepEqual(
+    [ev.type, ev.reason, ev.data?.cancelled, ev.data?.payout, ev.data?.pot, ev.data?.winner, ev.data?.treasury, ev.data?.conquests],
+    ["round_settled", "cancel", true, "1500", "1500", ALICE, "0", 0],
+  );
+  // afterwards nothing more is accepted
+  await fails(executeAct(s.deps, GAME, body(s.world, "conquer", { payer: BOB })), "round_over", "conquest after a cancel");
+  await fails(executeAct(s.deps, GAME, cancelBody(s.world)), "round_over", "a second cancel");
+  console.log("ok: cancel with no conquests: the referee signs settle, the king gets the whole pool (15.00 = 10.00 + 5.00 paid in), round_settled reason cancel");
+}
+{
+  // refused after one conquest, even by the new king
+  const s = await setup({ state: open1, pot: 1000n });
+  await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: BOB }));
+  await fails(executeAct(s.deps, GAME, cancelBody(s.world)), "not_cancellable", "cancel by the new king");
+  const stale = await setup({ state: open1, pot: 1000n });
+  const oldTx = cancelBody(stale.world); // built before the conquest
+  await executeAct(stale.deps, GAME, body(stale.world, "conquer", { payer: BOB }));
+  await fails(executeAct(stale.deps, GAME, oldTx), "not_cancellable", "cancel built before the conquest");
+  // refused when the requester is not the king
+  const t = await setup({ state: open1, pot: 1000n });
+  await fails(executeAct(t.deps, GAME, cancelBody(t.world, { payer: BOB })), "not_king", "cancel by someone else");
+  // refused before anyone opened
+  const w = await setup();
+  await fails(executeAct(w.deps, GAME, cancelBody(w.world)), "not_cancellable", "cancel on a waiting round");
+  // refused after the deadline (no grace for a cancel), and once the round is over
+  const late = await setup({ state: open1, pot: 1000n });
+  const d = late.manager.get(GAME.gameId).deadline!;
+  late.clock.set(d);
+  await fails(executeAct(late.deps, GAME, cancelBody(late.world)), "too_late", "cancel at the deadline");
+  const ok = await setup({ state: open1, pot: 1000n });
+  ok.clock.set(ok.manager.get(GAME.gameId).deadline! - 1);
+  await executeAct(ok.deps, GAME, cancelBody(ok.world)); // 1 ms before the deadline is still in time
+  const over = await setup({ state: open1, pot: 1000n });
+  over.clock.set(over.manager.get(GAME.gameId).deadline! + GRACE + 5);
+  await fails(executeAct(over.deps, GAME, cancelBody(over.world)), "too_late", "cancel when time is up");
+  // refused while paused
+  const paused = await setup({ state: open1, pot: 1000n });
+  paused.manager.pause(GAME.gameId, "network_busy");
+  await fails(executeAct(paused.deps, GAME, cancelBody(paused.world)), "paused", "cancel while paused");
+  // wrong shapes
+  const bad = async (label: string, o: CancelOpts, code: string) => {
+    const b = await setup({ state: open1, pot: 1000n });
+    await fails(executeAct(b.deps, GAME, cancelBody(b.world, o)), code, label);
+    assert.equal(b.world.broadcasts.length, 0, `${label}: nothing may be broadcast`);
+    assert.equal(b.manager.get(GAME.gameId).status, "open", `${label}: the round goes on`);
+  };
+  await bad("pool sent elsewhere", { payTo: BOB }, "invalid");
+  await bad("part of the pool kept back", { amountDelta: -1n }, "invalid");
+  await bad("no trophy output", { noTrophy: true }, "invalid");
+  await bad("unsigned king coin", { unsigned: true }, "invalid");
+  await bad("stale state coin", { stateTxid: hex32(99) }, "state_changed");
+  console.log("ok: cancel refused after a conquest (not_cancellable), before the open, by anyone but the king (not_king), at or after the deadline (too_late), while paused, and in every wrong shape");
+}
+{
+  // the race: a conquest and a cancel arrive together. The round lock decides; exactly one wins.
+  for (const cancelFirst of [true, false]) {
+    const s = await setup({ state: open1, pot: 1000n });
+    const cancel = cancelBody(s.world);
+    const conquer = body(s.world, "conquer", { payer: BOB });
+    const [a, b] = cancelFirst
+      ? [executeAct(s.deps, GAME, cancel), executeAct(s.deps, GAME, conquer)]
+      : [executeAct(s.deps, GAME, conquer), executeAct(s.deps, GAME, cancel)];
+    const both = await Promise.allSettled([a, b]);
+    assert.equal(both[0]!.status, "fulfilled", `${cancelFirst ? "cancel" : "conquest"} came first and wins`);
+    assert.equal(both[1]!.status, "rejected");
+    const code = ((both[1] as PromiseRejectedResult).reason as { code: string }).code;
+    assert.equal(code, cancelFirst ? "round_over" : "not_cancellable");
+    assert.equal(s.world.broadcasts.length, 1);
+    assert.equal(s.manager.get(GAME.gameId).status, cancelFirst ? "settled" : "open");
+  }
+  console.log("ok: conquest against cancel: the first one through the lock wins; the conquest then gets round_over, the cancel not_cancellable");
 }
 
 // ---------------------------------------------------------------- what the page is told

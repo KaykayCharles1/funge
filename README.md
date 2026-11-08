@@ -11,6 +11,7 @@ Built for the BCH BLAZE 2026 hackathon. It currently runs on chipnet (test coins
 - **Money:** the full rules and worked examples are in `docs/KINGDOM.md`. In short: open pays 10.00 PUSD into the pool; a conquest costs the throne's value plus 2%; the dethroned king gets 90% of the value plus the 2%; the pool gets the rest; the king can protect (add 1, 5 or 10 PUSD to the value, at most twice per reign, up to a cap of 50.00) but not in the last 30 seconds.
 - **Clock:** 10:00 at the open. Every conquest adds 1:00 to the time left, never above 10:00 (so 8:00 becomes 9:00, 0:10 becomes 1:10, 9:30 becomes 10:00). Protect does not touch the clock. The demo setting caps it at 5:00.
 - **Settling:** when time is up, the winner presses Claim. If nobody does, the server settles by itself after two minutes. If the server is gone, anyone can settle after 12 blocks and the last king is paid. A round where only the opener played pays the opener back.
+- **Cancel round:** while nobody has conquered yet, the king may cancel the round and take the whole pool back (the opening price plus any protects). Not after the first conquest, not while the clock is paused, and not once the deadline has passed.
 
 ## Two ways to play
 - **Game wallet (recommended).** A small wallet that lives in your browser. One tap per move, no pop-ups. Your seed phrase is stored encrypted on your device (with an optional password); keep only what you play with in it and back up the phrase.

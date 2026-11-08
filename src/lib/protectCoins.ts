@@ -25,6 +25,27 @@ export function pickPusd<T>(coins: T[], amountOf: (c: T) => bigint, need: bigint
 // Whether coins carry enough BCH for the fee: the old one-coin rule, plus a little for each extra input
 export const enoughBch = (sats: bigint, inputs: number) => sats >= MIN_FEE_COIN_SATS + SATS_PER_EXTRA_INPUT * BigInt(Math.max(0, inputs - 1));
 
+// Chooses the wallet inputs of a cancel. The pool and the trophy go to the king; the only wallet coin needed is the
+// proof: one coin at the king's address (input 2), which also pays its share of the fee and gets its change back.
+// A plain BCH coin is preferred; a plain PUSD coin works too (its PUSD comes back as change). Never an NFT.
+export function pickCancelCoins<T extends { utxo: SpendableUtxo; lock: Uint8Array }>(
+  coins: T[],
+  holderPkh: string,
+  pusdCategory: string,
+): { ok: true; inputs: T[] } | { ok: false; code: "no_king_coin" | "needs_bch" } {
+  const holderLock = `76a914${holderPkh}88ac`;
+  const bySats = (a: T, b: T) => (a.utxo.satoshis < b.utxo.satoshis ? 1 : -1);
+  const bchOnly = (c: T) => !c.utxo.token;
+  const plainPusd = (c: T) => !!c.utxo.token && c.utxo.token.category === pusdCategory && !c.utxo.token.nft;
+  const atKing = coins.filter((c) => binToHex(c.lock) === holderLock && (bchOnly(c) || plainPusd(c)));
+  if (atKing.length === 0) return { ok: false, code: "no_king_coin" };
+  const proof = atKing.filter(bchOnly).sort(bySats)[0] ?? [...atKing].sort(bySats)[0]!;
+  if (enoughBch(proof.utxo.satoshis, 1)) return { ok: true, inputs: [proof] };
+  const extra = coins.filter((c) => bchOnly(c) && c !== proof).sort(bySats)[0];
+  if (!extra) return { ok: false, code: "needs_bch" };
+  return { ok: true, inputs: [proof, extra] };
+}
+
 export type ProtectCoinFailure = { ok: false; code: "no_funds" | "needs_bch" | "no_king_coin"; have: bigint };
 
 // Chooses the wallet inputs of a protect. The contract wants INPUT 2 (the first wallet input) to sit at the king's address:

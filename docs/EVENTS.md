@@ -124,8 +124,8 @@ The deadline plus the one-second grace has passed. The king may now claim (or th
 }
 ```
 
-### `round_settled`, reasons `claim`, `keeper`, `chain`
-The pool was paid out. `claim`: the king pressed the button. `keeper`: the server did it. `chain`: the server noticed the state coin is gone and has no details. After the payout `treasury` is `"0"`; `payout` is what the winner received (`null` for reason `chain`). Extra fields: `txid`, `winner`, `pot` (the same as `payout`, kept for older pages), `cancelled` (always `false` unless the round never opened).
+### `round_settled`, reasons `claim`, `keeper`, `chain`, `cancel`
+The pool was paid out. `claim`: the king pressed the button. `keeper`: the server did it. `cancel`: the king cancelled the round before anyone conquered (`cancelled: true`, `payout` = the whole pool, `winner` = the king, `conquests` 0). `chain`: the server noticed the state coin is gone and has no details. After the payout `treasury` is `"0"`; `payout` is what the winner received (`null` for reason `chain`). Extra fields: `txid`, `winner`, `pot` (the same as `payout`, kept for older pages), `cancelled` (`true` for reason `cancel`; otherwise `false` unless the round never opened).
 
 ```json
 {

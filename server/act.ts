@@ -177,6 +177,15 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
       }
     }
 
+    // 2c. Cancel: only while the clock runs, never after the deadline itself (no grace for a cancel)
+    if (handler.fn === "cancel") {
+      const now = manager.get(id);
+      if (now.status === "waiting") throw new ActError("not_cancellable", "Nobody has opened this round yet.");
+      if (now.status !== "open" || now.deadline === null || arrivedAt >= now.deadline) {
+        throw new ActError("too_late", "Too late to cancel: the clock has run out.");
+      }
+    }
+
     // 3. Legal action?
     const decoded = decodeTransaction(hexToBin(body.txHex));
     if (typeof decoded === "string") throw new ActError("invalid", "The transaction could not be read.");
@@ -215,7 +224,11 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
       txid, king: checked.newHolder, actor: m.actor, previousKing: m.previousKing,
       paid: m.paid.toString(), refunded: m.refunded.toString(), toTreasury: m.toTreasury.toString(),
     };
-    if (handler.fn === "protect") {
+    if (handler.fn === "cancel") {
+      if (!checked.cancel) throw new Error("cancel without its payout");
+      const pot = checked.cancel.payout.toString();
+      r = manager.markSettled(id, txid, "cancel", { winner: checked.newHolder, passCount: checked.newPassCount, pot, cancelled: true });
+    } else if (handler.fn === "protect") {
       if (!checked.protect) throw new Error("protect without its details");
       r = manager.applyProtect(id, {
         ...moveData, amount: checked.protect.amount.toString(),
