@@ -29,8 +29,13 @@ These are the kingdom as it stands **after** the event. Money is always a string
 | `treasury` | The pool now. |
 | `protectsLeft` | Protects the king may still use this reign. |
 | `deadline` | When the clock runs out, server time in ms (`null` before the open). |
-| `clockSeconds` | The bell length the current king got. |
-| `nextClockSeconds` | The bell length the next conquest will set. |
+| `clockSeconds` | Seconds on the clock right after the latest open or conquest (the open: the cap; a conquest: what the rule below gave). `null` before the open. |
+| `clockCapSeconds` | The most time the clock can show. The open starts here. Standard 600, demo 300. |
+| `conquestAddSeconds` | What a conquest adds to the time left (60). |
+| `conquestMinSeconds` | A conquest never leaves less than this on the clock. `0` means off (the setting today). |
+| `nextClockSeconds` | **Deprecated**, kept for older pages: what a conquest made at the moment of this event would set the clock to. It goes stale as the clock runs; compute from `deadline` and the three settings above instead. |
+
+**The clock rule.** The open sets the clock to `clockCapSeconds`. Every conquest (a take-back too) sets the time left to `min(cap, max(min, left + add))`, where `left` is the time left at the instant the referee records the move (never below 0, so a conquest inside the one-second grace gets `add` from that moment). Protect never changes the clock. Examples with the standard settings: 10:00 left stays 10:00, 9:30 becomes 10:00, 8:00 becomes 9:00, 2:00 becomes 3:00, 0:10 becomes 1:10.
 
 ## The move fields (added to `deadline_changed` open/conquer and `protect_applied`)
 
@@ -42,12 +47,13 @@ These are the kingdom as it stands **after** the event. Money is always a string
 | `toTreasury` | PUSD added to the pool. `paid = refunded + toTreasury` always holds. |
 | `txid` | The transaction. |
 | `action` | `open` or `conquer` (on `deadline_changed`). |
+| `addedSeconds` | Conquests only: the seconds this conquest actually added to the time left (`add`, or less when the cap cut it). |
 | `amount`, `protectsUsed` | On `protect_applied`: the protect amount and how many protects this reign has used. |
 
 ## The events
 
 ### `deadline_changed`, reason `open`
-The first player opened the round. Status goes `waiting` → `open`; the clock starts at the bell start.
+The first player opened the round. Status goes `waiting` → `open`; the clock starts at the cap (`clockCapSeconds`).
 
 ```json
 {
@@ -55,7 +61,8 @@ The first player opened the round. Status goes `waiting` → `open`; the clock s
   "data": {
     "king": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1", "previousKing": null, "passCount": 1, "conquests": 0,
     "value": "1000", "treasury": "1000", "protectsLeft": 2, "deadline": 1780000602000,
-    "clockSeconds": 600, "nextClockSeconds": 570, "action": "open",
+    "clockSeconds": 600, "nextClockSeconds": 600,
+    "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0, "action": "open",
     "txid": "00…01", "actor": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
     "paid": "1000", "refunded": "0", "toTreasury": "1000"
   }
@@ -63,22 +70,23 @@ The first player opened the round. Status goes `waiting` → `open`; the clock s
 ```
 
 ### `deadline_changed`, reason `conquer`
-Someone took the throne. The clock resets to the next bell length. The dethroned king is `previousKing`; `refunded` is what they received.
+Someone took the throne. The clock gets `conquestAddSeconds` on top of the time left, at most the cap (the rule above). In this example Bob conquered 5 s after the open, with 9:55 left: 9:55 + 1:00 would be 10:55, so the cap cuts it to 10:00 and `addedSeconds` is 5. The dethroned king is `previousKing`; `refunded` is what they received.
 
 ```json
 {
   "seq": 3, "roundId": "00…00", "at": 1780000007000, "type": "deadline_changed", "reason": "conquer",
   "data": {
     "king": "b2b2…b2b2", "previousKing": "a1a1…a1a1", "passCount": 2, "conquests": 1,
-    "value": "1500", "treasury": "1650", "protectsLeft": 2, "deadline": 1780000577000,
-    "clockSeconds": 570, "nextClockSeconds": 540, "action": "conquer", "txid": "00…03",
-    "actor": "b2b2…b2b2", "paid": "1530", "refunded": "1380", "toTreasury": "150"
+    "value": "1500", "treasury": "1650", "protectsLeft": 2, "deadline": 1780000607000,
+    "clockSeconds": 600, "nextClockSeconds": 600, "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0,
+    "action": "conquer", "txid": "00…03", "actor": "b2b2…b2b2", "paid": "1530", "refunded": "1380", "toTreasury": "150",
+    "addedSeconds": 5
   }
 }
 ```
 
 ### `deadline_changed`, reason `observed_on_chain`
-The server saw a move on the chain that it did not process itself (rare: it restarted, or someone sent a move directly). The clock restarts from now. It has the scene fields, `deadline`, `clockSeconds` and `nextClockSeconds`, but no move fields (`actor`, `paid`, …).
+The server saw a move on the chain that it did not process itself (rare: it restarted, or someone sent a move directly). The same clock rule applies, from the moment the server noticed: an open gets the cap, a conquest adds to the time left. It has the scene fields and the clock fields, but no move fields (`actor`, `paid`, …).
 
 ### `protect_applied`, reason `protect`
 The king added to the value. The clock does not move: `deadline` is the same as before.
@@ -89,7 +97,8 @@ The king added to the value. The clock does not move: `deadline` is the same as 
   "data": {
     "king": "a1a1…a1a1", "previousKing": null, "passCount": 1, "conquests": 0,
     "value": "1500", "treasury": "1500", "protectsLeft": 1, "deadline": 1780000602000,
-    "clockSeconds": 600, "nextClockSeconds": 570, "txid": "00…02",
+    "clockSeconds": 600, "nextClockSeconds": 600, "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0,
+    "txid": "00…02",
     "actor": "a1a1…a1a1", "paid": "500", "refunded": "0", "toTreasury": "500", "amount": "500", "protectsUsed": 1
   }
 }
@@ -106,11 +115,11 @@ The deadline plus the one-second grace has passed. The king may now claim (or th
 
 ```json
 {
-  "seq": 4, "roundId": "00…00", "at": 1780000578100, "type": "round_over", "reason": "deadline",
+  "seq": 4, "roundId": "00…00", "at": 1780000608100, "type": "round_over", "reason": "deadline",
   "data": {
     "king": "b2b2…b2b2", "previousKing": "a1a1…a1a1", "passCount": 2, "conquests": 1,
-    "value": "1500", "treasury": "1650", "protectsLeft": 2, "deadline": 1780000577000,
-    "clockSeconds": 570, "nextClockSeconds": 540
+    "value": "1500", "treasury": "1650", "protectsLeft": 2, "deadline": 1780000607000,
+    "clockSeconds": 600, "nextClockSeconds": 60, "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0
   }
 }
 ```
@@ -123,8 +132,9 @@ The pool was paid out. `claim`: the king pressed the button. `keeper`: the serve
   "seq": 5, "roundId": "00…00", "at": 1780000700000, "type": "round_settled", "reason": "keeper",
   "data": {
     "king": "b2b2…b2b2", "previousKing": "a1a1…a1a1", "passCount": 2, "conquests": 1,
-    "value": "1500", "treasury": "0", "payout": "1650", "protectsLeft": 2, "deadline": 1780000577000,
-    "clockSeconds": 570, "nextClockSeconds": 540, "txid": "00…05", "winner": "b2b2…b2b2", "pot": "1650", "cancelled": false
+    "value": "1500", "treasury": "0", "payout": "1650", "protectsLeft": 2, "deadline": 1780000607000,
+    "clockSeconds": 600, "nextClockSeconds": 60, "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0,
+    "txid": "00…05", "winner": "b2b2…b2b2", "pot": "1650", "cancelled": false
   }
 }
 ```
@@ -135,10 +145,10 @@ The server only sets deadlines; each device counts down on its own against the s
 
 ```json
 {
-  "seq": 0, "roundId": "<game id>", "at": 1780000547000, "type": "clock_warning", "reason": "30s",
+  "seq": 0, "roundId": "<game id>", "at": 1780000577020, "type": "clock_warning", "reason": "30s",
   "data": {
-    "level": 30, "remainingMs": 29980, "deadline": 1780000577000, "king": "b2b2…b2b2", "previousKing": "a1a1…a1a1",
-    "passCount": 2, "conquests": 1, "value": "1500", "treasury": "1650", "protectsLeft": 2, "clockSeconds": 570, "nextClockSeconds": 540
+    "level": 30, "remainingMs": 29980, "deadline": 1780000607000, "king": "b2b2…b2b2", "previousKing": "a1a1…a1a1",
+    "passCount": 2, "conquests": 1, "value": "1500", "treasury": "1650", "protectsLeft": 2, "clockSeconds": 600, "nextClockSeconds": 90
   }
 }
 ```

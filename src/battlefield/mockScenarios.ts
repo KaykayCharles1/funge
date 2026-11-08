@@ -3,15 +3,15 @@
 // (playMockScenario in kingdomMode.ts), so events and snapshots take the same path as real ones.
 // The events mirror src/mockRound.ts and docs/EVENTS.md; src/mockRound.ts itself is not changed.
 import { CONFIG } from "../config.ts";
-import { clockSecondsFor, nextClockSecondsFor } from "../lib/bell.ts";
+import { clockAfterConquestMs, clockAfterOpenMs, wholeSeconds } from "../lib/kingdomClock.ts";
 import { conquestMoney, protectAmounts } from "../lib/kingdom.ts";
 import { MOCK_ROUND_ID } from "../mockRound.ts";
 import type { MockHooks } from "../mockRound.ts";
 import type { KingdomSnapshot, RefereeEvent, RoundSnapshot } from "../referee/api.ts";
-import { BELL_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../refereeParams.ts";
+import { CLOCK_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../refereeParams.ts";
 
 const P = CONFIG.kingdom;
-const bell = BELL_PRESETS.standard;
+const clockSettings = CLOCK_PRESETS.standard;
 const str = (n: bigint | number) => n.toString();
 const fakeTx = (n: number) => n.toString(16).padStart(64, "0");
 const KEYS = ["a1", "b2", "c3", "d4", "e5", "f6"].map((k) => k.repeat(20));
@@ -34,15 +34,34 @@ class MockKingdom {
     this.h = h;
   }
 
-  private clockFor = (n: number) => (n >= 1 ? clockSecondsFor(n, bell) : null);
+  lastClock: number | null = null; // seconds on the clock right after the last open or conquest
   private remaining = () => (this.deadline === null ? null : this.deadline - (this.paused ? this.paused.since : this.h.now()));
+
+  // The clock fields every event and snapshot carry (the same rule as the referee: src/lib/kingdomClock.ts)
+  private clockFields(): { clockSeconds: number | null; nextClockSeconds: number; clockCapSeconds: number; conquestAddSeconds: number; conquestMinSeconds: number } {
+    const left = this.remaining();
+    return {
+      clockSeconds: this.lastClock,
+      nextClockSeconds: wholeSeconds(left === null ? clockAfterOpenMs(clockSettings) : clockAfterConquestMs(left, clockSettings)),
+      clockCapSeconds: clockSettings.capSeconds, conquestAddSeconds: clockSettings.addSeconds, conquestMinSeconds: clockSettings.minSeconds,
+    };
+  }
+
+  // A conquest's new clock: the time left plus a minute, at most the cap. Returns the seconds actually added.
+  private addToClock(): number {
+    const left = Math.max(0, this.remaining() ?? 0);
+    const ms = clockAfterConquestMs(left, clockSettings);
+    this.deadline = this.h.now() + ms;
+    this.lastClock = wholeSeconds(ms);
+    return wholeSeconds(ms - left);
+  }
 
   private sceneFields(): Data {
     return {
       king: this.king, previousKing: this.previous, passCount: this.passCount, conquests: Math.max(0, this.passCount - 1),
       value: str(this.value), treasury: str(this.treasury),
       protectsLeft: this.passCount >= 1 ? P.protectsPerReign - this.protectsUsed : 0,
-      deadline: this.deadline, clockSeconds: this.clockFor(this.passCount), nextClockSeconds: nextClockSecondsFor(this.passCount, bell),
+      deadline: this.deadline, ...this.clockFields(),
     };
   }
 
@@ -56,7 +75,7 @@ class MockKingdom {
       protectsUsed: this.protectsUsed, protectsLeft: open ? P.protectsPerReign - this.protectsUsed : 0,
       protectsPerReign: P.protectsPerReign, protectAmounts: open ? protectAmounts(P.unit).map(str) : [],
       conquest: money ? { pay: str(money.payment), fee: str(money.fee), kingGets: str(money.kingGets), poolGets: str(money.poolGets) } : null,
-      clockSeconds: this.clockFor(this.passCount), nextClockSeconds: nextClockSecondsFor(this.passCount, bell), floorSeconds: bell.floorSeconds,
+      ...this.clockFields(), floorSeconds: null,
       protectLockoutSeconds: PROTECT_LOCKOUT_SECONDS,
       protectClosesInMs: this.status === "open" && rem !== null ? Math.max(0, rem - PROTECT_LOCKOUT_SECONDS * 1000) : null,
     };
@@ -80,7 +99,8 @@ class MockKingdom {
 
   open(key: string): void {
     this.status = "open"; this.passCount = 1; this.king = key; this.value = P.openingPrice; this.treasury = P.openingPrice;
-    this.deadline = this.h.now() + clockSecondsFor(1, bell) * 1000;
+    this.deadline = this.h.now() + clockAfterOpenMs(clockSettings);
+    this.lastClock = wholeSeconds(clockAfterOpenMs(clockSettings));
     this.send("deadline_changed", "open", {
       action: "open", txid: fakeTx(this.seq + 1), actor: key, paid: str(P.openingPrice), refunded: "0", toTreasury: str(P.openingPrice),
     });
@@ -98,9 +118,10 @@ class MockKingdom {
     const m = conquestMoney(this.value, P);
     this.previous = this.king; this.king = key; this.passCount++; this.protectsUsed = 0; this.treasury += m.poolGets;
     // The value stays: a conquest pays the value plus the fee, it does not raise it (src/mockRound.ts)
-    this.deadline = this.h.now() + clockSecondsFor(this.passCount, bell) * 1000;
+    const added = this.addToClock();
     this.send("deadline_changed", "conquer", {
       action: "conquer", txid: fakeTx(this.seq + 1), actor: key, paid: str(m.payment), refunded: str(m.kingGets), toTreasury: str(m.poolGets),
+      addedSeconds: added,
     });
   }
 
@@ -137,12 +158,12 @@ class MockKingdom {
     });
   }
 
-  // The server saw a conquest on the chain it did not make: scene fields only, the clock restarts.
+  // The server saw a conquest on the chain it did not make: scene fields only, the clock follows the same rule.
   // The money moved as in any conquest: the cut went into the Treasury.
   observed(key: string): void {
     this.treasury += conquestMoney(this.value, P).poolGets;
     this.previous = this.king; this.king = key; this.passCount++; this.protectsUsed = 0;
-    this.deadline = this.h.now() + clockSecondsFor(this.passCount, bell) * 1000;
+    this.addToClock();
     this.send("deadline_changed", "observed_on_chain");
   }
 

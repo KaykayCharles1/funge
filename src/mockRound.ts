@@ -1,8 +1,8 @@
 import { CONFIG } from "./config.ts";
-import { clockSecondsFor, nextClockSecondsFor } from "./lib/bell.ts";
+import { clockAfterConquestMs, clockAfterOpenMs, wholeSeconds } from "./lib/kingdomClock.ts";
 import { conquestMoney, protectAmounts } from "./lib/kingdom.ts";
 import type { KingdomSnapshot, RefereeEvent, RoundSnapshot } from "./referee/api.ts";
-import { BELL_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
+import { CLOCK_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
 
 // A scripted round for testing the page (and the animation) without a server or chain transactions:
 // open, protect, conquer, the clock warnings, round over. Every step goes through the same two doors a real
@@ -22,7 +22,7 @@ export type MockHooks = {
 };
 
 const P = CONFIG.kingdom;
-const bell = BELL_PRESETS.standard;
+const clockSettings = CLOCK_PRESETS.standard;
 const str = (n: bigint | number) => n.toString();
 const fakeTx = (n: number) => n.toString(16).padStart(64, "0");
 
@@ -37,12 +37,21 @@ export async function playMockRound(h: MockHooks): Promise<void> {
   let treasury = 0n;
   let protectsUsed = 0;
 
-  const clockFor = (n: number) => (n >= 1 ? clockSecondsFor(n, bell) : null);
+  let lastClock: number | null = null; // seconds on the clock right after the last open or conquest
+  // The clock fields every event and snapshot carry (the same rule as the referee: src/lib/kingdomClock.ts)
+  const clockFields = () => {
+    const left = remaining();
+    return {
+      clockSeconds: lastClock,
+      nextClockSeconds: wholeSeconds(left === null ? clockAfterOpenMs(clockSettings) : clockAfterConquestMs(left, clockSettings)),
+      clockCapSeconds: clockSettings.capSeconds, conquestAddSeconds: clockSettings.addSeconds, conquestMinSeconds: clockSettings.minSeconds,
+    };
+  };
   const remaining = () => (deadline === null ? null : deadline - h.now());
   const sceneFields = () => ({
     king, previousKing: previous, passCount, conquests: Math.max(0, passCount - 1), value: str(value), treasury: str(treasury),
     protectsLeft: passCount >= 1 ? P.protectsPerReign - protectsUsed : 0,
-    deadline, clockSeconds: clockFor(passCount), nextClockSeconds: nextClockSecondsFor(passCount, bell),
+    deadline, ...clockFields(),
   });
 
   function snapshot(): RoundSnapshot {
@@ -54,7 +63,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
       wallsAtMaximum: open && value >= P.cap, protectsUsed, protectsLeft: open ? P.protectsPerReign - protectsUsed : 0,
       protectsPerReign: P.protectsPerReign, protectAmounts: open ? protectAmounts(P.unit).map(str) : [],
       conquest: money ? { pay: str(money.payment), fee: str(money.fee), kingGets: str(money.kingGets), poolGets: str(money.poolGets) } : null,
-      clockSeconds: clockFor(passCount), nextClockSeconds: nextClockSecondsFor(passCount, bell), floorSeconds: bell.floorSeconds,
+      ...clockFields(), floorSeconds: null,
       protectLockoutSeconds: PROTECT_LOCKOUT_SECONDS,
       protectClosesInMs: status === "open" && rem !== null ? Math.max(0, rem - PROTECT_LOCKOUT_SECONDS * 1000) : null,
     };
@@ -89,7 +98,8 @@ export async function playMockRound(h: MockHooks): Promise<void> {
     if (!(await step("Alice opens: 10.00 into the treasury", 2000))) return;
 
     status = "open"; passCount = 1; king = MOCK_KINGS.alice; value = P.openingPrice; treasury = P.openingPrice;
-    deadline = h.now() + clockSecondsFor(1, bell) * 1000;
+    deadline = h.now() + clockAfterOpenMs(clockSettings);
+    lastClock = wholeSeconds(clockAfterOpenMs(clockSettings));
     deliver(event("deadline_changed", "open", {
       action: "open", txid: fakeTx(1), actor: king, paid: str(P.openingPrice), refunded: "0", toTreasury: str(P.openingPrice),
     }));
@@ -104,9 +114,14 @@ export async function playMockRound(h: MockHooks): Promise<void> {
 
     const money = conquestMoney(value, P);
     previous = king; king = MOCK_KINGS.bob; passCount = 2; protectsUsed = 0; treasury += money.poolGets;
-    deadline = h.now() + clockSecondsFor(2, bell) * 1000;
+    // The new clock: the time left plus a minute, at most the cap (the same rule as the referee)
+    const left = Math.max(0, remaining() ?? 0);
+    const ms = clockAfterConquestMs(left, clockSettings);
+    deadline = h.now() + ms;
+    lastClock = wholeSeconds(ms);
     deliver(event("deadline_changed", "conquer", {
       action: "conquer", txid: fakeTx(3), actor: king, paid: str(money.payment), refunded: str(money.kingGets), toTreasury: str(money.poolGets),
+      addedSeconds: wholeSeconds(ms - left),
     }));
 
     // The page's own countdown raises the clock warnings (60, 30 and 10 seconds) as time passes

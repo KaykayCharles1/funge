@@ -7,7 +7,8 @@ export type ServerEnv = { host: string; port: number; allowedOrigins: string[]; 
 // FUNGE_HOST            where to listen. Default 127.0.0.1 (this computer only). On a cloud host use 0.0.0.0.
 // PORT / FUNGE_PORT     the port (cloud hosts usually set PORT).
 // FUNGE_ALLOWED_ORIGINS the exact address(es) of the page, comma separated, e.g. https://funge.example.com
-// FUNGE_BELL_PRESET    Kingdom clock: "standard" (10:00 start, default) or "demo" (5:00 start). Both go down 0:30 per conquest to 2:00.
+// FUNGE_BELL_PRESET    Kingdom clock: "standard" (10:00 cap, default) or "demo" (5:00 cap). The open starts at the cap;
+//                       each conquest adds 1:00 to the time left, never above the cap (src/refereeParams.ts).
 // FUNGE_TRUST_PROXY=1   only when a host proxy sits in front: use the visitor address it forwards, for rate limits
 export function readServerEnv(env: Record<string, string | undefined>): ServerEnv {
   const host = env.FUNGE_HOST?.trim() || "127.0.0.1";

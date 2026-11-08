@@ -1,4 +1,4 @@
-import { clockSecondsFor, nextClockSecondsFor, validateBell, type BellSettings } from "../src/lib/bell.ts";
+import { clockAfterConquestMs, clockAfterOpenMs, validateClock, wholeSeconds, type ClockSettings } from "../src/lib/kingdomClock.ts";
 import { EVENT_HISTORY, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
 import type { Clock } from "./clock.ts";
 import type { EventData, EventRecord, RoundRecord, SceneState, Store } from "./store.ts";
@@ -16,8 +16,17 @@ export type ProtectCheck =
   | { ok: true; remainingMs: number }
   | { ok: false; why: "not_open" | "paused" | "locked"; remainingMs: number | null };
 
+// The clock fields every event and the round description carry (docs/EVENTS.md)
+export type ClockInfo = {
+  clockSeconds: number | null; // seconds on the clock right after the current king's move (null while waiting)
+  nextClockSeconds: number; // deprecated: what a conquest right now would set the clock to (the open's cap while waiting)
+  clockCapSeconds: number;
+  conquestAddSeconds: number;
+  conquestMinSeconds: number;
+};
+
 export class RoundManager {
-  private bells = new Map<string, BellSettings>(); // the bell clock of each game
+  private clocks = new Map<string, ClockSettings>(); // the clock settings of each game
   private store: Store;
   private clock: Clock;
   private listeners = new Set<Listener>();
@@ -28,20 +37,38 @@ export class RoundManager {
     this.clock = clock;
   }
 
-  // Sets the bell for a game: its clock follows the bell
-  setBell(gameId: string, settings: BellSettings): void {
-    validateBell(settings);
-    this.bells.set(gameId, settings);
+  // Sets the clock settings of a game
+  setClock(gameId: string, settings: ClockSettings): void {
+    validateClock(settings);
+    this.clocks.set(gameId, settings);
   }
 
-  // For the round description: the clock this pass got, and the clock the next conquest will set
-  bellInfo(gameId: string, passCount: number): { clockSeconds: number | null; nextClockSeconds: number; floorSeconds: number } | null {
-    const s = this.bells.get(gameId);
+  private settings(gameId: string, who: string): ClockSettings {
+    const s = this.clocks.get(gameId);
+    if (!s) throw new Error(who + ": this game has no clock settings");
+    return s;
+  }
+
+  // Time left on the clock at `now` (frozen while paused), never below 0; null when no clock runs
+  private leftMs(r: RoundRecord, now: number): number | null {
+    if (r.deadline === null) return null;
+    return Math.max(0, r.paused ? r.deadline - r.paused.since : r.deadline - now);
+  }
+
+  // The clock fields for events and the round description. Null for a game without clock settings.
+  clockInfo(gameId: string): ClockInfo | null {
+    const s = this.clocks.get(gameId);
     if (!s) return null;
+    const r = this.ensure(gameId);
+    const left = r.status === "waiting" ? null : this.leftMs(r, this.clock.now());
+    // Rounds saved before this field existed: the time left stands in for it
+    const clockSeconds = r.deadline === null ? null : r.lastClockSeconds ?? (left === null ? null : wholeSeconds(left));
     return {
-      clockSeconds: passCount >= 1 ? clockSecondsFor(passCount, s) : null,
-      nextClockSeconds: passCount >= 1 ? nextClockSecondsFor(passCount, s) : s.startSeconds,
-      floorSeconds: s.floorSeconds,
+      clockSeconds,
+      nextClockSeconds: wholeSeconds(left === null ? clockAfterOpenMs(s) : clockAfterConquestMs(left, s)),
+      clockCapSeconds: s.capSeconds,
+      conquestAddSeconds: s.addSeconds,
+      conquestMinSeconds: s.minSeconds,
     };
   }
 
@@ -67,14 +94,23 @@ export class RoundManager {
     return this.ensure(gameId);
   }
 
-  // Every event carries the kingdom as it stands (king, value, treasury, ...), the deadline and the current bell,
+  // Every event carries the kingdom as it stands (king, value, treasury, ...), the deadline and the clock fields,
   // so a scene can be drawn from the event alone. The fields a move adds itself win over these defaults.
   private publish(r: RoundRecord, type: string, reason: string, data?: EventData): EventRecord {
-    const bell = r.seenPassCount ? this.bellInfo(r.gameId, r.seenPassCount) : null;
+    const info = this.clockInfo(r.gameId);
+    const clock: EventData = info
+      ? {
+          ...(info.clockSeconds !== null ? { clockSeconds: info.clockSeconds } : {}),
+          nextClockSeconds: info.nextClockSeconds,
+          clockCapSeconds: info.clockCapSeconds,
+          conquestAddSeconds: info.conquestAddSeconds,
+          conquestMinSeconds: info.conquestMinSeconds,
+        }
+      : {};
     const full: EventData = {
       ...(r.scene ?? {}),
       deadline: r.deadline,
-      ...(bell && bell.clockSeconds !== null ? { clockSeconds: bell.clockSeconds, nextClockSeconds: bell.nextClockSeconds } : {}),
+      ...clock,
       ...(data ?? {}),
     };
     const ev: EventRecord = { seq: r.nextSeq++, roundId: r.gameId, at: this.clock.now(), type, reason, data: full };
@@ -143,16 +179,17 @@ export class RoundManager {
     if (chain.scene) r.scene = chain.scene;
     const seen = r.seenPassCount ?? (r.status === "waiting" ? 0 : chain.passCount);
     if ((r.status === "waiting" || r.status === "open") && chain.passCount > seen) {
-      // A move the timer has not accounted for (not made through /act): restart the clock from now
-      const bell = this.bells.get(gameId);
-      if (!bell) throw new Error("observe: this game has no bell");
-      const seconds = clockSecondsFor(chain.passCount, bell);
+      // A move the timer has not accounted for (not made through /act): the same rule as a move made here,
+      // from now. An open gets the cap; a conquest adds to the time left.
+      const s = this.settings(gameId, "observe");
+      const wasOpen = r.status === "open";
+      const ms = wasOpen ? clockAfterConquestMs(this.leftMs(r, now) ?? 0, s) : clockAfterOpenMs(s);
       r.status = "open";
-      r.deadline = now + seconds * 1000;
+      r.deadline = now + ms;
       r.seenPassCount = chain.passCount;
+      r.lastClockSeconds = wholeSeconds(ms);
       this.publish(r, "deadline_changed", "observed_on_chain", {
-        deadline: r.deadline,
-        clockSeconds: seconds, nextClockSeconds: nextClockSecondsFor(chain.passCount, bell), passCount: chain.passCount,
+        deadline: r.deadline, clockSeconds: r.lastClockSeconds, passCount: chain.passCount,
       });
     } else if (r.seenPassCount === undefined) {
       r.seenPassCount = chain.passCount;
@@ -164,7 +201,11 @@ export class RoundManager {
     return r;
   }
 
-  // Open or conquest, after a successful broadcast: the clock is set to the bell for this pass.
+  // Open or conquest, after a successful broadcast, inside the round lock. "Left" is measured now, at the
+  // instant the move is recorded, and the new deadline counts from this same instant: so a delay in the network
+  // or in the player's approval neither adds nor takes time. The open gets the cap. A conquest gets
+  // min(CAP, max(MIN, left + ADD)): in effect the old deadline plus ADD, at most the cap from now, and
+  // ADD from now when it lands inside the grace (left is never below 0).
   applyKingdomAction(
     gameId: string,
     action: "open" | "conquer",
@@ -172,17 +213,22 @@ export class RoundManager {
     data?: EventData,
     scene?: SceneState,
   ): RoundRecord {
-    const bell = this.bells.get(gameId);
-    if (!bell) throw new Error("applyKingdomAction: this game has no bell");
-    if (action === "open" ? passCount !== 1 : passCount < 2) throw new Error(`applyKingdomAction: pass count ${passCount} does not fit "${action}"`);
+    const s = this.settings(gameId, "applyKingdomAction");
+    if (action === "open" ? passCount !== 1 : passCount < 2) throw new Error("applyKingdomAction: pass count " + passCount + " does not fit " + action);
     const r = this.ensure(gameId);
-    const seconds = clockSecondsFor(passCount, bell);
+    const now = this.clock.now();
+    const left = action === "conquer" ? (this.leftMs(r, now) ?? 0) : 0;
+    const ms = action === "open" ? clockAfterOpenMs(s) : clockAfterConquestMs(left, s);
     r.status = "open";
-    r.deadline = this.clock.now() + seconds * 1000;
+    r.deadline = now + ms;
     r.seenPassCount = passCount;
+    r.lastClockSeconds = wholeSeconds(ms);
     if (scene) r.scene = scene;
     this.publish(r, "deadline_changed", action, {
-      deadline: r.deadline, action, passCount, clockSeconds: seconds, nextClockSeconds: nextClockSecondsFor(passCount, bell), ...(data ?? {}),
+      deadline: r.deadline, action, passCount, clockSeconds: r.lastClockSeconds,
+      // the time a conquest actually added (smaller when the cap cut it); the open has no "before"
+      ...(action === "conquer" ? { addedSeconds: wholeSeconds(ms - left) } : {}),
+      ...(data ?? {}),
     });
     return r;
   }

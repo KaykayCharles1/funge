@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { CONFIG } from "../src/config.ts";
 import { makeProvider } from "../src/lib/provider.ts";
-import { BELL_PRESETS, GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS, UNCONFIRMED_CAP } from "../src/refereeParams.ts";
+import { CLOCK_PRESETS, GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS, UNCONFIRMED_CAP } from "../src/refereeParams.ts";
 import { buildApp } from "./app.ts";
 import { makeChainReader } from "./chain.ts";
 import { systemClock } from "./clock.ts";
@@ -38,9 +38,9 @@ try {
   if (source === "bak") console.warn("state file was damaged; recovered from backup");
   const manager = new RoundManager(store, systemClock);
   manager.onEvent((id, e) => console.log(`[${id.slice(0, 8)}] event #${e.seq} ${e.type} (${e.reason})`));
-  for (const g of games) manager.setBell(g.gameId, BELL_PRESETS[bellPreset]); // before any restart handling or observing
-  const b = BELL_PRESETS[bellPreset];
-  console.log(`clock (${bellPreset}): ${b.startSeconds}s at the open, -${b.stepSeconds}s per conquest, floor ${b.floorSeconds}s`);
+  for (const g of games) manager.setClock(g.gameId, CLOCK_PRESETS[bellPreset]); // before any restart handling or observing
+  const b = CLOCK_PRESETS[bellPreset];
+  console.log(`clock (${bellPreset}): ${b.capSeconds}s at the open and at most, +${b.addSeconds}s per conquest, minimum after a conquest ${b.minSeconds}s`);
   const loaded = games.map((g) => g.gameId);
   const pruned = manager.pruneSettled(loaded);
   if (pruned > 0) console.log(`removed ${pruned} settled round(s) of games that are no longer loaded`);

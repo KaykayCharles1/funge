@@ -13,7 +13,10 @@ All of these live in config (shared by the app and the server). Names are fixed 
 
 | Name | Default | Meaning |
 |---|---|---|
-| BELL (`BELL_PRESETS`) | standard: 600 s start, 30 s step, 120 s floor. Demo: 300 s start | The open sets the clock to the start; each conquest sets it 30 s shorter than the one before, never below the floor. Chosen at server start with `FUNGE_BELL_PRESET`. |
+| CLOCK_CAP_SECONDS | 600 (demo preset: 300) | The open sets the clock here, and the clock never shows more. |
+| CONQUEST_ADD_SECONDS | 60 | Each conquest sets the time left to min(CAP, max(MIN, left + ADD)). |
+| CONQUEST_MIN_SECONDS | 0 (off) | A conquest never leaves less than this on the clock. |
+| Clock preset (`CLOCK_PRESETS`) | standard | `standard` (cap 10:00) or `demo` (cap 5:00), both +1:00 per conquest and minimum off. Chosen at server start with `FUNGE_BELL_PRESET` (the old name is kept so existing setups keep working). |
 | PROTECT_LOCKOUT_SECONDS | 30 | Protect is refused in the last 30 seconds before the deadline. Conquest is never affected. |
 | GRACE_SECONDS | 1 | Lateness tolerated for a move that arrives just after the deadline. |
 | KEEPER_DELAY_SECONDS | 120 | After a round is over, how long the king has to press Claim before the server settles automatically. |
@@ -42,8 +45,8 @@ Funge referee. An optional public audit trail is described under "Later, optiona
 
 - **waiting:** the game is deployed and nobody has opened it. There is **no deadline and no countdown**, and no PUSD in the game.
   The app shows "Waiting for the first player". The referee signs `open` only.
-- **open:** counting down. The open moves a round from waiting to open and sets the clock to the bell's start.
-  Each conquest sets the clock to the bell for that pass (30 s shorter, down to the floor). Protect changes nothing.
+- **open:** counting down. The open moves a round from waiting to open and sets the clock to the cap.
+  Each conquest sets the time left to min(CAP, max(MIN, left + ADD)) (10:00 → 10:00, 9:30 → 10:00, 8:00 → 9:00, 2:00 → 3:00, 0:10 → 1:10). Protect changes nothing.
 - **over:** the deadline plus the grace has passed. The app shows "Round is over" to everyone and only the king
   sees Claim.
 - **settled:** the pool has been paid out.
@@ -67,7 +70,9 @@ dust in the two contracts.
 4. The server signs the contract input and inserts the signature (to be proven in Step 3), then broadcasts the
    transaction itself and replies with the transaction id, or a typed error: `too_late`, `state_changed`,
    `round_over`, `invalid`, and for Kingdom rules `not_open`, `protect_locked`, `already_king`, `walls_at_maximum`, `no_protects_left`, `not_king`.
-5. Only on success: for an open or conquest the deadline becomes now + the bell for that pass; a protect leaves the deadline alone. An event is pushed to every
+5. Only on success, still under the lock: for an open the deadline becomes now + the cap. For a conquest the server measures the time left at this
+   instant and the deadline becomes now + min(CAP, max(MIN, left + ADD)): in effect the old deadline + 1:00, at most the cap from now, and 1:00 from now if the
+   move landed inside the grace. Slow checks or a slow wallet neither add nor take time. A protect leaves the deadline alone. An event is pushed to every
    connected player.
 
 ## Which action is it?
@@ -124,7 +129,7 @@ deadline is pushed out by the length of the pause and a `clock_resumed` event is
 
 ## The server, in outline
 - Round registry keyed by the game's token category: status, deadline, king, last action. `GET /rounds/:id` also describes the Kingdom: value, the exact price of the next conquest and how it splits, protects left and their allowed amounts, the current and next clock, and the previous king's short mark. All of it is computed on the server, so the page and the contract cannot disagree.
-- `GET /rounds/:id` returns state, deadline and serverNow. A WebSocket pushes deadline changes and events. Every event is self-contained (the kingdom after the change, the money moved, the deadline and the bell); `EVENTS.md` lists them all with examples.
+- `GET /rounds/:id` returns state, deadline and serverNow. A WebSocket pushes deadline changes and events. Every event is self-contained (the kingdom after the change, the money moved, the deadline and the clock settings); `EVENTS.md` lists them all with examples.
 - `POST /rounds/:id/act` takes a move built by the player's wallet, checks it, adds the referee signature and broadcasts it. `POST /rounds/:id/claim` settles a finished round.
 - Both wallets use the same route: the game wallet signs its own coins in the browser; a WizardConnect wallet signs them in the wallet app. The wallet's signatures do not cover the contract input's unlocking script, so adding the referee signature afterwards keeps them valid.
 

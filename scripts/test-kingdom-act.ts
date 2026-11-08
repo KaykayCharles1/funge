@@ -18,7 +18,7 @@ import { makeUnconfirmed } from "../server/unconfirmed.ts";
 import {
   NO_PREVIOUS, WAITING_STATE, conquestMoney, decodeKingdomCommitment, encodeKingdomCommitment, previousOf, type KingdomState,
 } from "../src/lib/kingdom.ts";
-import { BELL_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
+import { CLOCK_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
 
 const hex32 = (n: number) => n.toString(16).padStart(2, "0").repeat(32);
 const ALICE = "11".repeat(20);
@@ -27,7 +27,7 @@ const CAROL = "33".repeat(20);
 const p2pkh = (pkh: string) => `76a914${pkh}88ac`;
 const GRACE = GRACE_SECONDS * 1000;
 const LOCK = PROTECT_LOCKOUT_SECONDS * 1000;
-const bell = BELL_PRESETS.standard;
+const clockSettings = CLOCK_PRESETS.standard;
 const dir = mkdtempSync(join(tmpdir(), "funge-kact-"));
 let counter = 0;
 
@@ -69,7 +69,7 @@ async function setup(opts: { state?: KingdomState; pot?: bigint; cap?: number } 
   const { store } = await Store.open(join(dir, `s${counter++}.json`));
   const clock = fakeClock();
   const manager = new RoundManager(store, clock);
-  manager.setBell(GAME.gameId, bell);
+  manager.setClock(GAME.gameId, clockSettings);
   const state = opts.state ?? WAITING_STATE;
   const world = {
     state, potAmount: opts.pot ?? 0n, stateTxid: hex32(1), potTxid: hex32(1), next: 10,
@@ -108,7 +108,11 @@ async function setup(opts: { state?: KingdomState; pot?: bigint; cap?: number } 
   const deps = { manager, chain, clock, referee, locks: makeLocks(), unconfirmed, sleep: async () => undefined };
   // an already-running round: start its clock the way a real open or conquest would have
   if (state.passCount === 1) manager.applyKingdomAction(GAME.gameId, "open", 1);
-  else if (state.passCount > 1) manager.applyKingdomAction(GAME.gameId, "conquer", state.passCount);
+  else if (state.passCount > 1) {
+    // a conquest right after the open: the clock stays at the 10:00 cap
+    manager.applyKingdomAction(GAME.gameId, "open", 1);
+    manager.applyKingdomAction(GAME.gameId, "conquer", state.passCount);
+  }
   return { manager, clock, world, unconfirmed, deps, view };
 }
 type World = Awaited<ReturnType<typeof setup>>["world"];
@@ -264,9 +268,9 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.equal(res.king, ALICE);
   const r = s.manager.get(GAME.gameId);
   assert.equal(r.status, "open");
-  assert.equal(r.deadline, s.clock.now() + bell.startSeconds * 1000);
+  assert.equal(r.deadline, s.clock.now() + clockSettings.capSeconds * 1000);
   const ev = r.events.at(-1)!;
-  assert.deepEqual([ev.type, ev.reason, ev.data?.clockSeconds, ev.data?.nextClockSeconds, ev.data?.king], ["deadline_changed", "open", 600, 570, ALICE]);
+  assert.deepEqual([ev.type, ev.reason, ev.data?.clockSeconds, ev.data?.nextClockSeconds, ev.data?.king], ["deadline_changed", "open", 600, 600, ALICE]);
   assert.deepEqual(s.world.signs, [{ fn: "open", newHolder: ALICE }]);
   assert.deepEqual(kingdomOf(s), open1);
   assert.equal(s.world.potAmount, 1000n);
@@ -306,9 +310,9 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.equal(res.passCount, 2);
   assert.equal(res.king, BOB);
   const r = s.manager.get(GAME.gameId);
-  assert.equal(r.deadline, s.clock.now() + 570_000); // the bell, not what was left
+  assert.equal(r.deadline, s.clock.now() + 560_000); // 8:20 left + 1:00
   const ev = r.events.at(-1)!;
-  assert.deepEqual([ev.reason, ev.data?.clockSeconds, ev.data?.nextClockSeconds, ev.data?.passCount], ["conquer", 570, 540, 2]);
+  assert.deepEqual([ev.reason, ev.data?.clockSeconds, ev.data?.addedSeconds, ev.data?.nextClockSeconds, ev.data?.passCount], ["conquer", 560, 60, 600, 2]);
   assert.deepEqual(s.world.signs, [{ fn: "conquer", newHolder: BOB }]);
   assert.deepEqual(kingdomOf(s), conquered);
   assert.equal(s.world.potAmount, 1100n); // +1.00 for the pool: 10.20 paid, 9.20 to the king
@@ -316,8 +320,9 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   s.clock.advance(1000);
   await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: ALICE }));
   assert.deepEqual(kingdomOf(s), { passCount: 3, holderPkh: ALICE, value: 1000n, protects: 0, previous: previousOf(BOB) });
-  assert.equal(s.manager.get(GAME.gameId).deadline, s.clock.now() + 540_000);
-  console.log("ok: conquer: the clock resets to the bell (9:30, then 9:00), the pool grows by the pool share, take-back works");
+  assert.equal(s.manager.get(GAME.gameId).deadline, s.clock.now() + 600_000); // 9:19 left + 1:00, cut to the 10:00 cap
+  assert.equal(s.manager.get(GAME.gameId).events.at(-1)!.data?.addedSeconds, 41);
+  console.log("ok: conquer: the clock gets +1:00 on the time left (8:20 -> 9:20), at most the cap (9:19 -> 10:00), the pool grows by the pool share, take-back works");
 }
 {
   // a conquest at value 16.00 pays the king 14.72 and the pool 1.60
@@ -365,7 +370,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   s.clock.set(d + GRACE - 1);
   await executeAct(s.deps, GAME, body(s.world, "conquer")); // 999 ms late is inside the grace
   const d2 = s.manager.get(GAME.gameId).deadline!;
-  assert.equal(d2, d + GRACE - 1 + 570_000);
+  assert.equal(d2, d + GRACE - 1 + 60_000); // inside the grace nothing is left: 1:00 from now
   s.clock.set(d2 + GRACE);
   await fails(executeAct(s.deps, GAME, body(s.world, "conquer", { payer: CAROL })), "too_late");
   await fails(executeAct(s.deps, GAME, body(s.world, "conquer", { payer: CAROL })), "round_over");
@@ -533,7 +538,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.equal(s.world.broadcasts.length, 1);
   const r = s.manager.get(GAME.gameId);
   assert.equal(r.status, "open");
-  assert.equal(r.deadline, d1 + 1200 + 570_000);
+  assert.equal(r.deadline, d1 + 1200 + 60_000); // the time left is measured when the move is recorded: none, so 1:00 from then
   s.clock.set(r.deadline! + GRACE + 10);
   await fails(executeAct(slow, GAME, body(s.world, "conquer", { payer: CAROL })), "too_late"); // arrived late: still refused
   assert.equal(s.world.broadcasts.length, 1);
@@ -580,6 +585,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   const id = GAME.gameId;
   await executeAct(s.deps, GAME, body(s.world, "open", { payer: ALICE }));
   await executeAct(s.deps, GAME, body(s.world, "protect", { amount: PARAMS.unit * 5n }));
+  s.clock.advance(120_000); // 8:00 left
   await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: BOB }));
   const r = s.manager.get(id);
   const [opened, protectedEv, conquered2] = r.events;
@@ -594,14 +600,14 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.deepEqual(
     { ...scene(opened), deadline: "x", txid: "x" },
     { king: ALICE, previousKing: null, passCount: 1, conquests: 0, value: "1000", treasury: "1000", protectsLeft: 2,
-      deadline: "x", clockSeconds: 600, nextClockSeconds: 570, action: "open", txid: "x", actor: ALICE, paid: "1000", refunded: "0", toTreasury: "1000" },
+      deadline: "x", clockSeconds: 600, nextClockSeconds: 600, clockCapSeconds: 600, conquestAddSeconds: 60, conquestMinSeconds: 0, action: "open", txid: "x", actor: ALICE, paid: "1000", refunded: "0", toTreasury: "1000" },
     "open event",
   );
   // protect +5.00 on a throne of 10.00: nothing is refunded, the clock numbers are the king's current ones
   assert.deepEqual(
     { ...scene(protectedEv), deadline: "x", txid: "x" },
     { king: ALICE, previousKing: null, passCount: 1, conquests: 0, value: "1500", treasury: "1500", protectsLeft: 1,
-      deadline: "x", clockSeconds: 600, nextClockSeconds: 570, txid: "x", actor: ALICE, paid: "500", refunded: "0", toTreasury: "500", amount: "500", protectsUsed: 1 },
+      deadline: "x", clockSeconds: 600, nextClockSeconds: 600, clockCapSeconds: 600, conquestAddSeconds: 60, conquestMinSeconds: 0, txid: "x", actor: ALICE, paid: "500", refunded: "0", toTreasury: "500", amount: "500", protectsUsed: 1 },
     "protect event",
   );
   assert.equal(scene(protectedEv)!.deadline, scene(opened)!.deadline); // protect never moves the clock
@@ -609,7 +615,8 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.deepEqual(
     { ...scene(conquered2), deadline: "x", txid: "x" },
     { king: BOB, previousKing: ALICE, passCount: 2, conquests: 1, value: "1500", treasury: "1650", protectsLeft: 2,
-      deadline: "x", clockSeconds: 570, nextClockSeconds: 540, action: "conquer", txid: "x", actor: BOB, paid: "1530", refunded: "1380", toTreasury: "150" },
+      deadline: "x", clockSeconds: 540, nextClockSeconds: 600, clockCapSeconds: 600, conquestAddSeconds: 60, conquestMinSeconds: 0, action: "conquer", txid: "x", actor: BOB, paid: "1530", refunded: "1380", toTreasury: "150",
+      addedSeconds: 60 },
     "conquest event",
   );
   // the events that no move causes carry the same picture
@@ -620,7 +627,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   const [paused, resumed, over] = r.events.slice(3);
   for (const e of [paused, resumed, over]) {
     const d = e!.data!;
-    assert.deepEqual([d.king, d.previousKing, d.passCount, d.conquests, d.value, d.treasury, d.protectsLeft, d.clockSeconds], [BOB, ALICE, 2, 1, "1500", "1650", 2, 570]);
+    assert.deepEqual([d.king, d.previousKing, d.passCount, d.conquests, d.value, d.treasury, d.protectsLeft, d.clockSeconds], [BOB, ALICE, 2, 1, "1500", "1650", 2, 540]);
     assert.equal(typeof d.deadline, "number");
   }
   assert.deepEqual([paused!.type, resumed!.type, over!.type], ["clock_paused", "clock_resumed", "round_over"]);
@@ -628,7 +635,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   const old = s.manager.get(id).events[0]!;
   delete (old as { roundId?: string }).roundId;
   assert.equal(s.manager.eventsAfter(id, 0).events[0]!.roundId, id);
-  console.log("ok: events carry the round id, who acted, previous king, paid, refunded, to treasury, value and treasury after, protects left, conquests, bell and deadline");
+  console.log("ok: events carry the round id, who acted, previous king, paid, refunded, to treasury, value and treasury after, protects left, conquests, the clock (cap, +1:00, minimum, seconds after the move, seconds added) and deadline");
 }
 
 // ---------------------------------------------------------------- what the page is told
@@ -637,7 +644,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   const desc = () => {
     const c = s.view();
     s.manager.observe(GAME.gameId, { live: c.live, passCount: c.passCount });
-    return describeRound(GAME, s.manager.get(GAME.gameId), c, s.clock.now(), s.manager.bellInfo(GAME.gameId, c.passCount));
+    return describeRound(GAME, s.manager.get(GAME.gameId), c, s.clock.now(), s.manager.clockInfo(GAME.gameId));
   };
   let d = desc();
   assert.equal(d.kind, "kingdom");
@@ -653,7 +660,8 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.equal(d.king, ALICE);
   assert.equal(d.price, "1020"); // value + the 2% fee
   assert.deepEqual(d.kingdom?.conquest, { pay: "1020", fee: "20", kingGets: "920", poolGets: "100" });
-  assert.deepEqual([d.kingdom?.clockSeconds, d.kingdom?.nextClockSeconds, d.kingdom?.floorSeconds], [600, 570, 120]);
+  assert.deepEqual([d.kingdom?.clockSeconds, d.kingdom?.nextClockSeconds, d.kingdom?.floorSeconds], [600, 600, null]);
+  assert.deepEqual([d.kingdom?.clockCapSeconds, d.kingdom?.conquestAddSeconds, d.kingdom?.conquestMinSeconds], [600, 60, 0]);
   assert.deepEqual(d.kingdom?.protectAmounts, ["100", "500", "1000"]);
   assert.equal(d.kingdom?.protectsLeft, 2);
   assert.equal(d.kingdom?.previousKing, null);
@@ -663,26 +671,26 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   await executeAct(s.deps, GAME, body(s.world, "conquer"));
   d = desc();
   assert.equal(d.kingdom?.previousKing, previousOf(ALICE));
-  assert.deepEqual([d.kingdom?.clockSeconds, d.kingdom?.nextClockSeconds], [570, 540]);
+  assert.deepEqual([d.kingdom?.clockSeconds, d.kingdom?.nextClockSeconds], [560, 600]);
 
   await executeAct(s.deps, GAME, body(s.world, "protect", { amount: 1000n }));
   d = desc();
   assert.equal(d.kingdom?.value, "2000");
   assert.equal(d.kingdom?.protectsLeft, 1);
   assert.deepEqual(d.kingdom?.conquest, { pay: "2040", fee: "40", kingGets: "1840", poolGets: "200" });
-  s.clock.advance(500_000); // 70 s left: protect closes in 40 s
+  s.clock.advance(490_000); // 70 s left: protect closes in 40 s
   assert.equal(desc().kingdom?.protectClosesInMs, 40_000);
   s.clock.advance(60_000);
   assert.equal(desc().kingdom?.protectClosesInMs, 0);
 
   const maxed = await setup({ state: { ...conquered, value: 4950n }, pot: 3000n });
   const mc = maxed.view();
-  const md = describeRound(GAME, maxed.manager.get(GAME.gameId), mc, maxed.clock.now(), maxed.manager.bellInfo(GAME.gameId, mc.passCount));
+  const md = describeRound(GAME, maxed.manager.get(GAME.gameId), mc, maxed.clock.now(), maxed.manager.clockInfo(GAME.gameId));
   assert.equal(md.kingdom?.wallsAtMaximum, true);
   assert.deepEqual(md.kingdom?.protectAmounts, []);
   const near = await setup({ state: { ...conquered, value: 4500n }, pot: 3000n });
   const nc = near.view();
-  const nd = describeRound(GAME, near.manager.get(GAME.gameId), nc, near.clock.now(), near.manager.bellInfo(GAME.gameId, nc.passCount));
+  const nd = describeRound(GAME, near.manager.get(GAME.gameId), nc, near.clock.now(), near.manager.clockInfo(GAME.gameId));
   assert.deepEqual(nd.kingdom?.protectAmounts, ["100", "500"]);
   assert.equal(nd.kingdom?.wallsAtMaximum, false);
   console.log("ok: the round description: prices, shares, protects left, allowed protect amounts, clocks, previous king, walls at maximum");

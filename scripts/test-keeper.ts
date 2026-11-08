@@ -12,7 +12,7 @@ import { RoundManager } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
 import { makeUnconfirmed } from "../server/unconfirmed.ts";
 import { NO_PREVIOUS, encodeKingdomCommitment, type KingdomState } from "../src/lib/kingdom.ts";
-import { BELL_PRESETS, GRACE_SECONDS, KEEPER_DELAY_SECONDS } from "../src/refereeParams.ts";
+import { CLOCK_PRESETS, GRACE_SECONDS, KEEPER_DELAY_SECONDS } from "../src/refereeParams.ts";
 
 const hex32 = (n: number) => n.toString(16).padStart(2, "0").repeat(32);
 const KING = "11".repeat(20);
@@ -35,7 +35,7 @@ async function setup(opts: { open?: boolean } = {}) {
   const { store } = await Store.open(join(dir, `s${counter++}.json`));
   const clock = fakeClock();
   const manager = new RoundManager(store, clock);
-  manager.setBell(GAME.gameId, BELL_PRESETS.standard);
+  manager.setClock(GAME.gameId, CLOCK_PRESETS.standard);
   const world = { passCount: 3, live: true, settles: 0, broadcasts: 0, fail: null as Error | null };
   const kingdomState = (): KingdomState => ({ passCount: world.passCount, holderPkh: KING, value: 1000n, protects: 0, previous: NO_PREVIOUS });
   const view = (): ChainState =>

@@ -29,9 +29,9 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 ## Server host settings
 - Start: `npm ci` then `npm run server`. Node 24.
 - `FUNGE_HOST=0.0.0.0`, `FUNGE_ALLOWED_ORIGINS=https://<page>`, `FUNGE_TRUST_PROXY=1`, `REFEREE_KEY_<NETWORK>=<key>`, `FUNGE_DATA_DIR=<persistent disk folder>`.
-- Do not set `FUNGE_KEEPER_DELAY_SECONDS` or `FUNGE_UNCONFIRMED_CAP` for the real round. `FUNGE_BELL_PRESET` is `standard` (10:00 start) unless you mean to run the 5:00 demo clock.
+- Do not set `FUNGE_KEEPER_DELAY_SECONDS` or `FUNGE_UNCONFIRMED_CAP` for the real round. `FUNGE_BELL_PRESET` is `standard` (10:00 cap) unless you mean to run the 5:00 demo clock.
 - Health check path: `/health`. Restart automatically if it crashes (restart is safe: downtime counts as a pause).
-- The data folder must survive restarts. If it is lost, a round that already has moves gets a fresh clock from the chain's state (the bell for the current pass), and no one loses a payout.
+- The data folder must survive restarts. If it is lost, a round that already has moves gets a fresh clock from the chain's state (a full clock: the cap), and no one loses a payout.
 
 ## Demo day
 - **A day before:** preflight; check the host's clock is synced; fund the demo wallets with PUSD and a little BCH; read the server log for errors.
@@ -57,7 +57,7 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 1. Prepare a second host the same way as the main one: same code, same game file, same key in its secret settings, its own data folder. **Leave it stopped.**
 2. Make failover quick. Best: give the server a name you control (for example `referee.<your domain>`) with a short record lifetime (60 s) and build the page for that name. To fail over, point the name at the backup host. Without your own name, rebuild the page with the backup's address and upload it again (a few minutes).
 3. To fail over: confirm the main server is really down (not just slow), start the backup, run the preflight against it, switch the name or the page. Never run both.
-4. The backup starts without the main server's saved clock, so a round that already has moves gets a fresh clock (the bell for the current pass). Players keep their position and the pool.
+4. The backup starts without the main server's saved clock, so a round that already has moves gets a fresh clock (a full clock: the cap). Players keep their position and the pool.
 5. If you can reach the main server's data folder, copy `rounds.<network>.json` to the backup's data folder before starting it, and the old deadlines carry over, with the downtime counted as a pause.
 
 ## If the referee key is lost or leaked

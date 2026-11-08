@@ -1,6 +1,6 @@
 # Funge
 
-Funge is a king-of-the-hill game on Bitcoin Cash. One throne, one shared pool of PUSD. Pay to conquer the throne: the king you dethrone is paid back most of what their throne was worth, and a small share goes into the pool. When the clock runs out, the last king takes the whole pool and a trophy NFT. Every conquest makes the clock shorter.
+Funge is a king-of-the-hill game on Bitcoin Cash. One throne, one shared pool of PUSD. Pay to conquer the throne: the king you dethrone is paid back most of what their throne was worth, and a small share goes into the pool. When the clock runs out, the last king takes the whole pool and a trophy NFT. Every conquest adds a minute to the clock, up to 10:00.
 
 Built for the BCH BLAZE 2026 hackathon. It currently runs on chipnet (test coins); a mainnet round comes later.
 
@@ -9,7 +9,7 @@ Built for the BCH BLAZE 2026 hackathon. It currently runs on chipnet (test coins
 - **Pot contract** (`contracts/FungePot.cash`) holds the PUSD pool. It can only be spent in a transaction that also spends the throne.
 - **The referee** is the Funge game server. It runs the round clock and signs moves that arrive before the deadline (plus one second of grace). The contract requires its signature to open, conquer, protect and settle early. The referee decides *when*, never *who gets paid*: the contract always pays the last king. See `docs/REFEREE.md`.
 - **Money:** the full rules and worked examples are in `docs/KINGDOM.md`. In short: open pays 10.00 PUSD into the pool; a conquest costs the throne's value plus 2%; the dethroned king gets 90% of the value plus the 2%; the pool gets the rest; the king can protect (add 1, 5 or 10 PUSD to the value, at most twice per reign, up to a cap of 50.00) but not in the last 30 seconds.
-- **Clock:** 10:00 at the open, 30 seconds shorter with every conquest, never below 2:00 (the demo setting starts at 5:00).
+- **Clock:** 10:00 at the open. Every conquest adds 1:00 to the time left, never above 10:00 (so 8:00 becomes 9:00, 0:10 becomes 1:10, 9:30 becomes 10:00). Protect does not touch the clock. The demo setting caps it at 5:00.
 - **Settling:** when time is up, the winner presses Claim. If nobody does, the server settles by itself after two minutes. If the server is gone, anyone can settle after 12 blocks and the last king is paid. A round where only the opener played pays the opener back.
 
 ## Two ways to play
@@ -38,7 +38,7 @@ Offline (no network, no coins):
 
     node scripts/test-kingdom-contract.ts  the contract on a mock chain
     node scripts/test-rounds.ts            the round clock
-    node scripts/test-bell.ts              the bell, protect lockout, clock events
+    node scripts/test-clock.ts             the clock rule, protect lockout, clock events
     node scripts/test-kingdom-act.ts       move validation, races, timing, the round description
     node scripts/test-keeper.ts            automatic settlement
     node scripts/test-mock-round.ts        the dev-only mock round (see docs/EVENTS.md)

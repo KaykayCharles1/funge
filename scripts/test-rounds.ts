@@ -5,23 +5,22 @@ import { join } from "node:path";
 import { fakeClock } from "../server/clock.ts";
 import { RoundManager } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
-import { clockSecondsFor } from "../src/lib/bell.ts";
-import { BELL_PRESETS, EVENT_HISTORY, GRACE_SECONDS } from "../src/refereeParams.ts";
+import { CLOCK_PRESETS, EVENT_HISTORY, GRACE_SECONDS } from "../src/refereeParams.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "funge-rounds-"));
-const bell = BELL_PRESETS.standard;
-const RESET = bell.startSeconds * 1000; // the clock the open sets (pass 1)
+const clockSettings = CLOCK_PRESETS.standard;
+const RESET = clockSettings.capSeconds * 1000; // the clock the open sets (pass 1): the cap
 const GRACE = GRACE_SECONDS * 1000;
 
 async function setup(name: string, clock = fakeClock()) {
   const path = join(dir, `${name}.json`);
   const { store } = await Store.open(path);
   const mgr = new RoundManager(store, clock);
-  for (const id of ["g", "open", "paused", "over", "old", "live", "lost"]) mgr.setBell(id, bell);
+  for (const id of ["g", "open", "paused", "over", "old", "live", "lost"]) mgr.setClock(id, clockSettings);
   return { path, clock, store, mgr };
 }
 
-// The n-th move of a round: pass 1 is the open, later passes are conquests. The clock follows the bell.
+// The n-th move of a round: pass 1 is the open, later passes are conquests. The clock follows src/lib/kingdomClock.ts.
 function move(mgr: RoundManager, id: string, passCount = 1) {
   return mgr.applyKingdomAction(id, passCount === 1 ? "open" : "conquer", passCount);
 }
@@ -51,16 +50,16 @@ function move(mgr: RoundManager, id: string, passCount = 1) {
   console.log("ok: open until deadline + grace, then over");
 }
 
-// a conquest resets the deadline again (to the bell), and events are numbered
+// a conquest adds a minute to the time left (8:20 left -> 9:20), and events are numbered
 {
   const { mgr, clock } = await setup("reset");
   move(mgr, "g", 1);
   clock.advance(100_000);
   move(mgr, "g", 2);
   const r = mgr.get("g");
-  assert.equal(r.deadline, clock.now() + clockSecondsFor(2, bell) * 1000);
+  assert.equal(r.deadline, clock.now() + 560_000);
   assert.deepEqual(r.events.map((e) => e.seq), [1, 2]);
-  console.log("ok: deadline resets on each move, events numbered");
+  console.log("ok: a conquest adds 1:00 to the time left, events numbered");
 }
 
 // pause freezes the clock; resume pushes the deadline out by the pause length
@@ -132,7 +131,7 @@ function move(mgr: RoundManager, id: string, passCount = 1) {
   console.log("ok: chain overrides our record");
 }
 
-// a move made outside /act still restarts the clock
+// a move made outside /act still follows the clock rule
 {
   const { mgr, clock } = await setup("unseen");
   move(mgr, "g", 1);
@@ -140,9 +139,9 @@ function move(mgr: RoundManager, id: string, passCount = 1) {
   mgr.observe("g", { live: true, passCount: 1 });
   assert.equal(mgr.get("g").events.length, 1); // nothing new
   mgr.observe("g", { live: true, passCount: 2 });
-  assert.equal(mgr.get("g").deadline, clock.now() + clockSecondsFor(2, bell) * 1000);
+  assert.equal(mgr.get("g").deadline, clock.now() + 560_000);
   assert.equal(mgr.get("g").events.at(-1)?.reason, "observed_on_chain");
-  console.log("ok: moves made outside /act restart the clock");
+  console.log("ok: moves made outside /act follow the clock rule");
 }
 
 // a move that is being processed holds the round open, so there is no "over" flash

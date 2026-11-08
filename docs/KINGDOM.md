@@ -10,7 +10,7 @@ Status: built and running on chipnet. The old steal game was retired in K9d and 
 - **Protect:** king only. Amounts 1, 5 or 10 PUSD, 100% into the pool, raising the stored value. The value never exceeds CAP (50). At most 2 per reign; the counter resets on every conquest. Protect does not reset the clock and is refused in the last 30 seconds before the deadline (a referee rule).
 - **Settle:** the last king takes the whole pool plus the trophy. If only the opener played, the pool goes back to the opener and the page says "No challengers, pool returned".
 - **Take back your throne:** a normal conquest at the normal price. The page shows it to the player whose key is in the previous-king field.
-- **Clock (referee only):** the bell starts at 10:00 on open and drops 30 s per conquest, floor 2:00. Demo preset: 5:00, 30 s, 2:00. Every open or conquest resets the clock to the current bell. Protect changes nothing. Every clock change publishes an event with a reason code.
+- **Clock (referee only):** the open starts the clock at CAP (10:00). Every conquest, a take-back too, sets the time left to min(CAP, max(MIN, left + ADD)), with ADD = 1:00 and MIN = 0 (off), where "left" is the time left when the referee records the move (never below 0: a conquest inside the grace gets 1:00). So 10:00 stays 10:00, 9:30 becomes 10:00, 8:00 becomes 9:00, 2:00 becomes 3:00, 0:10 becomes 1:10. Demo preset: CAP 5:00, the same +1:00. Protect changes nothing. Every clock change publishes an event with a reason code.
 
 ## Deploy-time settings (in the contract)
 | Setting | Value | Notes |

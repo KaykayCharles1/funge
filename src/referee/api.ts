@@ -36,9 +36,12 @@ export type KingdomSnapshot = {
   protectsPerReign: number;
   protectAmounts: string[];
   conquest: { pay: string; fee: string; kingGets: string; poolGets: string } | null;
-  clockSeconds: number | null;
-  nextClockSeconds: number | null;
-  floorSeconds: number | null;
+  clockSeconds: number | null; // seconds on the clock right after the current king's move
+  nextClockSeconds: number | null; // deprecated: what a conquest right now would set the clock to
+  floorSeconds: number | null; // deprecated: always null (the bell's floor is gone)
+  clockCapSeconds: number | null; // the most time the clock can show; the open starts here
+  conquestAddSeconds: number | null; // what a conquest adds to the time left
+  conquestMinSeconds: number | null; // a conquest never leaves less (0 = off)
   protectLockoutSeconds: number;
   protectClosesInMs: number | null;
 };

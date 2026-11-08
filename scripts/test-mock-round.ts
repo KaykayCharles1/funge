@@ -21,7 +21,7 @@ assert.deepEqual(events.map((e) => `${e.type}/${e.reason}`), ["deadline_changed/
 assert.deepEqual(events.map((e) => e.seq), [1, 2, 3, 4]);
 for (const e of events) {
   assert.equal(e.roundId, MOCK_ROUND_ID);
-  for (const key of ["king", "previousKing", "passCount", "conquests", "value", "treasury", "protectsLeft", "deadline", "clockSeconds", "nextClockSeconds"]) {
+  for (const key of ["king", "previousKing", "passCount", "conquests", "value", "treasury", "protectsLeft", "deadline", "clockSeconds", "nextClockSeconds", "clockCapSeconds", "conquestAddSeconds", "conquestMinSeconds"]) {
     assert.ok(key in (e.data ?? {}), `${e.type} is missing ${key}`);
   }
 }
@@ -29,8 +29,8 @@ const [open, protect, conquer, over] = events.map((e) => e.data!);
 assert.deepEqual([open!.actor, open!.paid, open!.toTreasury, open!.treasury, open!.clockSeconds], [MOCK_KINGS.alice, "1000", "1000", "1000", 600]);
 assert.deepEqual([protect!.paid, protect!.value, protect!.treasury, protect!.protectsLeft, protect!.deadline], ["500", "1500", "1500", 1, open!.deadline]);
 assert.deepEqual(
-  [conquer!.actor, conquer!.previousKing, conquer!.paid, conquer!.refunded, conquer!.toTreasury, conquer!.treasury, conquer!.conquests, conquer!.clockSeconds, conquer!.nextClockSeconds],
-  [MOCK_KINGS.bob, MOCK_KINGS.alice, "1530", "1380", "150", "1650", 1, 570, 540],
+  [conquer!.actor, conquer!.previousKing, conquer!.paid, conquer!.refunded, conquer!.toTreasury, conquer!.treasury, conquer!.conquests, conquer!.clockSeconds, conquer!.addedSeconds, conquer!.nextClockSeconds],
+  [MOCK_KINGS.bob, MOCK_KINGS.alice, "1530", "1380", "150", "1650", 1, 600, 5, 600], // 5 s after the open: 9:55 + 1:00, cut to the 10:00 cap
 );
 assert.deepEqual([over!.king, over!.treasury], [MOCK_KINGS.bob, "1650"]);
 assert.equal(snapshots.at(0)!.status, "waiting");

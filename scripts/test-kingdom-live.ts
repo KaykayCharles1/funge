@@ -84,7 +84,7 @@ assert.equal(afterOpen.pot, openPay.toString());
 assert.equal(afterOpen.kingdom.value, openPay.toString());
 assert.equal(afterOpen.kingdom.conquest.pay, money.payment.toString());
 const clock1 = afterOpen.kingdom.clockSeconds as number;
-assert.ok(afterOpen.remainingMs <= clock1 * 1000 && afterOpen.remainingMs > clock1 * 1000 - 20_000, `clock after open: ${afterOpen.remainingMs} ms for a ${clock1} s bell`);
+assert.ok(afterOpen.remainingMs <= clock1 * 1000 && afterOpen.remainingMs > clock1 * 1000 - 20_000, `clock after open: ${afterOpen.remainingMs} ms for a ${clock1} s clock`);
 console.log(`ok    round is open, A is king, pot ${afterOpen.pot}, clock ${clock1} s`);
 await expectPusd("A", A, a0 - openPay);
 
@@ -112,7 +112,7 @@ const afterConquer = await snapshot();
 assert.equal(afterConquer.king, B.pkhHex);
 assert.equal(afterConquer.pot, (openPay + money.poolGets).toString());
 const clock2 = afterConquer.kingdom.clockSeconds as number;
-assert.ok(clock2 <= clock1, `the bell must not go up after a conquest (${clock1} -> ${clock2})`);
+assert.ok(clock2 <= afterOpen.kingdom.clockCapSeconds, `the clock never goes above the cap after a conquest (${clock1} -> ${clock2})`);
 console.log(`ok    B is king, previous king recorded, pot ${afterConquer.pot}, clock ${clock2} s`);
 await expectPusd("A", A, a0 - openPay + money.kingGets);
 await expectPusd("B", B, b0 - money.payment);

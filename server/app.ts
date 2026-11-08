@@ -10,7 +10,7 @@ import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
 import type { LockRunner } from "./lock.ts";
-import type { RoundManager } from "./rounds.ts";
+import type { ClockInfo, RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
 import { sceneOf } from "./scene.ts";
@@ -29,10 +29,8 @@ export type AppDeps = {
   trustProxy?: boolean; // true only behind a host proxy, so rate limits see the visitor and not the proxy
 };
 
-type BellInfo = ReturnType<RoundManager["bellInfo"]>;
-
 // Everything a Kingdom page needs to show, computed on the server so the page and the contract cannot disagree
-function describeKingdom(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, bell: BellInfo) {
+function describeKingdom(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, clock: ClockInfo | null) {
   const params = game.kingdom;
   const k = chain.kingdom;
   if (!k || !chain.live) return null;
@@ -55,18 +53,21 @@ function describeKingdom(game: ServerGame, round: RoundRecord, chain: ChainState
     conquest: money
       ? { pay: money.payment.toString(), fee: money.fee.toString(), kingGets: money.kingGets.toString(), poolGets: money.poolGets.toString() }
       : null,
-    clockSeconds: bell?.clockSeconds ?? null, // the clock the current king's pass started with
-    nextClockSeconds: bell?.nextClockSeconds ?? null, // what the next conquest will set the clock to
-    floorSeconds: bell?.floorSeconds ?? null,
+    clockSeconds: clock?.clockSeconds ?? null, // seconds on the clock right after the current king's move
+    nextClockSeconds: clock?.nextClockSeconds ?? null, // deprecated: what a conquest right now would set the clock to
+    floorSeconds: null, // deprecated: the bell's floor is gone (always null)
+    clockCapSeconds: clock?.clockCapSeconds ?? null, // the most time the clock can show; the open starts here
+    conquestAddSeconds: clock?.conquestAddSeconds ?? null, // what a conquest adds to the time left
+    conquestMinSeconds: clock?.conquestMinSeconds ?? null, // a conquest never leaves less (0 = off)
     protectLockoutSeconds: PROTECT_LOCKOUT_SECONDS,
     protectClosesInMs: round.status === "open" && remainingMs !== null ? Math.max(0, remainingMs - PROTECT_LOCKOUT_SECONDS * 1000) : null,
   };
 }
 
-export function describeRound(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, bell: BellInfo = null) {
+export function describeRound(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, clock: ClockInfo | null = null) {
   const remainingMs =
     round.deadline === null ? null : round.paused ? round.deadline - round.paused.since : round.deadline - now;
-  const kingdom = describeKingdom(game, round, chain, now, bell);
+  const kingdom = describeKingdom(game, round, chain, now, clock);
   // "price" is what it costs to take the throne right now
   const price = !chain.live
     ? null
@@ -120,7 +121,7 @@ export async function buildApp(deps: AppDeps) {
     try {
       const c = await chain.read(game);
       const round = manager.observe(id, { live: c.live, passCount: c.passCount, scene: sceneOf(game, c) });
-      return describeRound(game, round, c, clock.now(), manager.bellInfo(id, c.passCount));
+      return describeRound(game, round, c, clock.now(), manager.clockInfo(id));
     } catch {
       return reply.code(503).send({ error: "chain_unavailable" });
     }
