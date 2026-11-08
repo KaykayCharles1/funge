@@ -190,8 +190,9 @@ export async function kingdomAct(opts: {
   action: "open" | "conquer";
   expectedPay: bigint; // what the player agreed to pay; never spend more than this without asking again
   artifacts: KingdomArtifacts;
+  profile?: { name: string; avatarId: string }; // the name and portrait the player chose (all game wallet coins sit at the king's address)
 }): Promise<KingdomOutcome> {
-  const { game, provider, wallet, action, expectedPay, artifacts } = opts;
+  const { game, provider, wallet, action, expectedPay, artifacts, profile } = opts;
 
   const { pot, state, matches } = kingdomContracts(game, provider, artifacts);
   if (!matches) return fail("mismatch", COPY.grab.mismatch);
@@ -233,7 +234,7 @@ export async function kingdomAct(opts: {
     return fail("build_failed", COPY.grab.buildFailed);
   }
 
-  const res = await act(game.gameCategory, { action, txHex, walletInputs: claimsFor(wallet, inputs) });
+  const res = await act(game.gameCategory, { action, txHex, walletInputs: claimsFor(wallet, inputs), ...(profile ? { profile } : {}) });
   if (res.ok) return { ok: true, txid: res.txid, passCount: res.passCount };
   if (res.message) console.error(`${action} refused (${res.error}): ${res.message}`);
   return fail(res.error, errorText(res.error));

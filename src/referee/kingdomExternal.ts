@@ -6,7 +6,7 @@ import { CONFIG } from "../config.ts";
 import { COPY, errorText } from "../copy.ts";
 import { formatUnits } from "../lib/format.ts";
 import type { GameKingdom } from "../lib/game.ts";
-import { pickCancelCoins, pickProtectCoins } from "../lib/protectCoins.ts";
+import { MAX_WALLET_INPUTS, pickCancelCoins, pickProtectCoins } from "../lib/protectCoins.ts";
 import { toRelaySafe } from "../lib/relay.ts";
 import { retry } from "../lib/retry.ts";
 import { findWalletCoins } from "../lib/walletCoins.ts";
@@ -75,6 +75,7 @@ async function sendSigned(
   action: "open" | "conquer" | "protect" | "cancel",
   signedHex: string,
   walletInputs: WalletCoin[],
+  profile?: { name: string; avatarId: string },
 ): Promise<KingdomExternalOutcome> {
   const claims: WalletInputClaim[] = walletInputs.map((c) => ({
     txid: c.utxo.txid,
@@ -83,7 +84,7 @@ async function sendSigned(
     lockingBytecode: binToHex(c.lock),
     ...(c.utxo.token ? { token: { amount: String(c.utxo.token.amount), category: c.utxo.token.category } } : {}),
   }));
-  const res = await act(game.gameCategory, { action, txHex: signedHex, walletInputs: claims });
+  const res = await act(game.gameCategory, { action, txHex: signedHex, walletInputs: claims, ...(profile ? { profile } : {}) });
   if (res.ok) return { ok: true, txid: res.txid, passCount: res.passCount };
   if (res.message) console.error(`${action} refused (${res.error}): ${res.message}`);
   return fail(res.error, errorText(res.error));
@@ -103,8 +104,10 @@ export async function kingdomActExternal(opts: {
   artifacts: KingdomArtifacts;
   signal: AbortSignal;
   onPrompt: (text: string) => void;
+  profile?: { name: string; avatarId: string }; // the name and portrait the player chose
 }): Promise<KingdomExternalOutcome> {
   const { game, provider, walletPkhHex, action, expectedPay, artifacts, signal, onPrompt } = opts;
+  let profile = opts.profile;
   const fmt = (n: bigint) => formatUnits(n, CONFIG.pusdDecimals);
 
   const { pot, state, matches } = kingdomContracts(game, provider, artifacts);
@@ -128,6 +131,19 @@ export async function kingdomActExternal(opts: {
   if (!picked.ok) return coinFailure(picked, plan.pay);
   const walletInputs = toWalletCoins(coins, picked.inputs); // the PUSD coin comes first
   const first = walletInputs[0]!;
+  // A chosen name counts only when one of the coins sits at the new king's address (server/players.ts). The PUSD may
+  // live on another address of this wallet, so add a small coin from the king address when none is in yet.
+  if (profile) {
+    const kingLock = `76a914${walletPkhHex}88ac`;
+    const atKing = (c: WalletCoin) => binToHex(c.lock) === kingLock;
+    if (!walletInputs.some(atKing)) {
+      const extra = coins
+        .filter((c) => atKing(c) && !walletInputs.includes(c) && (!c.utxo.token || (c.utxo.token.category === game.pusdCategory && !c.utxo.token.nft)))
+        .sort((a, b) => (a.utxo.satoshis < b.utxo.satoshis ? 1 : -1))[0];
+      if (extra && walletInputs.length < MAX_WALLET_INPUTS) walletInputs.push(extra);
+      else profile = undefined; // the move goes ahead; the name falls back to the derived one
+    }
+  }
 
   let built: ReturnType<typeof signRequest>;
   try {
@@ -149,7 +165,7 @@ export async function kingdomActExternal(opts: {
 
   const signed = await signWithWallet(built.request, signal);
   if (!signed.ok) return signed;
-  return sendSigned(game, action, signed.signedHex, walletInputs);
+  return sendSigned(game, action, signed.signedHex, walletInputs, profile);
 }
 
 // The king protects the kingdom with the player's own wallet (WizardConnect). The contract wants the first wallet input to

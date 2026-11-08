@@ -7,7 +7,6 @@ import { COPY } from "../copy.ts";
 import { formatUnits } from "../lib/format.ts";
 import { avatarKey } from "./assets.ts";
 import type { FieldState } from "./director.ts";
-import { displayName } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { sfx } from "./sound.ts";
 
@@ -334,7 +333,7 @@ export class Hud {
   show(state: FieldState, king: Identity | null, nextCost: bigint | null): void {
     const open = state.status !== "waiting" && king !== null;
     this.drawAvatar(open ? king : null);
-    this.name.setText(open ? displayName(king.portrait) : T.noKing);
+    this.name.setText(open ? king.name : T.noKing); // a chosen name is shown only as text
     this.value.setText(`${T.kingdomValue}  ${open ? money(state.value) : "—"}`);
     this.shieldsShown = { open, left: state.protectsLeft };
     this.paintShields();

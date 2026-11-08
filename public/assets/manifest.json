@@ -4,6 +4,7 @@
       "id": "king_01",
       "title": "King",
       "name": "Taren Valecrest",
+      "house": "crimson",
       "image": "portraits/king_01.webp",
       "avatar": "portraits/king_01_avatar.webp",
       "face": {
@@ -16,6 +17,7 @@
       "id": "king_02",
       "title": "Queen",
       "name": "Maelis Emberwyn",
+      "house": "crimson",
       "image": "portraits/king_02.webp",
       "avatar": "portraits/king_02_avatar.webp",
       "face": {
@@ -28,6 +30,7 @@
       "id": "king_03",
       "title": "King",
       "name": "Brannoc Ironhorn",
+      "house": "violet",
       "image": "portraits/king_03.webp",
       "avatar": "portraits/king_03_avatar.webp",
       "face": {
@@ -40,6 +43,7 @@
       "id": "king_04",
       "title": "Queen",
       "name": "Navira Solenne",
+      "house": "violet",
       "image": "portraits/king_04.webp",
       "avatar": "portraits/king_04_avatar.webp",
       "face": {
@@ -52,6 +56,7 @@
       "id": "king_05",
       "title": "King",
       "name": "Rhovan Ardell",
+      "house": "crimson",
       "image": "portraits/king_05.webp",
       "avatar": "portraits/king_05_avatar.webp",
       "face": {
@@ -64,6 +69,7 @@
       "id": "king_06",
       "title": "King",
       "name": "Teodric Blueharrow",
+      "house": "sapphire",
       "image": "portraits/king_06.webp",
       "avatar": "portraits/king_06_avatar.webp",
       "face": {
@@ -76,6 +82,7 @@
       "id": "king_07",
       "title": "King",
       "name": "Ostmar Silverhold",
+      "house": "sapphire",
       "image": "portraits/king_07.webp",
       "avatar": "portraits/king_07_avatar.webp",
       "face": {
@@ -88,6 +95,7 @@
       "id": "king_08",
       "title": "Queen",
       "name": "Seraphine Pearlmoor",
+      "house": "sapphire",
       "image": "portraits/king_08.webp",
       "avatar": "portraits/king_08_avatar.webp",
       "face": {
@@ -100,6 +108,7 @@
       "id": "king_09",
       "title": "King",
       "name": "Torvald Ashenmoor",
+      "house": "obsidian",
       "image": "portraits/king_09.webp",
       "avatar": "portraits/king_09_avatar.webp",
       "face": {
@@ -112,6 +121,7 @@
       "id": "king_10",
       "title": "Queen",
       "name": "Amaranth Velloria",
+      "house": "obsidian",
       "image": "portraits/king_10.webp",
       "avatar": "portraits/king_10_avatar.webp",
       "face": {

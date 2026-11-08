@@ -2,6 +2,7 @@
 
 Run from the repo root:   python tools/build_assets.py
 With contact sheets:      python tools/build_assets.py --sheet <folder>
+Only some kinds:          python tools/build_assets.py --only portraits[,soldiers,...]
 
 Needs Pillow and numpy (pip install --user pillow numpy). No AI models: a plain chroma key.
 How the key works, per pixel:
@@ -45,6 +46,13 @@ FACES = {
     "king_04": (0.62, 0.37, 0.46), "king_05": (0.57, 0.35, 0.48), "king_06": (0.58, 0.38, 0.48),
     "king_07": (0.57, 0.39, 0.52), "king_08": (0.58, 0.37, 0.46), "king_09": (0.60, 0.38, 0.48),
     "king_10": (0.57, 0.37, 0.46),
+}
+# House per portrait, by the colour of the outfit (first run only; edit it in public/assets/manifest.json).
+HOUSES = {
+    "king_01": "crimson", "king_02": "crimson", "king_05": "crimson",
+    "king_06": "sapphire", "king_07": "sapphire", "king_08": "sapphire",
+    "king_03": "violet", "king_04": "violet",
+    "king_09": "obsidian", "king_10": "obsidian",
 }
 # Made-up names, first run only. Edit them in public/assets/manifest.json.
 NAMES = {
@@ -155,11 +163,14 @@ def green_left(im: Image.Image) -> float:
 
 def main() -> None:
     sheet_dir = Path(sys.argv[sys.argv.index("--sheet") + 1]) if "--sheet" in sys.argv else None
+    only = set(sys.argv[sys.argv.index("--only") + 1].split(",")) if "--only" in sys.argv else None
     built: dict[str, Image.Image] = {}
     total = 0
     report = []
 
     for kind in ["backgrounds", *SIZES]:
+        if only is not None and kind not in only:
+            continue
         for src in sorted((SRC / kind).glob("*.png")):
             name = src.stem
             im = Image.open(src)
@@ -194,7 +205,7 @@ def main() -> None:
 
     # manifest: keep names already there
     # Sound: art-source/audio/*.mp3 is copied as it is (MP3 plays in every browser; keep the files small)
-    for src in sorted((SRC / "audio").glob("*.mp3")):
+    for src in sorted((SRC / "audio").glob("*.mp3")) if only is None or "audio" in only else []:
         dst = OUT / "audio" / src.name
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
@@ -203,8 +214,10 @@ def main() -> None:
 
     mpath = OUT / "manifest.json"
     old = {}
+    whole = {}
     if mpath.exists():
-        old = {p["id"]: p for p in json.loads(mpath.read_text(encoding="utf-8")).get("portraits", [])}
+        whole = json.loads(mpath.read_text(encoding="utf-8"))
+        old = {p["id"]: p for p in whole.get("portraits", [])}
     portraits = []
     for pid in sorted(FACES):
         cx, cy, side = FACES[pid]
@@ -214,12 +227,13 @@ def main() -> None:
             "id": pid,
             "title": prev.get("title", title),
             "name": prev.get("name", name),
+            "house": prev.get("house", HOUSES[pid]),
             "image": f"portraits/{pid}.webp",
             "avatar": f"portraits/{pid}_avatar.webp",
             # face square in the 512x640 portrait, pixels
             "face": {"x": round((cx - side / 2) * 512), "y": round(cy * 640 - side * 512 / 2), "size": round(side * 512)},
         })
-    mpath.write_text(json.dumps({"portraits": portraits}, indent=2) + "\n", encoding="utf-8")
+    mpath.write_text(json.dumps({**whole, "portraits": portraits}, indent=2) + "\n", encoding="utf-8")
 
     print("\n".join(report))
     print(f"TOTAL {total / 1024 / 1024:.2f} MB")
@@ -242,6 +256,8 @@ def sheets(built: dict[str, Image.Image], d: Path) -> None:
             sh.alpha_composite(t, (x, y))
         sh.convert("RGB").save(d / f"sheet_{label}.png")
     # hair and fur edges at full output size, on dark
+    if "portraits/king_01" not in built:
+        return
     zoom = Image.new("RGBA", (5 * 256, 2 * 320), (16, 22, 44, 255))
     for i in range(10):
         p = built[f"portraits/king_{i + 1:02d}"]

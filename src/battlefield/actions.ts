@@ -6,6 +6,8 @@ import { COPY, pauseText } from "../copy.ts";
 import type { battlefieldDo, battlefieldPage } from "../kingdomMode.ts";
 import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
+import type { Portrait } from "./identity.ts";
+import { openPicker } from "./picker.ts";
 import { isOn, onSoundChange, setSound } from "./sound.ts";
 
 const T = COPY.battlefield;
@@ -31,6 +33,7 @@ export function mountActionBar(
   run: PageDo,
   popup: (text: string) => void,
   openWallet: () => void,
+  portraits: () => Portrait[],
 ): void {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = "") => {
     const e = document.createElement(tag);
@@ -160,7 +163,9 @@ export function mountActionBar(
         : T.conquerBtn(money(BigInt(price)));
       enabled = v.act.enabled && !mine;
       reason = v.act.hint;
-      mainAction = run.act;
+      // Before the player's first open or conquest in this round: "Choose your king" first, then the same move at the
+      // price confirmed in the window (the page's price guard refuses it if the chain price moved meanwhile)
+      mainAction = v.needsProfile && portraits().length > 0 ? () => choose() : () => run.act();
       if (v.act.label === COPY.kingdom.roundOver) {
         // The page's own clock says time is up (actState returns this label then). The referee may take a while
         // to announce the end, so say so instead of showing a price that can no longer be paid.
@@ -233,6 +238,32 @@ export function mountActionBar(
       b.setAttribute("aria-label", amount === null ? T.protectNotOpen : T.protectAria(money(BigInt(amount))));
       b.disabled = !p?.enabled || v.busy || v.mock;
       b.title = amount !== null && over(amount) ? T.protectCap(money(BigInt(k.cap))) : why;
+    });
+  }
+
+  // The price the confirm button shows, live; null when the move is no longer possible
+  function pickPrice(): { label: string; price: bigint } | null {
+    const v = page();
+    const r = v.round, k = r?.kingdom ?? null;
+    if (!r || !k || v.busy || !v.act.enabled || v.ended) return null;
+    if (r.status === "waiting") return { label: T.pickConfirmOpen(money(BigInt(k.openingPrice))), price: BigInt(k.openingPrice) };
+    if (r.status !== "open" || !k.conquest) return null;
+    const pay = BigInt(k.conquest.pay);
+    return { label: v.previousKingIsMine ? T.pickConfirmTakeBack(money(pay)) : T.pickConfirmConquer(money(pay)), price: pay };
+  }
+  function choose(): void {
+    let agreed: bigint | null = null;
+    openPicker({
+      portraits: portraits(),
+      players: page().players,
+      confirmLabel: () => {
+        const p = pickPrice();
+        agreed = p ? p.price : null;
+        return p ? p.label : null;
+      },
+      onConfirm: (profile) => {
+        if (agreed !== null) run.act(profile, agreed);
+      },
     });
   }
 

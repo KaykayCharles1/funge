@@ -1,6 +1,7 @@
-// Who is who on the battlefield. Events carry only key hashes, so until players can choose a name and avatar,
-// each key gets one here, per round: the next free house in order, and a portrait (with its name) picked by hash.
-// Everything about identity lives in this file, so chosen names and avatars can replace it later.
+// Who is who on the battlefield, per round. A player who chose a name and portrait (the referee's players map, and
+// actorName/actorAvatar on their events) is shown with them: "King Charles". A key with no profile, or a round the
+// referee no longer has saved state for, gets a derived one: a portrait (with its made-up name) picked by hash.
+// Houses: the next free house in order. Everything about identity lives in this file.
 
 export type House = {
   id: "violet" | "crimson" | "obsidian" | "sapphire";
@@ -17,9 +18,11 @@ export const HOUSES: readonly House[] = [
   { id: "sapphire", color: 0x2f73e0, text: 0x7fb0f5, soldier: "soldier_sapphire" },
 ];
 
-export type Portrait = { id: string; title: string; name: string; image: string; avatar: string };
+export type Portrait = { id: string; title: string; name: string; image: string; avatar: string; house?: string };
 
-export type Identity = { key: string; house: House; portrait: Portrait };
+// name: what the page shows, "King Charles" (chosen) or "Queen Maelis" (derived)
+export type Identity = { key: string; house: House; portrait: Portrait; name: string };
+export type Profile = { name: string; avatarId: string };
 
 // Keys are compared by their first 22 hex characters: the chain records only that much of the previous king.
 const prefix = (key: string) => key.slice(0, 22).toLowerCase();
@@ -33,6 +36,7 @@ function hash(s: string): number {
 export class IdentityBook {
   private round: string | null = null;
   private byKey = new Map<string, Identity>();
+  private profiles = new Map<string, Profile>(); // chosen names, by key prefix
 
   private portraits: readonly Portrait[];
 
@@ -45,11 +49,35 @@ export class IdentityBook {
     if (roundId === this.round) return;
     this.round = roundId;
     this.byKey.clear();
+    this.profiles.clear();
+  }
+
+  // The referee's players map (from a snapshot): chosen names, by key prefix
+  setPlayers(players: Record<string, { name: string; avatarId: string }> | undefined): void {
+    for (const [k, p] of Object.entries(players ?? {})) this.learn(k, p.name, p.avatarId);
+  }
+
+  // One player's chosen name and portrait (from a snapshot or an event). A key keeps the first one it got.
+  learn(key: string, name: string, avatarId: string): void {
+    const p = prefix(key);
+    if (this.profiles.has(p) || !this.portraits.some((x) => x.id === avatarId)) return;
+    this.profiles.set(p, { name, avatarId });
+    const known = this.byKey.get(p);
+    if (known) this.byKey.set(p, this.withProfile(known));
+  }
+
+  // The chosen name, if any, else the derived one
+  private withProfile(id: Identity): Identity {
+    const chosen = this.profiles.get(prefix(id.key));
+    const portrait = chosen ? this.portraits.find((x) => x.id === chosen.avatarId) : undefined;
+    if (!chosen || !portrait) return id;
+    return { ...id, portrait, name: `${portrait.title} ${chosen.name}` };
   }
 
   // A round that starts over (no events yet) hands out houses from the start again
   reset(): void {
     this.byKey.clear();
+    this.profiles.clear();
   }
 
   get(key: string): Identity {
@@ -58,13 +86,15 @@ export class IdentityBook {
     if (known) return known;
     const n = this.byKey.size;
     const house = HOUSES[n % HOUSES.length];
-    // Portrait by hash; if it is taken, the next free one (while any are free)
+    // Portrait by hash; if it is taken (by anyone shown, or by a chosen profile), the next free one (while any are free)
     const used = new Set([...this.byKey.values()].map((i) => i.portrait.id));
+    for (const pr of this.profiles.values()) used.add(pr.avatarId);
     let at = hash(p) % this.portraits.length;
     for (let tries = 0; tries < this.portraits.length && used.has(this.portraits[at].id); tries++) {
       at = (at + 1) % this.portraits.length;
     }
-    const id: Identity = { key, house, portrait: this.portraits[at] };
+    const portrait = this.portraits[at];
+    const id = this.withProfile({ key, house, portrait, name: displayName(portrait) });
     this.byKey.set(p, id);
     return id;
   }

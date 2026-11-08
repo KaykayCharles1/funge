@@ -13,7 +13,7 @@ import type { PageDo, PageView } from "./actions.ts";
 import { Director } from "./director.ts";
 import type { DirectorStats, FieldState } from "./director.ts";
 import { H, H_COMPACT, W } from "./hud.ts";
-import { HOUSES, IdentityBook } from "./identity.ts";
+import { displayName, HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
 import { installUnlock, preloadTracks } from "./sound.ts";
@@ -88,6 +88,10 @@ export function mountBattlefield(opts: MountOptions): void {
 
   const scene = new BattlefieldScene(() => {
     book = new IdentityBook(scene.portraits);
+    if (early) {
+      book.setRound(early.gameId);
+      book.setPlayers(early.players);
+    }
     director = new Director({ scene, kingOf, nextCost, isMe, identityOf: (k) => book?.get(k) ?? null });
     scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
       if (!held) director?.tick();
@@ -155,13 +159,17 @@ export function mountBattlefield(opts: MountOptions): void {
   const wallet = foldOldPage();
   mountActionBar(host, opts.page, opts.run, (text) => {
     if (director) scene.hud.popup(text);
-  }, wallet.open);
+  }, wallet.open, () => scene.portraits);
 
   onSceneSnapshot((s, source) => {
     if (source === "mock") mockOn = true;
     else serverSeen = true;
     connection();
     if (s.lastSeq === 0) book?.reset();
+    if (book) {
+      book.setRound(s.gameId);
+      book.setPlayers(s.players); // chosen names
+    }
     if (!director) early = s;
     else if (!held) director.onSnapshot(s, CONFIG.kingdom.openingPrice);
   });
@@ -172,6 +180,12 @@ export function mountBattlefield(opts: MountOptions): void {
     if (book && typeof prev === "string") {
       book.setRound(e.roundId);
       book.get(prev);
+    }
+    // A chosen name and portrait travel with the player's own moves
+    const d = e.data ?? {};
+    if (book && typeof d.actor === "string" && typeof d.actorName === "string" && typeof d.actorAvatar === "string") {
+      book.setRound(e.roundId);
+      book.learn(d.actor, d.actorName, d.actorAvatar);
     }
     director.onEvent(e);
   });
@@ -228,6 +242,22 @@ function devPanel(
       });
       buttons.append(b);
     }
+    // The picker as a player would see it, with two portraits and a name taken (nothing is sent)
+    const pick = el("button", "rounded-lg bg-slate-600 px-3 py-1 font-semibold", "Picker preview");
+    pick.addEventListener("click", () =>
+      void import("./picker.ts").then(({ openPicker }) =>
+        openPicker({
+          portraits: scene.portraits,
+          players: {
+            a1a1a1a1a1a1a1a1a1a1a1: { name: "Charles", avatarId: "king_05", title: "King", house: "crimson" },
+            b2b2b2b2b2b2b2b2b2b2b2: { name: "Amina", avatarId: "king_04", title: "Queen", house: "violet" },
+          },
+          confirmLabel: () => COPY.battlefield.pickConfirmConquer("10.20"),
+          onConfirm: (p) => (status.textContent = `picker chose ${p.name} (${p.avatarId})`),
+        }),
+      ),
+    );
+    buttons.append(pick);
     // Pretend to be mock king A (a1a1…), to see "YOUR kingdom" and "Claim your reward"
     const meBox = el("label", "ml-2 flex items-center gap-1 text-slate-300");
     const me = el("input", "");
@@ -302,7 +332,7 @@ function devPanel(
       deadline: null, capMs: CLOCK_CAP_SECONDS * 1000, pausedSince: null, payout: null, cancelled: null,
     };
     const p = scene.portraits[Number(portrait.value)];
-    const king: Identity | null = waiting || !p ? null : { key: "dev", house: HOUSES[Number(house.value)], portrait: p };
+    const king: Identity | null = waiting || !p ? null : { key: "dev", house: HOUSES[Number(house.value)], portrait: p, name: displayName(p) };
     const fees = getFees();
     scene.cancelScenes();
     scene.hud.ribbon(null);

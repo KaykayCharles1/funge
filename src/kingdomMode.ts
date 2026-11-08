@@ -164,7 +164,8 @@ function renderStats() {
   $("kPool").textContent = units(s.pot);
   $("kValue").textContent = started ? units(k.value) : "—";
   $("kPass").textContent = started ? String(s.passCount) : "—";
-  $("kKing").textContent = king === null ? COPY.kingdom.nobody : isMine(king) ? `${shortKey(king)} (${COPY.kingdom.you})` : shortKey(king);
+  const kingName = king === null ? null : chosenName(king) ?? shortKey(king);
+  $("kKing").textContent = king === null ? COPY.kingdom.nobody : isMine(king) ? `${kingName} (${COPY.kingdom.you})` : kingName!;
   $("kPrev").textContent =
     k.previousKing === null ? "—" : `${k.previousKing.slice(0, 8)}…${isMinePrefix(k.previousKing) ? ` (${COPY.kingdom.you})` : ""}`;
 }
@@ -236,7 +237,7 @@ function renderOver() {
   $("overTitle").textContent = COPY.over.title;
   $("overText").textContent = iAmKing
     ? COPY.kingdom.overYouWin(pool)
-    : `${COPY.kingdom.overSomeone(pool, king ? shortKey(king) : "the last king")} ${COPY.over.auto}`;
+    : `${COPY.kingdom.overSomeone(pool, king ? chosenName(king) ?? shortKey(king) : COPY.kingdom.lastKing)} ${COPY.over.auto}`;
   show("claimBtn", iAmKing);
   const btn = $("claimBtn") as HTMLButtonElement;
   btn.disabled = claiming;
@@ -440,7 +441,7 @@ function renderActions() {
 
 // Open, conquer or protect with whichever wallet is playing. `amount` is the price the player agreed to (open, conquer)
 // or the protect amount. Nothing is spent beyond it: the helpers re-check the chain and refuse a changed price.
-async function run(kind: Kind, amount: bigint) {
+async function run(kind: Kind, amount: bigint, profile?: { name: string; avatarId: string }) {
   if (acting || mockActive) return; // never spend anything while the mock round is showing
   const external = externalPkh();
   const local = getLocalWallet();
@@ -474,9 +475,9 @@ async function run(kind: Kind, amount: bigint) {
       out =
         external !== null
           ? await kingdomActExternal({
-              game, provider, walletPkhHex: external, action: kind, expectedPay: amount, artifacts, signal: controller.signal, onPrompt,
+              game, provider, walletPkhHex: external, action: kind, expectedPay: amount, artifacts, signal: controller.signal, onPrompt, profile,
             })
-          : await kingdomAct({ game, provider, wallet: local!, action: kind, expectedPay: amount, artifacts });
+          : await kingdomAct({ game, provider, wallet: local!, action: kind, expectedPay: amount, artifacts, profile });
     }
     if (out.ok) {
       const text = kind === "open" ? COPY.kingdom.doneOpen : kind === "conquer" ? COPY.kingdom.doneConquer
@@ -503,12 +504,20 @@ async function run(kind: Kind, amount: bigint) {
   }
 }
 
-function onAct() {
+// profile: the name and portrait chosen in the battlefield's picker. agreed: the price the player confirmed there; the
+// helpers re-check it against the chain (the price guard) and refuse with "price changed" if it moved meanwhile.
+function onAct(profile?: { name: string; avatarId: string }, agreed?: bigint) {
   const r = round;
   const k = r?.kingdom ?? null;
   if (acting || !r || !k || !actState().enabled) return;
-  if (r.status === "waiting") void run("open", BigInt(k.openingPrice));
-  else if (k.conquest) void run("conquer", BigInt(k.conquest.pay));
+  if (r.status === "waiting") void run("open", agreed ?? BigInt(k.openingPrice), profile);
+  else if (k.conquest) void run("conquer", agreed ?? BigInt(k.conquest.pay), profile);
+}
+
+// The chosen name of a key in this round, "King Charles", or null (the page then shows its own short form)
+function chosenName(key: string | null): string | null {
+  const p = key ? round?.players?.[key.slice(0, 22).toLowerCase()] : undefined;
+  return p ? (p.title ? `${p.title} ${p.name}` : p.name) : null;
 }
 
 function onProtect(i: number) {
@@ -540,7 +549,8 @@ function onCancelRound() {
 function describe(e: RefereeEvent): string | null {
   const d = e.data ?? {};
   const king = typeof d.king === "string" ? d.king : null;
-  const who = king === null ? COPY.kingdom.someone : isMine(king) ? COPY.kingdom.youCap : shortKey(king);
+  const named = typeof d.actorName === "string" && typeof d.actor === "string" && d.actor === king ? d.actorName : null;
+  const who = king === null ? COPY.kingdom.someone : isMine(king) ? COPY.kingdom.youCap : chosenName(king) ?? named ?? shortKey(king);
   try {
     if (e.type === "deadline_changed") {
       const clock = typeof d.clockSeconds === "number" ? mmss(d.clockSeconds) : "";
@@ -845,7 +855,7 @@ export async function startKingdomMode() {
   onLocalWalletChange(renderAll);
   void initLocalWallet(provider);
 
-  $("kActBtn").addEventListener("click", onAct);
+  $("kActBtn").addEventListener("click", () => onAct());
   $("kCancelBtn").addEventListener("click", () => activeAct?.abort(new Error("Cancelled by you")));
   [0, 1, 2].forEach((i) => $(`kProt${i}`).addEventListener("click", () => onProtect(i)));
   $("claimBtn").addEventListener("click", () => void onClaim());
@@ -943,6 +953,9 @@ export function battlefieldPage() {
       enabled: !document.getElementById("kProtectBox")?.classList.contains("hidden") && protectBtn(i)?.disabled === false,
     })),
     cancelRound: cancelState(), // { show, enabled, pool }: the king's "Cancel round" while nobody has conquered
+    // The picker: the player has no name in this round yet; what others already took
+    needsProfile: actingPkh() !== null && !round?.players?.[actingPkh()!.slice(0, 22).toLowerCase()],
+    players: round?.players ?? {},
     claiming,
     claimNote,
     wallet: {
@@ -956,9 +969,9 @@ export function battlefieldPage() {
   };
 }
 export const battlefieldDo = {
-  act: () => {
+  act: (profile?: { name: string; avatarId: string }, agreed?: bigint) => {
     bfActStartedAt = Date.now();
-    onAct();
+    onAct(profile, agreed);
   },
   protect: (i: number) => {
     bfActStartedAt = Date.now();

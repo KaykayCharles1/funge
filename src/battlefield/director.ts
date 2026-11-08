@@ -8,7 +8,6 @@ import { serverNow } from "../referee/clock.ts";
 import { CLOCK_CAP_SECONDS } from "../refereeParams.ts";
 import { clockText, money } from "./hud.ts";
 import type { Urgency } from "./hud.ts";
-import { displayName } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { conquestLength, openLength, OVER, SETTLE } from "./scene.ts";
 import type { BattlefieldScene, Mode, SceneRun } from "./scene.ts";
@@ -236,7 +235,7 @@ export class Director {
 
   private name(key: string | null): string {
     const who = key ? this.d.identityOf(key) : null;
-    return who ? displayName(who.portrait) : "";
+    return who ? who.name : "";
   }
 
   // What happens at once, whatever is playing: the sky, protect, pauses, and the popups
