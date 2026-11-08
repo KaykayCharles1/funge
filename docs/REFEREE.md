@@ -69,7 +69,7 @@ dust in the two contracts.
    chain, not trusted from the app); the move is legal for its kind (the exact payments, the new king and value, the dethroned king's payout, the protect rules); protect is also refused in the last 30 seconds; the wallet inputs are signed.
 4. The server signs the contract input and inserts the signature (to be proven in Step 3), then broadcasts the
    transaction itself and replies with the transaction id, or a typed error: `too_late`, `state_changed`,
-   `round_over`, `invalid`, and for Kingdom rules `not_open`, `protect_locked`, `already_king`, `walls_at_maximum`, `no_protects_left`, `not_king`, `not_cancellable`.
+   `round_over`, `invalid`, and for Kingdom rules `not_open`, `protect_locked`, `already_king`, `walls_at_maximum`, `no_protects_left`, `not_king`, `not_cancellable`, and for player profiles `bad_name`, `name_taken`, `avatar_taken`.
 5. Only on success, still under the lock: for an open the deadline becomes now + the cap. For a conquest the server measures the time left at this
    instant and the deadline becomes now + min(CAP, max(MIN, left + ADD)): in effect the old deadline + 1:00, at most the cap from now, and 1:00 from now if the
    move landed inside the grace. Slow checks or a slow wallet neither add nor take time. A protect leaves the deadline alone. An event is pushed to every
@@ -170,3 +170,21 @@ The king may end a round before anyone has challenged it and take the whole pool
   and `payout` = the pool (see `EVENTS.md`). The keeper has nothing left to do.
 - **The trophy** is minted as with any settle. A finished round whose trophy has pass count 1 (cancelled, or nobody
   challenged) says "Round cancelled. Pool returned", never "Wins X".
+
+## Player profiles
+An open or a conquest may carry `profile: { name, avatarId }` in the `/act` body (protect and cancel ignore it).
+- **Checked before signing,** under the round lock: a bad profile refuses the whole move, with nothing broadcast.
+  - `bad_name` (400): the name rules in `src/lib/playerName.ts`, shared with the picker: 2 to 16 characters of
+    letters (accents included), digits, spaces, apostrophes and hyphens, with at least one letter; repeated spaces
+    collapse; a leading "King" or "Queen" is stripped (the title comes from the portrait); nothing that looks like a
+    link, a domain or a wallet address; no word from a short blocklist. An unknown portrait is `invalid`.
+  - `name_taken` (409): another key in this round has the same name, compared without case and spaces.
+  - `avatar_taken` (409): another key in this round has the same portrait.
+- **Only from that key:** the profile is stored for the new king's key, and only when one of the wallet inputs sits at
+  that key's address (the referee's signature covers the inputs' claimed coins, so this cannot be faked). Otherwise
+  the move counts and the profile is ignored.
+- **Once per round:** a key that already has a profile keeps it; a later profile from it is ignored.
+- **Stored** after the broadcast succeeds, in the round's saved state (`players`, keyed by the first 22 hex
+  characters of the key; older saved rounds have none). Shown as `actorName`/`actorAvatar` on that player's open,
+  conquest and protect events, and as the `players` map of the round snapshot (see `EVENTS.md`). If the saved state is
+  lost, the page shows its derived names.

@@ -15,6 +15,15 @@ const clockSettings = CLOCK_PRESETS.standard;
 const str = (n: bigint | number) => n.toString();
 const fakeTx = (n: number) => n.toString(16).padStart(64, "0");
 const KEYS = ["a1", "b2", "c3", "d4", "e5", "f6"].map((k) => k.repeat(20));
+// The names and portraits the mock players chose (as the referee stores them: name without the title)
+const PROFILES: Record<string, { name: string; avatarId: string; title: string }> = {
+  [KEYS[0]!]: { name: "Charles", avatarId: "king_05", title: "King" },
+  [KEYS[1]!]: { name: "Amina", avatarId: "king_04", title: "Queen" },
+  [KEYS[2]!]: { name: "Kwame", avatarId: "king_06", title: "King" },
+  [KEYS[3]!]: { name: "Ada", avatarId: "king_02", title: "Queen" },
+  [KEYS[4]!]: { name: "Tunde", avatarId: "king_03", title: "King" },
+  [KEYS[5]!]: { name: "Zoë", avatarId: "king_08", title: "Queen" },
+};
 type Data = Record<string, string | number | boolean | null>;
 
 class MockKingdom {
@@ -29,6 +38,7 @@ class MockKingdom {
   treasury = 0n;
   protectsUsed = 0;
   paused: { since: number; reason: string } | null = null;
+  players: RoundSnapshot["players"] = {}; // the referee's players map: chosen names by key prefix
 
   constructor(h: MockHooks) {
     this.h = h;
@@ -83,8 +93,18 @@ class MockKingdom {
       gameId: MOCK_ROUND_ID, network: CONFIG.network, status: this.status, deadline: this.deadline, remainingMs: rem,
       paused: this.paused, serverNow: this.h.now(), graceSeconds: GRACE_SECONDS, lastSeq: this.seq, passCount: this.passCount,
       king: this.king, price: money ? str(money.payment) : str(P.openingPrice), pot: str(this.treasury), stateCoin: null,
-      refereePubkey: "", chainStale: false, kind: "kingdom", kingdom,
+      refereePubkey: "", chainStale: false, kind: "kingdom", kingdom, players: this.players,
     };
+  }
+
+  // A player's open or conquest carries their chosen name (the first time it is stored, as the referee does)
+  private chosen(key: string): Data {
+    const p = PROFILES[key];
+    if (!p) return {};
+    const k = key.slice(0, 22);
+    if (!this.players![k]) this.players = { ...this.players, [k]: { name: p.name, avatarId: p.avatarId, title: p.title, house: null } };
+    const mine = this.players![k]!;
+    return { actorName: mine.name, actorAvatar: mine.avatarId };
   }
 
   private send(type: string, reason: string, extra: Data = {}): void {
@@ -103,6 +123,7 @@ class MockKingdom {
     this.lastClock = wholeSeconds(clockAfterOpenMs(clockSettings));
     this.send("deadline_changed", "open", {
       action: "open", txid: fakeTx(this.seq + 1), actor: key, paid: str(P.openingPrice), refunded: "0", toTreasury: str(P.openingPrice),
+      ...this.chosen(key),
     });
   }
 
@@ -111,6 +132,7 @@ class MockKingdom {
     this.value += amount; this.treasury += amount; this.protectsUsed++;
     this.send("protect_applied", "protect", {
       txid: fakeTx(this.seq + 1), actor: this.king, paid: str(amount), refunded: "0", toTreasury: str(amount), amount: str(amount), protectsUsed: this.protectsUsed,
+      ...this.chosen(this.king!),
     });
   }
 
@@ -121,7 +143,7 @@ class MockKingdom {
     const added = this.addToClock();
     this.send("deadline_changed", "conquer", {
       action: "conquer", txid: fakeTx(this.seq + 1), actor: key, paid: str(m.payment), refunded: str(m.kingGets), toTreasury: str(m.poolGets),
-      addedSeconds: added,
+      addedSeconds: added, ...this.chosen(key),
     });
   }
 

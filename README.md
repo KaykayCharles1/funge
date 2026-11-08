@@ -40,6 +40,7 @@ Offline (no network, no coins):
     node scripts/test-kingdom-contract.ts  the contract on a mock chain
     node scripts/test-rounds.ts            the round clock
     node scripts/test-clock.ts             the clock rule, protect lockout, clock events
+    node scripts/test-player-name.ts       the player name rules
     node scripts/test-kingdom-act.ts       move validation, races, timing, the round description
     node scripts/test-keeper.ts            automatic settlement
     node scripts/test-mock-round.ts        the dev-only mock round (see docs/EVENTS.md)

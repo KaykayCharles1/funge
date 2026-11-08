@@ -10,6 +10,11 @@ import { CLOCK_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./referee
 
 export const MOCK_ROUND_ID = "00".repeat(32);
 export const MOCK_KINGS = { alice: "a1".repeat(20), bob: "b2".repeat(20) };
+// Their chosen names and portraits, as the referee would store them
+const MOCK_PLAYERS = {
+  [MOCK_KINGS.alice.slice(0, 22)]: { name: "Charles", avatarId: "king_05", title: "King", house: null },
+  [MOCK_KINGS.bob.slice(0, 22)]: { name: "Amina", avatarId: "king_04", title: "Queen", house: null },
+};
 
 export type MockHooks = {
   now: () => number; // the page's server clock
@@ -36,6 +41,13 @@ export async function playMockRound(h: MockHooks): Promise<void> {
   let value = 0n;
   let treasury = 0n;
   let protectsUsed = 0;
+  let players: NonNullable<RoundSnapshot["players"]> = {};
+  const chosen = (key: string): Record<string, string> => {
+    const k = key.slice(0, 22);
+    if (!players[k] && MOCK_PLAYERS[k]) players = { ...players, [k]: MOCK_PLAYERS[k]! };
+    const p = players[k];
+    return p ? { actorName: p.name, actorAvatar: p.avatarId } : {};
+  };
 
   let lastClock: number | null = null; // seconds on the clock right after the last open or conquest
   // The clock fields every event and snapshot carry (the same rule as the referee: src/lib/kingdomClock.ts)
@@ -70,7 +82,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
     return {
       gameId: MOCK_ROUND_ID, network: CONFIG.network, status, deadline, remainingMs: rem, paused: null, serverNow: h.now(),
       graceSeconds: GRACE_SECONDS, lastSeq: seq, passCount, king, price: money ? str(money.payment) : str(P.openingPrice),
-      pot: str(treasury), stateCoin: null, refereePubkey: "", chainStale: false, kind: "kingdom", kingdom,
+      pot: str(treasury), stateCoin: null, refereePubkey: "", chainStale: false, kind: "kingdom", kingdom, players,
     };
   }
   function event(type: string, reason: string, extra: Record<string, string | number | boolean | null>): RefereeEvent {
@@ -102,6 +114,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
     lastClock = wholeSeconds(clockAfterOpenMs(clockSettings));
     deliver(event("deadline_changed", "open", {
       action: "open", txid: fakeTx(1), actor: king, paid: str(P.openingPrice), refunded: "0", toTreasury: str(P.openingPrice),
+      ...chosen(king),
     }));
     if (!(await step("Alice protects the throne with +5.00", 2500))) return;
 
@@ -109,6 +122,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
     value += amount; treasury += amount; protectsUsed = 1;
     deliver(event("protect_applied", "protect", {
       txid: fakeTx(2), actor: king, paid: str(amount), refunded: "0", toTreasury: str(amount), amount: str(amount), protectsUsed,
+      ...chosen(king),
     }));
     if (!(await step("Bob conquers the throne", 2500))) return;
 
@@ -121,7 +135,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
     lastClock = wholeSeconds(ms);
     deliver(event("deadline_changed", "conquer", {
       action: "conquer", txid: fakeTx(3), actor: king, paid: str(money.payment), refunded: str(money.kingGets), toTreasury: str(money.poolGets),
-      addedSeconds: wholeSeconds(ms - left),
+      addedSeconds: wholeSeconds(ms - left), ...chosen(king),
     }));
 
     // The page's own countdown raises the clock warnings (60, 30 and 10 seconds) as time passes

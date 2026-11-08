@@ -26,6 +26,7 @@ export type RoundRecord = {
   seenPassCount?: number; // the pass count the timer has accounted for
   lastClockSeconds?: number; // seconds on the clock right after the last open or conquest (missing in older saves: the time left stands in)
   scene?: SceneState; // the kingdom as of the last move or chain read
+  players?: Record<string, { name: string; avatarId: string }>; // chosen names, by key prefix (missing in older saves: none yet)
   events: EventRecord[];
 };
 

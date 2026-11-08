@@ -234,6 +234,9 @@ export const COPY = {
     walls_at_maximum: "The walls are at their maximum.",
     no_protects_left: "No protects left in this reign.",
     not_cancellable: "Someone has already conquered the throne, so the round can no longer be cancelled.",
+    bad_name: "That name cannot be used. Use 2 to 16 letters, digits, spaces, apostrophes or hyphens.",
+    name_taken: "Another player in this round already uses that name. Choose another.",
+    avatar_taken: "Another player in this round already uses that portrait. Choose another.",
   } satisfies Record<ApiErrorCode, string>,
 } as const;
 

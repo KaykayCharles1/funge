@@ -763,6 +763,72 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   console.log("ok: conquest against cancel: the first one through the lock wins; the conquest then gets round_over, the cancel not_cancellable");
 }
 
+// ---------------------------------------------------------------- player profiles
+{
+  const withProfile = <T extends object>(b: T, name: string, avatarId: string) => ({ ...b, profile: { name, avatarId } });
+  const file = join(dir, `s${counter}.json`); // the next setup's saved state
+  const s = await setup();
+  const id = GAME.gameId;
+  // the open with a profile: "King Charles" is stored as "Charles" with the portrait's title
+  await executeAct(s.deps, GAME, withProfile(body(s.world, "open", { payer: ALICE }), "  King   Charles ", "king_05"));
+  assert.deepEqual(s.manager.playerOf(id, ALICE), { name: "Charles", avatarId: "king_05" });
+  let ev = s.manager.get(id).events.at(-1)!;
+  assert.deepEqual([ev.data?.actorName, ev.data?.actorAvatar], ["Charles", "king_05"]);
+
+  // refusals: nothing is broadcast, the round does not move
+  const refused = async (label: string, raw: object, code: string) => {
+    const before = s.world.broadcasts.length;
+    await fails(executeAct(s.deps, GAME, raw), code, label);
+    assert.equal(s.world.broadcasts.length, before, `${label}: nothing may be broadcast`);
+    assert.equal(s.world.state.holderPkh, ALICE, `${label}: the throne stays`);
+  };
+  await refused("a name in another case", withProfile(body(s.world, "conquer", { payer: BOB }), "charles", "king_02"), "name_taken");
+  await refused("the same name with spaces", withProfile(body(s.world, "conquer", { payer: BOB }), "Char les", "king_02"), "name_taken");
+  await refused("a portrait in use", withProfile(body(s.world, "conquer", { payer: BOB }), "Kwame", "king_05"), "avatar_taken");
+  await refused("a bad name", withProfile(body(s.world, "conquer", { payer: BOB }), "bob.com", "king_02"), "bad_name");
+  await refused("a one-letter name", withProfile(body(s.world, "conquer", { payer: BOB }), "B", "king_02"), "bad_name");
+  await refused("an unknown portrait", withProfile(body(s.world, "conquer", { payer: BOB }), "Kwame", "king_99"), "invalid");
+  await refused("a malformed profile", { ...body(s.world, "conquer", { payer: BOB }), profile: { name: 5 } }, "invalid");
+
+  // a valid one for BOB
+  await executeAct(s.deps, GAME, withProfile(body(s.world, "conquer", { payer: BOB }), "Kwame", "king_06"));
+  ev = s.manager.get(id).events.at(-1)!;
+  assert.deepEqual([ev.data?.actorName, ev.data?.actorAvatar], ["Kwame", "king_06"]);
+  // ALICE takes back with another profile: she keeps the first one
+  s.clock.advance(1000);
+  await executeAct(s.deps, GAME, withProfile(body(s.world, "conquer", { payer: ALICE }), "Someone Else", "king_01"));
+  assert.deepEqual(s.manager.playerOf(id, ALICE), { name: "Charles", avatarId: "king_05" });
+  assert.equal(s.manager.get(id).events.at(-1)!.data?.actorName, "Charles");
+  // protect carries the king's name; a profile sent with it is ignored
+  await executeAct(s.deps, GAME, withProfile(body(s.world, "protect", { amount: 100n }), "Changed", "king_01"));
+  ev = s.manager.get(id).events.at(-1)!;
+  assert.deepEqual([ev.type, ev.data?.actorName, ev.data?.actorAvatar], ["protect_applied", "Charles", "king_05"]);
+  // a move whose wallet coins are not at the new king's address: the move counts, the profile does not
+  await executeAct(s.deps, GAME, withProfile(body(s.world, "conquer", { payer: CAROL, walletLock: p2pkh(BOB) }), "Ama", "king_04"));
+  assert.equal(s.world.state.holderPkh, CAROL);
+  assert.equal(s.manager.playerOf(id, CAROL), null);
+  assert.equal("actorName" in (s.manager.get(id).events.at(-1)!.data ?? {}), false);
+
+  // the snapshot's players map: key prefix -> name, portrait, title, house
+  const c = s.view();
+  s.manager.observe(id, { live: c.live, passCount: c.passCount });
+  const snap = describeRound(GAME, s.manager.get(id), c, s.clock.now(), s.manager.clockInfo(id));
+  assert.deepEqual(snap.players, {
+    [ALICE.slice(0, 22)]: { name: "Charles", avatarId: "king_05", title: "King", house: snap.players[ALICE.slice(0, 22)]!.house },
+    [BOB.slice(0, 22)]: { name: "Kwame", avatarId: "king_06", title: "King", house: snap.players[BOB.slice(0, 22)]!.house },
+  });
+  // the profiles are saved with the referee's state
+  await new Promise((r) => setTimeout(r, 50));
+  const { store: again } = await Store.open(file);
+  assert.deepEqual(Object.keys(again.data.rounds[id]!.players ?? {}).sort(), [ALICE.slice(0, 22), BOB.slice(0, 22)].sort());
+  // an older saved round with no players: an empty map
+  const old = await setup();
+  delete old.manager.get(id).players;
+  const oc = old.view();
+  assert.deepEqual(describeRound(GAME, old.manager.get(id), oc, old.clock.now()).players, {});
+  console.log("ok: profiles: stored with a valid open or conquest from that key, King/Queen stripped, kept once set; bad_name, name_taken, avatar_taken refuse the move; actorName/actorAvatar on open, conquest and protect; players in the snapshot and in the saved state");
+}
+
 // ---------------------------------------------------------------- what the page is told
 {
   const s = await setup();

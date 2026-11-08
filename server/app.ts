@@ -6,6 +6,7 @@ import { conquestMoney, protectAmounts } from "../src/lib/kingdom.ts";
 import { ACT_BODY_LIMIT, ACT_RATE, GLOBAL_RATE, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
 import { ActError, executeAct, type Referee } from "./act.ts";
 import { settleRound } from "./keeper.ts";
+import { playersView } from "./players.ts";
 import type { ChainReader, ChainState } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import type { ServerGame } from "./games.ts";
@@ -91,6 +92,7 @@ export function describeRound(game: ServerGame, round: RoundRecord, chain: Chain
     refereePubkey: game.refereePubkey,
     chainStale: chain.stale,
     kingdom,
+    players: playersView(round.players), // chosen names: key prefix (22 hex) -> name, avatarId, title, house
   };
 }
 

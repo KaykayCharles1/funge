@@ -6,13 +6,15 @@ export type ActErrorCode =
   | "invalid" | "state_changed" | "too_late" | "round_over"
   | "paused" | "network_busy" | "chain_unavailable" | "outcome_unknown" | "not_over"
   // Kingdom
-  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left" | "not_cancellable";
+  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left" | "not_cancellable"
+  // player profiles
+  | "bad_name" | "name_taken" | "avatar_taken";
 
 const STATUS: Record<ActErrorCode, number> = {
   invalid: 400, state_changed: 409, too_late: 409, round_over: 409, not_over: 409,
   paused: 503, network_busy: 503, chain_unavailable: 503, outcome_unknown: 503,
   not_open: 409, protect_locked: 409, already_king: 409, walls_at_maximum: 409, no_protects_left: 409, not_king: 403,
-  not_cancellable: 409,
+  not_cancellable: 409, bad_name: 400, name_taken: 409, avatar_taken: 409,
 };
 
 export class ActError extends Error {
@@ -38,7 +40,8 @@ export type WalletInputClaim = {
   lockingBytecode: string;
   token?: { amount: bigint; category: string; nft?: { capability: Capability; commitment: string } };
 };
-export type ActBody = { action: string; txHex: string; walletInputs: WalletInputClaim[] };
+// profile: the name and portrait a player chose, sent with an open or a conquest (ignored for protect and cancel)
+export type ActBody = { action: string; txHex: string; walletInputs: WalletInputClaim[]; profile?: { name: string; avatarId: string } };
 
 // Which contract function the referee signs for, and with what arguments
 export type SignCall =

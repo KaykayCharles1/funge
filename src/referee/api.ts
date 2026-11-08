@@ -22,7 +22,11 @@ export type RoundSnapshot = {
   chainStale: boolean;
   kind?: "kingdom";
   kingdom?: KingdomSnapshot | null; // Kingdom rounds only
+  players?: Record<string, PlayerProfile>; // chosen names, by the first 22 hex characters of the key (missing on older servers)
 };
+
+// A player's chosen name and portrait. The title ("King"/"Queen") and the house come from the portrait.
+export type PlayerProfile = { name: string; avatarId: string; title: string | null; house: string | null };
 
 export type KingdomSnapshot = {
   holder: string | null;
@@ -58,7 +62,8 @@ export type RefereeEvent = {
 export type ApiErrorCode =
   | "invalid" | "state_changed" | "too_late" | "round_over" | "not_over" | "paused" | "network_busy"
   | "chain_unavailable" | "outcome_unknown" | "unknown_round" | "internal" | "rate_limited" | "server_unreachable"
-  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left" | "not_cancellable";
+  | "not_open" | "protect_locked" | "not_king" | "already_king" | "walls_at_maximum" | "no_protects_left" | "not_cancellable"
+  | "bad_name" | "name_taken" | "avatar_taken";
 
 export type ApiFailure = { ok: false; error: ApiErrorCode; message: string; serverNow: number | null };
 
@@ -69,7 +74,10 @@ export type WalletInputClaim = {
   lockingBytecode: string;
   token?: { amount: string; category: string; nft?: { capability: "none" | "mutable" | "minting"; commitment: string } };
 };
-export type ActRequest = { action: "open" | "conquer" | "protect" | "cancel"; txHex: string; walletInputs: WalletInputClaim[] };
+export type ActRequest = {
+  action: "open" | "conquer" | "protect" | "cancel"; txHex: string; walletInputs: WalletInputClaim[];
+  profile?: { name: string; avatarId: string }; // open and conquer only: the name and portrait the player chose
+};
 export type ActSuccess = {
   ok: true; txid: string; passCount: number; king: string; deadline: number | null; serverNow: number; lastSeq: number;
 };
@@ -82,6 +90,7 @@ const KNOWN: string[] = [
   "invalid", "state_changed", "too_late", "round_over", "not_over", "paused", "network_busy",
   "chain_unavailable", "outcome_unknown", "unknown_round", "internal",
   "not_open", "protect_locked", "not_king", "already_king", "walls_at_maximum", "no_protects_left", "not_cancellable",
+  "bad_name", "name_taken", "avatar_taken",
 ];
 const base = () => CONFIG.referee.url.replace(/\/$/, "");
 

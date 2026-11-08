@@ -10,6 +10,7 @@ import type { ServerGame } from "./games.ts";
 import { KINGDOM_HANDLERS } from "./kingdomAct.ts";
 import { sceneAfter, sceneOf } from "./scene.ts";
 import type { LockRunner } from "./lock.ts";
+import { playerKey, vetProfile, type Profile } from "./players.ts";
 import { classifyKingdomAction, type RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
@@ -76,7 +77,15 @@ export function parseActBody(raw: unknown): ActBody {
       lockingBytecode: x.lockingBytecode as string, ...(token ? { token } : {}),
     };
   });
-  return { action: b.action, txHex: b.txHex as string, walletInputs };
+  let profile: ActBody["profile"];
+  if (b.profile !== undefined) {
+    const p = b.profile as Record<string, unknown> | null;
+    if (!p || typeof p !== "object" || typeof p.name !== "string" || p.name.length > 64 || typeof p.avatarId !== "string" || !/^[a-z0-9_]{1,32}$/.test(p.avatarId)) {
+      return invalid("profile is malformed.");
+    }
+    profile = { name: p.name, avatarId: p.avatarId };
+  }
+  return { action: b.action, txHex: b.txHex as string, walletInputs, ...(profile ? { profile } : {}) };
 }
 
 const toLibauth = (
@@ -192,6 +201,17 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     const tx = decoded;
     const checked = handler.validate({ game, chain: c, tx, body });
 
+    // 3b. A chosen name and portrait, with an open or a conquest only. It counts only when the move comes from the new
+    // king's own key: one of the wallet inputs sits at that key's address (the referee's signature binds the claims).
+    // A bad profile refuses the move before anything is signed; a key that already has one keeps it.
+    let newProfile: Profile | null = null;
+    if (body.profile && (handler.fn === "open" || handler.fn === "conquer")) {
+      const own = `76a914${checked.newHolder}88ac`;
+      if (body.walletInputs.some((w) => w.lockingBytecode.toLowerCase() === own)) {
+        newProfile = vetProfile(manager.get(id).players ?? {}, checked.newHolder, body.profile);
+      }
+    }
+
     // 4. Near the node's unconfirmed chain limit: pause with a clear message
     if (!deps.unconfirmed.canSend(id)) {
       manager.pause(id, "network_busy");
@@ -220,9 +240,12 @@ async function runAct(deps: ActDeps, game: ServerGame, body: ActBody, handler: A
     let r: RoundRecord;
     const m = checked.moved;
     const scene = sceneAfter(checked.newPassCount, m);
+    if (newProfile) manager.setPlayer(id, playerKey(checked.newHolder), newProfile);
+    const who = manager.playerOf(id, m.actor);
     const moveData = {
       txid, king: checked.newHolder, actor: m.actor, previousKing: m.previousKing,
       paid: m.paid.toString(), refunded: m.refunded.toString(), toTreasury: m.toTreasury.toString(),
+      ...(who ? { actorName: who.name, actorAvatar: who.avatarId } : {}),
     };
     if (handler.fn === "cancel") {
       if (!checked.cancel) throw new Error("cancel without its payout");

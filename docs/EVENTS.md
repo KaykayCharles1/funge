@@ -49,6 +49,7 @@ These are the kingdom as it stands **after** the event. Money is always a string
 | `action` | `open` or `conquer` (on `deadline_changed`). |
 | `addedSeconds` | Conquests only: the seconds this conquest actually added to the time left (`add`, or less when the cap cut it). |
 | `amount`, `protectsUsed` | On `protect_applied`: the protect amount and how many protects this reign has used. |
+| `actorName`, `actorAvatar` | The name and portrait id the actor chose (see "Player profiles" below), when they have one. Absent otherwise. The name has no title: the page puts "King" or "Queen" before it, from the portrait. |
 
 ## The events
 
@@ -165,7 +166,7 @@ onSceneSnapshot((snapshot, source) => { /* the full round state, for the first f
 ```
 
 - `onSceneEvent` receives every event in the order the page applies it: server events (live and the history the page reads at load do **not** replay through it; only new events do), the page's own `clock_warning`, and events from the mock player.
-- `onSceneSnapshot` receives each full round snapshot the page gets (about every few seconds, and after each event). Use it to draw the starting scene when the page loads in the middle of a round. A snapshot has `status`, `deadline`, `king`, `pot`, `kingdom` (`holder`, `previousKing`, `value`, `protectsLeft`, `conquest`, `clockSeconds`, …) and `lastSeq`.
+- `onSceneSnapshot` receives each full round snapshot the page gets (about every few seconds, and after each event). Use it to draw the starting scene when the page loads in the middle of a round. A snapshot has `status`, `deadline`, `king`, `pot`, `kingdom` (`holder`, `previousKing`, `value`, `protectsLeft`, `conquest`, `clockSeconds`, …) and `lastSeq`, plus `players` (below).
 - A listener that throws is skipped; it cannot break the page.
 
 **From the network (what the page itself does).** `src/referee/api.ts`:
@@ -181,3 +182,22 @@ onSceneSnapshot((snapshot, source) => { /* the full round state, for the first f
 ## Changing the format
 
 Adding a field is not a breaking change for readers that ignore what they do not know. Renaming or removing a field, changing a type, or changing a `type`/`reason` code is. Any such change is announced to the animation branch **before** it is made on `main`.
+
+## Player profiles
+
+A player chooses a name and a portrait before their first open or conquest in a round. The page sends them with
+that move as `profile: { name, avatarId }`, and the referee stores them per round, keyed by the first 22 hex
+characters of the key (see `REFEREE.md`). Events of that player's moves then carry `actorName` and `actorAvatar`,
+and every round snapshot carries the whole map:
+
+```json
+"players": {
+  "a1a1a1a1a1a1a1a1a1a1a1": { "name": "Charles", "avatarId": "king_05", "title": "King", "house": "crimson" },
+  "b2b2b2b2b2b2b2b2b2b2b2": { "name": "Amina", "avatarId": "king_04", "title": "Queen", "house": "violet" }
+}
+```
+
+`title` and `house` come from the portrait's entry in `public/assets/manifest.json` (`house` is `null` until the
+manifest has one). A key with no entry, or a round the referee no longer has saved state for (its `players` map is
+empty), is shown with the name the page derives from the key, as before. Names are untrusted text: show them only
+as text, never as HTML.

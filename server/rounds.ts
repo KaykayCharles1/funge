@@ -94,6 +94,17 @@ export class RoundManager {
     return this.ensure(gameId);
   }
 
+  // Player profiles (server/players.ts): the chosen name and portrait of a key in this round, if any
+  playerOf(gameId: string, key: string | null): { name: string; avatarId: string } | null {
+    if (!key) return null;
+    return this.ensure(gameId).players?.[key.slice(0, 22).toLowerCase()] ?? null;
+  }
+  // Saved with the move's event, which is published right after
+  setPlayer(gameId: string, key: string, profile: { name: string; avatarId: string }): void {
+    const r = this.ensure(gameId);
+    r.players = { ...(r.players ?? {}), [key.slice(0, 22).toLowerCase()]: profile };
+  }
+
   // Every event carries the kingdom as it stands (king, value, treasury, ...), the deadline and the clock fields,
   // so a scene can be drawn from the event alone. The fields a move adds itself win over these defaults.
   private publish(r: RoundRecord, type: string, reason: string, data?: EventData): EventRecord {
