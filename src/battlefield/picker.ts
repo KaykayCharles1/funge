@@ -51,14 +51,13 @@ export function openPicker(o: PickerOpen): void {
   };
   const takenAvatars = new Set(Object.values(o.players).map((p) => p.avatarId));
   const takenNames = new Set(Object.values(o.players).map((p) => nameKey(p.name)));
-  const housesInUse = new Set(Object.values(o.players).map((p) => p.house).filter(Boolean));
   const free = o.portraits.filter((p) => !takenAvatars.has(p.id));
 
   const last = lastChoice();
   let chosen: Portrait | undefined = o.portraits.find((p) => p.id === last?.avatarId && !takenAvatars.has(p.id)) ?? free[0];
 
   const overlay = el("div", "fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4");
-  const box = el("div", "max-h-full w-full max-w-xl overflow-y-auto rounded-2xl border-2 border-[#e0a93a] bg-[#0f1a33] p-4 text-[#f4ead2] shadow-2xl sm:p-6");
+  const box = el("div", "max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl border-2 border-[#e0a93a] bg-[#0f1a33] p-4 text-[#f4ead2] shadow-2xl sm:p-6");
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-modal", "true");
   box.setAttribute("aria-labelledby", "pickTitle");
@@ -72,15 +71,17 @@ export function openPicker(o: PickerOpen): void {
   grid.setAttribute("aria-label", T.pickPortraits);
   const tiles = o.portraits.map((p) => {
     const taken = takenAvatars.has(p.id);
-    const b = el("button", "relative flex min-h-11 flex-col items-center gap-1 rounded-xl border-2 p-1 text-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-40");
+    const b = el("button", "relative min-h-11 overflow-hidden rounded-xl border-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed");
     b.type = "button";
     b.disabled = taken;
     b.setAttribute("role", "radio");
     b.setAttribute("aria-label", taken ? T.pickTakenAria(p.title) : T.pickPortraitAria(p.title, houseName(p)));
-    const img = el("img", "aspect-square w-full rounded-lg object-cover");
-    (img as HTMLImageElement).src = base + p.avatar;
+    // The whole portrait, so the colour of the outfit (the house) shows
+    const img = el("img", `block aspect-[4/5] w-full object-cover ${taken ? "opacity-30 grayscale" : ""}`);
+    (img as HTMLImageElement).src = base + p.image;
     (img as HTMLImageElement).alt = "";
-    b.append(img, el("span", "font-semibold", taken ? T.pickTaken : p.title));
+    b.append(img);
+    if (taken) b.append(el("span", "absolute inset-x-0 top-1/2 -translate-y-1/2 bg-[#0f1a33]/85 py-1 text-center text-sm font-bold", T.pickTaken));
     b.addEventListener("click", () => {
       chosen = p;
       render();
@@ -90,11 +91,10 @@ export function openPicker(o: PickerOpen): void {
   });
 
   // the name
-  const nameRow = el("div", "mt-3 flex flex-col gap-1");
+  const nameRow = el("div", "mx-auto mt-4 flex w-full max-w-md flex-col items-center gap-1 text-center");
   const label = el("label", "text-sm font-semibold", T.pickNameLabel);
   label.setAttribute("for", "pickName");
-  const inputRow = el("div", "flex gap-2");
-  const input = el("input", "min-h-11 grow rounded-xl border-2 border-[#2a3550] bg-[#0b1226] px-3 text-lg text-[#f4ead2] focus-visible:border-[#e0a93a] focus-visible:outline-none") as HTMLInputElement;
+  const input = el("input", "min-h-11 w-full rounded-xl border-2 border-[#2a3550] bg-[#0b1226] px-3 text-center text-lg text-[#f4ead2] focus-visible:border-[#e0a93a] focus-visible:outline-none") as HTMLInputElement;
   input.id = "pickName";
   input.type = "text";
   input.autocomplete = "off";
@@ -102,28 +102,22 @@ export function openPicker(o: PickerOpen): void {
   input.maxLength = 40; // room for a pasted "King " before it is stripped; the rule is checked below
   input.value = last?.name ?? "";
   input.setAttribute("aria-describedby", "pickRules pickProblem");
-  const random = el("button", `${BTN} border-2 border-[#e0a93a] bg-[#0f1a33] hover:bg-[#1f2b4d]`, T.pickRandom);
-  random.type = "button";
-  inputRow.append(input, random);
   const rules = el("p", "text-xs text-[#f4ead2]/70", T.pickRules);
   rules.id = "pickRules";
   const counter = el("span", "text-xs text-[#f4ead2]/70");
   const problem = el("p", "min-h-5 text-sm text-rose-300");
   problem.id = "pickProblem";
   problem.setAttribute("aria-live", "polite");
-  const rulesRow = el("div", "flex items-start justify-between gap-2");
-  rulesRow.append(rules, counter);
-  nameRow.append(label, inputRow, rulesRow, problem);
+  nameRow.append(label, input, counter, rules, problem);
 
   // the preview card in the house colour
-  const preview = el("div", "mt-2 flex items-center gap-3 rounded-2xl border-4 bg-[#0b1226] p-3");
-  const pImg = el("img", "h-16 w-16 rounded-full border-4 object-cover") as HTMLImageElement;
+  const preview = el("div", "mt-2 flex items-center gap-4 rounded-2xl border-4 bg-[#0b1226] p-3");
+  const pImg = el("img", "aspect-[4/5] w-24 shrink-0 rounded-lg border-4 object-cover") as HTMLImageElement;
   pImg.alt = "";
   const pText = el("div", "flex flex-col");
   const pName = el("span", "text-xl font-extrabold");
   const pHouse = el("span", "text-sm");
-  const pHint = el("span", "text-xs text-amber-200");
-  pText.append(pName, pHouse, pHint);
+  pText.append(pName, pHouse);
   preview.append(pImg, pText);
 
   // the buttons
@@ -166,12 +160,11 @@ export function openPicker(o: PickerOpen): void {
     const h = houseOf(chosen);
     preview.style.borderColor = css(h.color);
     pImg.style.borderColor = css(h.color);
-    if (chosen) pImg.src = base + chosen.avatar;
+    if (chosen) pImg.src = base + chosen.image;
     pName.textContent = chosen ? `${chosen.title} ${shown || "…"}` : "…";
     pName.style.color = css(h.text);
     pHouse.textContent = houseName(chosen);
     pHouse.style.color = css(h.text);
-    pHint.textContent = chosen && housesInUse.has(h.id) ? T.pickHouseInUse(houseName(chosen)) : "";
     const label = o.confirmLabel();
     confirm.textContent = label ?? T.pickClosed;
     confirm.disabled = !chosen || err !== null || label === null;
@@ -224,12 +217,6 @@ export function openPicker(o: PickerOpen): void {
   });
   cancel.addEventListener("click", close);
   input.addEventListener("input", render);
-  random.addEventListener("click", () => {
-    const names = T.randomNames.filter((n) => !takenNames.has(nameKey(n)));
-    if (free.length > 0) chosen = free[Math.floor(Math.random() * free.length)];
-    input.value = names[Math.floor(Math.random() * names.length)] ?? "";
-    render();
-  });
   confirm.addEventListener("click", () => {
     const c = checkName(input.value);
     if (!chosen || !c.ok || confirm.disabled) return;
