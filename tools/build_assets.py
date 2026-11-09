@@ -39,6 +39,15 @@ BANNER_SIZE = ("h", 400)  # the banner is a tall pole: 400 wide would make it 80
 # Extra variants with a light rim, for art that is too dark to read on the field: name -> (rgb, rim px at output size).
 # The black archer is the obsidian house; 4 px at 160 px tall is about 2 px at the 90 px the field shows.
 RIMS = {"warrior_03": ((0xD0, 0xD3, 0xDE), 4)}
+# Art with green inside it (the bushes at the base of the castle and keep, greenness about 65-100, the screen about 235):
+# start the fade later so the bushes stay solid
+OPAQUE_BELOW_BY_NAME = {"castle": 110, "keep": 110}
+# Each soldier's eye line, in rows of the 160 px output. The game scales soldiers so the eyes-to-feet distance is the
+# same for all four: these big-headed figures read as the same size that way, whatever sticks up above them (a plume,
+# a spear tip, a halberd blade). Measured on tools' contact sheets; re-measure if the art changes.
+EYE_Y = {"warrior_01": 62, "warrior_02": 62, "warrior_03": 55, "warrior_04": 62}
+# Small light-blue patches (the wall caps beside the castle's side towers) are shifted to grey: name -> True
+GREY_CYAN = {"castle": True}
 
 # Face square per portrait, as fractions of the source (centre x, centre y, side). Used for the round avatar.
 FACES = {
@@ -71,13 +80,13 @@ def key_color(rgb: np.ndarray) -> np.ndarray:
     return np.median(green, 0) if len(green) else np.array([0.0, 255.0, 0.0])
 
 
-def chroma_key(im: Image.Image) -> Image.Image:
+def chroma_key(im: Image.Image, opaque_below: int = OPAQUE_BELOW) -> Image.Image:
     rgb = np.asarray(im.convert("RGB")).astype(np.float32)
     k = key_color(rgb)
     dk = k[1] - max(k[0], k[2])
     d = rgb[..., 1] - rgb[..., [0, 2]].max(-1)
     top = dk * 0.78  # the screen is not uniform: castle and keep have a second patch near (1, 250, 30)
-    a = np.clip((top - d) / (top - OPAQUE_BELOW), 0.0, 1.0)
+    a = np.clip((top - d) / (top - opaque_below), 0.0, 1.0)
 
     # unmix partly transparent pixels: C = a*F + (1-a)*K  ->  F = (C - (1-a)*K) / a
     part = (a > 0.02) & (a < 1.0)
@@ -97,6 +106,61 @@ def chroma_key(im: Image.Image) -> Image.Image:
     al[al < 16] = 0
     out = np.dstack([fg.astype(np.uint8), al])
     return Image.fromarray(out, "RGBA")
+
+
+def grey_cyan(im: Image.Image) -> Image.Image:
+    """Light-blue pixels (blue well above red, not green) become a stone grey of the same brightness."""
+    a = np.asarray(im).astype(np.float32)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    strength = np.clip((b - r - 30) / 30, 0, 1) * (b > 140) * (g - np.maximum(r, b) < 20)
+    lum = 0.30 * r + 0.59 * g + 0.11 * b
+    grey = np.stack([lum * 1.02, lum, lum * 0.97], -1)  # a touch warm, like the stone
+    a[..., :3] = a[..., :3] * (1 - strength[..., None]) + grey * strength[..., None]
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), im.mode)
+
+
+def tower_tips(im: Image.Image, three: bool) -> list:
+    """The topmost opaque point of each tower roof: the main tower, and for the three-tower castle the two side towers."""
+    alpha = np.asarray(im.getchannel("A")) > 128
+    h, w = alpha.shape
+    top = np.where(alpha.any(0), alpha.argmax(0), h)
+    def tip(x0, x1):
+        x = x0 + int(np.argmin(top[x0:x1]))
+        xs = [i for i in range(x0, x1) if top[i] == top[x]]  # the middle of a flat tip
+        return [int(round(sum(xs) / len(xs))), int(top[x])]
+    main = tip(0, w)
+    tips = [main]
+    if three:
+        # the side towers: the highest point on each side, away from the main roof (its slopes are higher still)
+        gap = int(w * 0.2)
+        tips += [tip(0, max(1, main[0] - gap)), tip(min(w - 1, main[0] + gap), w)]
+    return tips
+
+
+def door_box(im: Image.Image) -> dict:
+    """The wooden door: the brown pixels in the lower half, as x0, x1 and top in output pixels."""
+    a = np.asarray(im).astype(int)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    wood = (r > 110) & (g > 45) & (g < 130) & (b < 80) & (r - g > 35) & (al > 128)
+    wood[: im.height // 2] = False
+    # only the middle of the building (the doors are centred), and only columns and rows that are mostly wood
+    w = im.width
+    wood[:, : int(w * 0.3)] = False
+    wood[:, int(w * 0.7):] = False
+    rowsum = wood.sum(1)
+    rows = np.nonzero(rowsum > rowsum.max() * 0.3)[0]
+    if len(rows) == 0:
+        return {}
+    # the door is the lowest block of wood rows (the small window above it is another block)
+    start = len(rows) - 1
+    while start > 0 and rows[start - 1] >= rows[start] - 2:
+        start -= 1
+    rows = rows[start:]
+    colsum = wood[rows.min(): rows.max() + 1].sum(0)
+    cols = np.nonzero(colsum > colsum.max() * 0.4)[0]
+    if len(cols) == 0 or len(rows) == 0:
+        return {}
+    return {"x0": int(cols.min()), "x1": int(cols.max()), "top": int(rows.min())}
 
 
 def trim(im: Image.Image, pad: int = 2) -> Image.Image:
@@ -165,6 +229,7 @@ def main() -> None:
     sheet_dir = Path(sys.argv[sys.argv.index("--sheet") + 1]) if "--sheet" in sys.argv else None
     only = set(sys.argv[sys.argv.index("--only") + 1].split(",")) if "--only" in sys.argv else None
     built: dict[str, Image.Image] = {}
+    measured: dict[str, dict] = {"soldiers": {}, "buildings": {}}  # written into manifest.json for the game
     total = 0
     report = []
 
@@ -184,7 +249,9 @@ def main() -> None:
                 out.save(path, "WEBP", quality=82, method=6)
                 n = path.stat().st_size
             else:
-                keyed = chroma_key(im)
+                keyed = chroma_key(im, OPAQUE_BELOW_BY_NAME.get(name, OPAQUE_BELOW))
+                if GREY_CYAN.get(name):
+                    keyed = grey_cyan(keyed)
                 fit, sz = BANNER_SIZE if name == "banner" else SIZES[kind]
                 if fit != "box":
                     keyed = trim(keyed)
@@ -194,6 +261,16 @@ def main() -> None:
                     rimmed = rim(out, *RIMS[name])
                     n += save(rimmed, OUT / kind / f"{name}_silver.webp")
                     built[f"{kind}/{name}_silver"] = rimmed
+                    if kind == "soldiers":
+                        measured["soldiers"][f"{name}_silver"] = {"height": rimmed.height, "eyeY": EYE_Y[name] + (rimmed.height - out.height) // 2}
+                if kind == "soldiers":
+                    # anchored at the feet (the bottom of the trimmed image); scaled in the game by body height
+                    measured["soldiers"][name] = {"height": out.height, "eyeY": EYE_Y[name]}
+                if name in ("castle", "keep"):
+                    measured["buildings"][name] = {
+                        "width": out.width, "height": out.height,
+                        "tips": tower_tips(out, name == "castle"), "door": door_box(out),
+                    }
                 if kind == "portraits":
                     av = avatar(out, FACES[name])
                     n += save(av, OUT / kind / f"{name}_avatar.webp")
@@ -233,7 +310,7 @@ def main() -> None:
             # face square in the 512x640 portrait, pixels
             "face": {"x": round((cx - side / 2) * 512), "y": round(cy * 640 - side * 512 / 2), "size": round(side * 512)},
         })
-    mpath.write_text(json.dumps({**whole, "portraits": portraits}, indent=2) + "\n", encoding="utf-8")
+    mpath.write_text(json.dumps({**whole, **{k: {**whole.get(k, {}), **v} for k, v in measured.items() if v}, "portraits": portraits}, indent=2) + "\n", encoding="utf-8")
 
     print("\n".join(report))
     print(f"TOTAL {total / 1024 / 1024:.2f} MB")

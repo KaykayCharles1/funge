@@ -30,6 +30,21 @@ const LATER: Record<string, string> = {
   field_dusk: "backgrounds/field_dusk.webp",
 };
 
+// What tools/build_assets.py measured: each soldier's eye line (soldiers are scaled by eyes-to-feet, so the four look
+// the same size) and, for the castle and keep, the tower tips (where the flags go) and the door, in output pixels
+type Measured = {
+  soldiers?: Record<string, { height: number; eyeY: number }>;
+  buildings?: Record<string, { width: number; height: number; tips: [number, number][]; door: { x0?: number; x1?: number; top?: number } }>;
+};
+const measured = (scene: Phaser.Scene): Measured => (scene.cache.json.get("manifest") as Measured | undefined) ?? {};
+// The eye line of a soldier texture, in its own pixels (null for an older manifest)
+export function soldierEye(scene: Phaser.Scene, textureKey: string): number | null {
+  const file = FIRST[textureKey];
+  const stem = file ? file.replace(/^.*\//, "").replace(/\.webp$/, "") : "";
+  return measured(scene).soldiers?.[stem]?.eyeY ?? null;
+}
+export const buildingInfo = (scene: Phaser.Scene, kind: "castle" | "keep") => measured(scene).buildings?.[kind] ?? null;
+
 export const avatarKey = (p: Portrait) => `avatar_${p.id}`;
 export const portraitKey = (p: Portrait) => `portrait_${p.id}`;
 

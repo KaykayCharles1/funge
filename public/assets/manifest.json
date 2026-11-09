@@ -130,5 +130,67 @@
         "size": 236
       }
     }
-  ]
+  ],
+  "soldiers": {
+    "warrior_01": {
+      "height": 160,
+      "eyeY": 62
+    },
+    "warrior_02": {
+      "height": 160,
+      "eyeY": 62
+    },
+    "warrior_03_silver": {
+      "height": 168,
+      "eyeY": 59
+    },
+    "warrior_03": {
+      "height": 160,
+      "eyeY": 55
+    },
+    "warrior_04": {
+      "height": 160,
+      "eyeY": 62
+    }
+  },
+  "buildings": {
+    "castle": {
+      "width": 400,
+      "height": 365,
+      "tips": [
+        [
+          200,
+          1
+        ],
+        [
+          67,
+          90
+        ],
+        [
+          332,
+          90
+        ]
+      ],
+      "door": {
+        "x0": 165,
+        "x1": 236,
+        "top": 282
+      }
+    },
+    "keep": {
+      "width": 400,
+      "height": 450,
+      "tips": [
+        [
+          202,
+          1
+        ]
+      ],
+      "door": {
+        "x0": 161,
+        "x1": 243,
+        "top": 345
+      }
+    }
+  }
 }

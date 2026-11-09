@@ -1,6 +1,7 @@
 // The battlefield scene: the field (day, dusk on top), the kingdom in the clearing, the HUD, and the scenes.
 import * as Phaser from "phaser";
-import { avatarKey, bannerKey, loadFirst, loadLater, makeBanners, makeFxTextures, portraitKey, portraitsOf } from "./assets.ts";
+import { avatarKey, bannerKey, buildingInfo, loadFirst, loadLater, makeBanners, makeFxTextures, portraitKey, portraitsOf, soldierEye } from "./assets.ts";
+import { makeFlagCloths, WavingFlag } from "./flag.ts";
 import { isCancelled } from "./director.ts";
 import type { FieldState } from "./director.ts";
 import { BAND_TOP, C, css, FONT, H, H_COMPACT, Hud, HUD_DEPTH, money, reducedMotion, W } from "./hud.ts";
@@ -24,14 +25,18 @@ const CASTLE_FROM = 2500n; // the three-tower castle from 25.00
 // The road enters at the left edge (x < 200, y 340-450) and the right edge (x > 1060, y 330-420): keep those clear.
 const BASE_X = 640, BASE_Y = 410;
 const CASTLE_W = W * 0.22; // the three-tower castle is 22% of the field's width
-const BUILDING = {
-  keep: { height: CASTLE_W * (429 / 400) * 0.9, flags: [[209, 2, 54, 36]] },
-  castle: { height: CASTLE_W * (429 / 400), flags: [[202, 2, 42, 26], [63, 99, 34, 21], [335, 99, 34, 21]] },
-} as const; // flags: where the art's own flags are, in source pixels [x, y, w, h]
+const KEEP_H = CASTLE_W * (429 / 400) * 0.9; // the keep keeps the height it always had
+// The flags drawn on the tower tips (tools/build_assets.py finds the tips): the main tower's, then the side towers'
+const TOWER_FLAG = { main: { poleH: 42, clothW: 64 }, side: { poleH: 28, clothW: 40 } };
+// The two corner banners, the army's territory markers: on the grass below each road entrance, clear of the road,
+// the price panel and the HUD at the top. [pole x, pole top y]
+const CORNERS: [number, number][] = [[46, 500], [1150, 490]];
+const CORNER_FLAG = { poleH: 200, clothW: 100 };
 const WALL_W = 88, WALL_STEP = WALL_W * 0.86; // four a side end at about x 217 and x 1063
-export const SOLDIER_H = 90; // 72 px at a 1024 px field
+export const SOLDIER_H = 90; // a plumed soldier's height: 72 px at a 1024 px field
+const EYES_TO_FEET = SOLDIER_H * (98 / 160); // every soldier is scaled so this matches (the archer has no plume, so he is shorter)
 const BANNER_H = 88, BANNER_X = 320; // in front of the left wall, between two soldiers' places
-const CORRIDOR = 45; // half the clear path in front of the gate door
+const CORRIDOR_MIN = 45; // half the clear path in front of the gate door, at least (wider when the door is)
 // The garrison, in the order places fill. Rows 150 px apart (a soldier is about 85 px wide, so 65 px between
 // neighbours), staggered, none inside the gate corridor. [x offset from the middle, base y]
 const R1 = 538, R2 = 596, R3 = 642;
@@ -201,6 +206,8 @@ export class BattlefieldScene extends Phaser.Scene {
   private bannerImg: Phaser.GameObjects.Image | null = null;
   private walls: Phaser.GameObjects.Image[] = [];
   private flagSpots: [number, number][] = []; // castle flags and the banner, for the banner change glow
+  private flags: WavingFlag[] = []; // the waving flags on the field
+  private corridor = CORRIDOR_MIN; // half the clear path in front of the door of the building on the field
   private dusk: Phaser.GameObjects.Image | null = null;
   private duskWanted = false;
   private skyFrozen = false;
@@ -225,6 +232,7 @@ export class BattlefieldScene extends Phaser.Scene {
   create(): void {
     const day = this.cover(this.add.image(W / 2, H / 2, "field_day")).setDepth(-2);
     makeBanners(this);
+    makeFlagCloths(this);
     makeFxTextures(this);
     this.portraits = portraitsOf(this);
     this.world = this.add.layer();
@@ -237,6 +245,9 @@ export class BattlefieldScene extends Phaser.Scene {
     this.hudCam = this.cameras.add(0, 0, W, H);
     this.hudCam.ignore(day).ignore([this.world, this.fxLayer]);
     this.cameras.main.ignore(hudObjects).ignore(this.topLayer);
+    this.events.on(Phaser.Scenes.Events.UPDATE, (time: number) => {
+      for (const f of this.flags) f.update(time);
+    });
     this.onReady();
 
     // The dusk field and the portraits come after the first frame
@@ -258,6 +269,7 @@ export class BattlefieldScene extends Phaser.Scene {
     w.removeAll(true);
     this.garrison = [];
     this.flagSpots = [];
+    this.flags = [];
     this.walls = [];
     this.building = this.bannerImg = null;
     if (state.status === "settled" && !king) {
@@ -273,30 +285,46 @@ export class BattlefieldScene extends Phaser.Scene {
     const half = this.drawBuilding(kind, king.house);
     this.drawWalls(wallPieces(state.value), half);
     this.drawBanner(king.house);
+    this.drawCorners(king.house);
     // Once the bell has rung the soldiers stand still
     this.drawGarrison(garrisonSize(state.value), king.house, half, state.status === "open");
     if (state.status === "settled") this.drawFinal(state, king);
   }
 
-  private drawBuilding(kind: keyof typeof BUILDING, house: House): number {
-    const spec = BUILDING[kind];
+  private drawBuilding(kind: "castle" | "keep", house: House): number {
     const img = this.add.image(BASE_X, BASE_Y, kind).setOrigin(0.5, 1);
-    const scale = spec.height / img.height;
+    // the castle is 22% of the field wide; the keep keeps its height
+    const scale = kind === "castle" ? CASTLE_W / img.width : KEEP_H / img.height;
     img.setScale(scale).setDepth(BASE_Y);
     this.world.add(img);
     this.building = img;
-    // Cover the art's flags with pennants in the house colour
     const left = BASE_X - (img.width * scale) / 2, top = BASE_Y - img.height * scale;
-    const g = this.add.graphics().setDepth(BASE_Y + 1);
-    for (const [fx, fy, fw, fh] of spec.flags) {
-      const x = left + (fx - 2) * scale, y = top + (fy - 2) * scale, w = (fw + 6) * scale, h = (fh + 4) * scale;
-      const pts = this.points([x, y, x + w, y + h * 0.15, x + w * 0.78, y + h * 0.5, x + w, y + h * 0.85, x, y + h]);
-      g.fillStyle(house.color, 1).fillPoints(pts, true);
-      g.lineStyle(house.edge ? 2.5 : 1.5, house.text, 1).strokePoints(pts, true);
-      this.flagSpots.push([x + w / 2, y + h / 2]);
-    }
-    this.world.add(g);
+    const info = buildingInfo(this, kind);
+    const s = info ? (img.width * scale) / info.width : scale; // manifest pixels -> field pixels
+    // A house flag on the tip of each tower roof: large on the main tower, smaller on the side towers
+    (info?.tips ?? []).forEach(([tx, ty], i) => {
+      const f = i === 0 ? TOWER_FLAG.main : TOWER_FLAG.side;
+      // the pole stands on the roof tip; the cloth hangs from the pole's top
+      this.addFlag(left + tx * s, top + ty * s - f.poleH, { ...f, house, phase: i * 1.7, depth: BASE_Y + 1 });
+    });
+    // the clear path in front of the door: the door's half width plus room to pass
+    const door = info?.door;
+    this.corridor = door && door.x0 !== undefined && door.x1 !== undefined ? Math.max(CORRIDOR_MIN, ((door.x1 - door.x0) * s) / 2 + 20) : CORRIDOR_MIN;
     return (img.width * scale) / 2;
+  }
+
+  // A waving house flag (src/battlefield/flag.ts), part of the field; its cloth also glows at a change of house
+  private addFlag(x: number, y: number, o: { poleH: number; clothW: number; house: House; phase: number; depth: number }): WavingFlag {
+    const f = new WavingFlag(this, x, y, o);
+    this.world.add(f.objects);
+    this.flags.push(f);
+    this.flagSpots.push([f.clothCentre.x, f.clothCentre.y]);
+    return f;
+  }
+
+  // The army's territory markers: a large house flag at each bottom corner of the field
+  private drawCorners(house: House): void {
+    CORNERS.forEach(([x, y], i) => this.addFlag(x, y, { ...CORNER_FLAG, house, phase: 0.8 + i * 2.3, depth: y + CORNER_FLAG.poleH }));
   }
 
   // Walls extend left and right of the building, alternating sides
@@ -320,9 +348,13 @@ export class BattlefieldScene extends Phaser.Scene {
     this.flagSpots.push([BANNER_X, img.y - BANNER_H * 0.6]);
   }
 
+  // A soldier anchored at the feet (the bottom of the trimmed art), scaled so the eyes-to-feet distance is the same for
+  // all four houses, give or take a little for variety
   private soldier(x: number, y: number, house: House, rand: () => number, faceRight: boolean): Phaser.GameObjects.Image {
     const img = this.add.image(x, y, house.soldier).setOrigin(0.5, 1);
-    return img.setScale((SOLDIER_H / img.height) * (0.92 + rand() * 0.16)).setDepth(y).setFlipX(!faceRight);
+    const eye = soldierEye(this, house.soldier);
+    const base = eye !== null ? EYES_TO_FEET / (img.height - eye) : SOLDIER_H / img.height;
+    return img.setScale(base * (0.92 + rand() * 0.16)).setDepth(y).setFlipX(!faceRight);
   }
 
   // Two guards beside the gate door, a standard-bearer with the house banner, the rest in loose rows in front.
@@ -337,7 +369,7 @@ export class BattlefieldScene extends Phaser.Scene {
       this.garrison.push({ img, x, y, post });
       return img;
     };
-    const gx = Math.max(CORRIDOR + 46, half * 0.3);
+    const gx = Math.max(this.corridor + 46, half * 0.3); // a guard on each side of the clear path in front of the door
     add(BASE_X - gx, BASE_Y + 16, true, true);
     add(BASE_X + gx, BASE_Y + 16, false, true);
 
@@ -388,7 +420,7 @@ export class BattlefieldScene extends Phaser.Scene {
   // A faint keep and a card with a title and a line under it
   private drawNotice(title: string, detail: string): void {
     const keep = this.add.image(BASE_X, BASE_Y, "keep").setOrigin(0.5, 1).setAlpha(0.3);
-    keep.setScale(BUILDING.keep.height / keep.height);
+    keep.setScale(KEEP_H / keep.height);
     const cw = 560, ch = 140, cx = W / 2 - cw / 2, cy = 430;
     const g = this.add.graphics().setDepth(1000);
     g.fillStyle(C.navy, 0.88).fillRoundedRect(cx, cy, cw, ch, 20);
@@ -940,12 +972,6 @@ export class BattlefieldScene extends Phaser.Scene {
 
   get isDusk(): boolean {
     return this.duskWanted;
-  }
-
-  private points(flat: number[]): Phaser.Math.Vector2[] {
-    const out: Phaser.Math.Vector2[] = [];
-    for (let i = 0; i < flat.length; i += 2) out.push(new Phaser.Math.Vector2(flat[i], flat[i + 1]));
-    return out;
   }
 
   // Scale a background so it fills the game, cropping the overflow
