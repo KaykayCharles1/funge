@@ -3,7 +3,7 @@
 // Names are shown only as text (textContent), never as HTML. Keyboard: Tab stays inside, Esc closes.
 import { COPY } from "../copy.ts";
 import type { PlayerProfile } from "../referee/api.ts";
-import { checkName, NAME_MAX, nameKey } from "../lib/playerName.ts";
+import { checkName, nameKey } from "../lib/playerName.ts";
 import { css } from "./hud.ts";
 import { HOUSES, type Portrait } from "./identity.ts";
 
@@ -57,11 +57,11 @@ export function openPicker(o: PickerOpen): void {
   let chosen: Portrait | undefined = o.portraits.find((p) => p.id === last?.avatarId && !takenAvatars.has(p.id)) ?? free[0];
 
   const overlay = el("div", "fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4");
-  const box = el("div", "max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl border-2 border-[#e0a93a] bg-[#0f1a33] p-4 text-[#f4ead2] shadow-2xl sm:p-6");
+  const box = el("div", "max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl border-2 border-[#e0a93a] bg-[#0f1a33] p-4 text-[#f4ead2] shadow-2xl sm:p-5");
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-modal", "true");
   box.setAttribute("aria-labelledby", "pickTitle");
-  const title = el("h2", "text-2xl font-extrabold text-[#e0a93a]", T.pickTitle);
+  const title = el("h2", "text-xl font-extrabold text-[#e0a93a]", T.pickTitle);
   title.id = "pickTitle";
   const intro = el("p", "mt-1 text-sm text-[#f4ead2]/80", T.pickIntro);
 
@@ -91,9 +91,7 @@ export function openPicker(o: PickerOpen): void {
   });
 
   // the name
-  const nameRow = el("div", "mx-auto mt-4 flex w-full max-w-md flex-col items-center gap-1 text-center");
-  const label = el("label", "text-sm font-semibold", T.pickNameLabel);
-  label.setAttribute("for", "pickName");
+  const nameRow = el("div", "mx-auto mt-2 flex w-full max-w-md flex-col items-center gap-1 text-center");
   const input = el("input", "min-h-11 w-full rounded-xl border-2 border-[#2a3550] bg-[#0b1226] px-3 text-center text-lg text-[#f4ead2] focus-visible:border-[#e0a93a] focus-visible:outline-none") as HTMLInputElement;
   input.id = "pickName";
   input.type = "text";
@@ -101,34 +99,35 @@ export function openPicker(o: PickerOpen): void {
   input.spellcheck = false;
   input.maxLength = 40; // room for a pasted "King " before it is stripped; the rule is checked below
   input.value = last?.name ?? "";
-  input.setAttribute("aria-describedby", "pickRules pickProblem");
-  const rules = el("p", "text-xs text-[#f4ead2]/70", T.pickRules);
-  rules.id = "pickRules";
-  const counter = el("span", "text-xs text-[#f4ead2]/70");
+  input.placeholder = T.pickNameLabel;
+  input.setAttribute("aria-label", T.pickNameLabel);
+  input.setAttribute("aria-describedby", "pickProblem"); // what is wrong with the name, if anything
   const problem = el("p", "min-h-5 text-sm text-rose-300");
   problem.id = "pickProblem";
   problem.setAttribute("aria-live", "polite");
-  nameRow.append(label, input, counter, rules, problem);
+  nameRow.append(input, problem);
 
   // the preview card in the house colour
-  const preview = el("div", "mt-2 flex items-center gap-4 rounded-2xl border-4 bg-[#0b1226] p-3");
-  const pImg = el("img", "aspect-[4/5] w-24 shrink-0 rounded-lg border-4 object-cover") as HTMLImageElement;
+  const preview = el("div", "flex min-w-0 grow items-center gap-3 rounded-2xl border-2 bg-[#0b1226] p-2");
+  const pImg = el("img", "aspect-[4/5] w-14 shrink-0 rounded-lg border-2 object-cover") as HTMLImageElement;
   pImg.alt = "";
-  const pText = el("div", "flex flex-col");
-  const pName = el("span", "text-xl font-extrabold");
+  const pText = el("div", "flex min-w-0 flex-col");
+  const pName = el("span", "truncate text-lg font-extrabold");
   const pHouse = el("span", "text-sm");
   pText.append(pName, pHouse);
   preview.append(pImg, pText);
 
   // the buttons
-  const actions = el("div", "mt-3 flex flex-wrap justify-end gap-2");
+  const actions = el("div", "flex flex-wrap items-center justify-end gap-2");
   const cancel = el("button", `${BTN} border-2 border-[#e0a93a] bg-[#0f1a33] hover:bg-[#1f2b4d]`, T.pickCancel);
   cancel.type = "button";
   const confirm = el("button", `${BTN} bg-[#e0a93a] text-[#0f1a33] enabled:hover:bg-amber-300 disabled:bg-[#2a3550] disabled:text-[#f4ead2]/60`);
   confirm.type = "button";
   actions.append(cancel, confirm);
 
-  box.append(title, intro, grid, nameRow, preview, actions);
+  const bottom = el("div", "flex flex-wrap items-center gap-3");
+  bottom.append(preview, actions);
+  box.append(title, intro, grid, nameRow, bottom);
   overlay.append(box);
   document.body.append(overlay);
 
@@ -154,7 +153,6 @@ export function openPicker(o: PickerOpen): void {
     }
     const c = checkName(input.value);
     const shown = c.ok ? c.name : input.value.trim();
-    counter.textContent = T.pickCounter([...(c.ok ? c.name : input.value.trim())].length, NAME_MAX);
     const err = chosen ? nameProblem() : T.pickChoosePortrait;
     problem.textContent = input.value === "" && chosen ? "" : err ?? "";
     const h = houseOf(chosen);
