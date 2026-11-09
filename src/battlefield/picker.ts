@@ -63,7 +63,6 @@ export function openPicker(o: PickerOpen): void {
   box.setAttribute("aria-labelledby", "pickTitle");
   const title = el("h2", "text-xl font-extrabold text-[#e0a93a]", T.pickTitle);
   title.id = "pickTitle";
-  const intro = el("p", "mt-1 text-sm text-[#f4ead2]/80", T.pickIntro);
 
   // the portraits
   const grid = el("div", "mt-3 grid grid-cols-5 gap-2");
@@ -127,7 +126,7 @@ export function openPicker(o: PickerOpen): void {
 
   const bottom = el("div", "flex flex-wrap items-center gap-3");
   bottom.append(preview, actions);
-  box.append(title, intro, grid, nameRow, bottom);
+  box.append(title, grid, nameRow, bottom);
   overlay.append(box);
   document.body.append(overlay);
 

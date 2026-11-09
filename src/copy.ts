@@ -170,8 +170,7 @@ export const COPY = {
     popOver: "The round is over",
     popWins: (who: string, amount: string) => `${who} wins ${amount} PUSD`,
     // "Choose your king": the picker before a player's first open or conquest in a round
-    pickTitle: "Choose your king",
-    pickIntro: "Pick a portrait and a name. Everyone in this round will see them.",
+    pickTitle: "Choose your King or Queen",
     pickPortraits: "Portraits",
     pickPortraitAria: (title: string, house: string) => `${title}, ${house}`,
     pickTakenAria: (title: string) => `${title}, taken by another player`,

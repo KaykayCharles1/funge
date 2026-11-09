@@ -818,7 +818,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
     [BOB.slice(0, 22)]: { name: "Kwame", avatarId: "king_06", title: "King", house: snap.players[BOB.slice(0, 22)]!.house },
   });
   // the profiles are saved with the referee's state
-  await new Promise((r) => setTimeout(r, 50));
+  await s.manager.flush(); // saves are queued: wait for the last one
   const { store: again } = await Store.open(file);
   assert.deepEqual(Object.keys(again.data.rounds[id]!.players ?? {}).sort(), [ALICE.slice(0, 22), BOB.slice(0, 22)].sort());
   // an older saved round with no players: an empty map

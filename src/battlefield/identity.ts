@@ -1,7 +1,8 @@
 // Who is who on the battlefield, per round. A player who chose a name and portrait (the referee's players map, and
 // actorName/actorAvatar on their events) is shown with them: "King Charles". A key with no profile, or a round the
 // referee no longer has saved state for, gets a derived one: a portrait (with its made-up name) picked by hash.
-// Houses: the next free house in order. Everything about identity lives in this file.
+// Houses: the house of the portrait (manifest.json), so the army, banners, frame and plate ring match the outfit.
+// Two players may share a house. Everything about identity lives in this file.
 
 export type House = {
   id: "violet" | "crimson" | "obsidian" | "sapphire";
@@ -26,6 +27,9 @@ export type Profile = { name: string; avatarId: string };
 
 // Keys are compared by their first 22 hex characters: the chain records only that much of the previous king.
 const prefix = (key: string) => key.slice(0, 22).toLowerCase();
+
+// The house a portrait belongs to; a portrait without one (an older manifest) falls back to the order keys appeared in
+export const houseOfPortrait = (p: Portrait, fallback: number): House => HOUSES.find((h) => h.id === p.house) ?? HOUSES[fallback % HOUSES.length]!;
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -71,10 +75,10 @@ export class IdentityBook {
     const chosen = this.profiles.get(prefix(id.key));
     const portrait = chosen ? this.portraits.find((x) => x.id === chosen.avatarId) : undefined;
     if (!chosen || !portrait) return id;
-    return { ...id, portrait, name: `${portrait.title} ${chosen.name}` };
+    return { ...id, portrait, house: houseOfPortrait(portrait, HOUSES.indexOf(id.house)), name: `${portrait.title} ${chosen.name}` };
   }
 
-  // A round that starts over (no events yet) hands out houses from the start again
+  // A round that starts over (no events yet) forgets who was who
   reset(): void {
     this.byKey.clear();
     this.profiles.clear();
@@ -84,8 +88,6 @@ export class IdentityBook {
     const p = prefix(key);
     const known = this.byKey.get(p);
     if (known) return known;
-    const n = this.byKey.size;
-    const house = HOUSES[n % HOUSES.length];
     // Portrait by hash; if it is taken (by anyone shown, or by a chosen profile), the next free one (while any are free)
     const used = new Set([...this.byKey.values()].map((i) => i.portrait.id));
     for (const pr of this.profiles.values()) used.add(pr.avatarId);
@@ -94,7 +96,7 @@ export class IdentityBook {
       at = (at + 1) % this.portraits.length;
     }
     const portrait = this.portraits[at];
-    const id = this.withProfile({ key, house, portrait, name: displayName(portrait) });
+    const id = this.withProfile({ key, house: houseOfPortrait(portrait, this.byKey.size), portrait, name: displayName(portrait) });
     this.byKey.set(p, id);
     return id;
   }

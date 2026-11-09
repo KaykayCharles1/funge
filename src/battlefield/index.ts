@@ -175,7 +175,7 @@ export function mountBattlefield(opts: MountOptions): void {
   });
   onSceneEvent((e) => {
     if (!director || held) return;
-    // Register the dethroned king first, so houses follow the order keys appeared in
+    // Register the dethroned king first, so derived portraits are handed out in the order keys appeared in
     const prev = e.data?.previousKing;
     if (book && typeof prev === "string") {
       book.setRound(e.roundId);
