@@ -140,6 +140,10 @@ export function makeFxTextures(scene: Phaser.Scene): void {
       g.lineStyle(width, 0xffffff, alpha).beginPath().arc(80, 110, 92, Math.PI * 1.18, Math.PI * 1.82, false).strokePath();
     }
   });
+  // A soft ground shadow: an ellipse, dark in the middle and fading out (drawn under every soldier)
+  once("fx_shadow", 64, 24, () => {
+    for (let i = 0; i < 8; i++) g.fillStyle(0x000000, 0.09).fillEllipse(32, 12, 64 - i * 7, 24 - i * 2.6);
+  });
   once("fx_dust", 48, 48, () => {
     for (let r = 24; r > 0; r -= 3) g.fillStyle(0xc9a272, 0.05 + (24 - r) * 0.025).fillCircle(24, 24, r);
   });

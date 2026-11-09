@@ -47,6 +47,9 @@ const PLACES: [number, number][] = [
 const BEARER: [number, number] = [170, R2]; // the standard-bearer's place
 type Pt = { x: number; y: number };
 const HOUSE_FOR_STRESS = HOUSES[1]!; // dev stress test only
+// The wander: where garrison soldiers may walk (clear of the corner banners, the road entrances and the price panel),
+// how fast, and how far from home
+const WANDER = { xMin: 170, xMax: 1110, yMin: 514, yMax: 646, speed: 24, reachX: 75, reachY: 30, apart: 46, stride: 15 };
 
 // The march in along the road, from the left or the right edge, ending at the front of the formation
 const ROAD = {
@@ -191,7 +194,13 @@ class Run implements Fx {
   }
 }
 
-type Soldier = { img: Phaser.GameObjects.Image; x: number; y: number; post: boolean }; // post: a guard or the bearer
+// A garrison soldier. post: a gate guard or the standard-bearer (they keep their place). x, y: where the soldier
+// stands now (the feet). The rest is the slow wander of the others: a home to stay near, where it is walking to,
+// how far it has walked (for the stride) and until when it rests.
+type Soldier = {
+  img: Phaser.GameObjects.Image; x: number; y: number; post: boolean;
+  home: Pt; to: Pt | null; walked: number; restUntil: number; base: number;
+};
 type Marcher = { img: Phaser.GameObjects.Image; base: number; x: number; y: number }; // an attacker and where it stops
 
 export class BattlefieldScene extends Phaser.Scene {
@@ -207,6 +216,9 @@ export class BattlefieldScene extends Phaser.Scene {
   private walls: Phaser.GameObjects.Image[] = [];
   private flagSpots: [number, number][] = []; // castle flags and the banner, for the banner change glow
   private flags: WavingFlag[] = []; // the waving flags on the field
+  private shadows = new Map<Phaser.GameObjects.Image, Phaser.GameObjects.Image>(); // soldier -> its ground shadow
+  private wandering = false; // the garrison walks about (an open round, no reduced motion)
+  private walkDust: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private corridor = CORRIDOR_MIN; // half the clear path in front of the door of the building on the field
   private dusk: Phaser.GameObjects.Image | null = null;
   private duskWanted = false;
@@ -245,8 +257,10 @@ export class BattlefieldScene extends Phaser.Scene {
     this.hudCam = this.cameras.add(0, 0, W, H);
     this.hudCam.ignore(day).ignore([this.world, this.fxLayer]);
     this.cameras.main.ignore(hudObjects).ignore(this.topLayer);
-    this.events.on(Phaser.Scenes.Events.UPDATE, (time: number) => {
+    this.events.on(Phaser.Scenes.Events.UPDATE, (time: number, delta: number) => {
       for (const f of this.flags) f.update(time);
+      this.wander(time, delta);
+      this.syncShadows();
     });
     this.onReady();
 
@@ -265,11 +279,16 @@ export class BattlefieldScene extends Phaser.Scene {
   showState(state: FieldState, king: Identity | null, nextCost: bigint | null): void {
     this.hud.show(state, king, nextCost);
     const w = this.world;
-    this.tweens.killTweensOf(w.getChildren());
-    w.removeAll(true);
+    // The old field goes for good. (Layer.removeAll's argument skips callbacks; it does not destroy, so destroy here.)
+    const old = [...w.getChildren()];
+    this.tweens.killTweensOf(old);
+    w.removeAll();
+    for (const o of old) o.destroy();
     this.garrison = [];
     this.flagSpots = [];
     this.flags = [];
+    this.wandering = false;
+    this.walkDust = null;
     this.walls = [];
     this.building = this.bannerImg = null;
     if (state.status === "settled" && !king) {
@@ -350,11 +369,90 @@ export class BattlefieldScene extends Phaser.Scene {
 
   // A soldier anchored at the feet (the bottom of the trimmed art), scaled so the eyes-to-feet distance is the same for
   // all four houses, give or take a little for variety
-  private soldier(x: number, y: number, house: House, rand: () => number, faceRight: boolean): Phaser.GameObjects.Image {
+  // put: where its ground shadow goes (the same layer or scene run as the soldier)
+  private soldier(x: number, y: number, house: House, rand: () => number, faceRight: boolean, put: (o: Phaser.GameObjects.GameObject) => void): Phaser.GameObjects.Image {
+    // the shadow first, so it is drawn under the soldier
+    const shadow = this.add.image(x, y, "fx_shadow").setDepth(y - 0.5);
+    put(shadow);
     const img = this.add.image(x, y, house.soldier).setOrigin(0.5, 1);
     const eye = soldierEye(this, house.soldier);
     const base = eye !== null ? EYES_TO_FEET / (img.height - eye) : SOLDIER_H / img.height;
-    return img.setScale(base * (0.92 + rand() * 0.16)).setDepth(y).setFlipX(!faceRight);
+    img.setScale(base * (0.92 + rand() * 0.16)).setDepth(y).setFlipX(!faceRight);
+    this.shadows.set(img, shadow);
+    img.once(Phaser.GameObjects.Events.DESTROY, () => {
+      shadow.destroy();
+      this.shadows.delete(img);
+    });
+    return img;
+  }
+
+  // Every frame: each shadow sits on the ground under its soldier, as wide as the soldier's stance, and fades with it
+  private syncShadows(): void {
+    for (const [img, sh] of this.shadows) {
+      const ground = (img.getData("ground") as number | undefined) ?? img.y; // a walking soldier lifts off it mid-stride
+      sh.setPosition(img.x, ground - 2).setDepth(img.depth - 0.5).setVisible(img.visible).setAlpha(0.85 * img.alpha);
+      sh.setDisplaySize(img.displayWidth * 0.66, Math.max(7, img.displayWidth * 0.2));
+    }
+  }
+
+  // The garrison walks about, slowly: to a free spot near home, a rest, a turn, again. Only in an open round, never
+  // during a scene (they stand still for it) and never with reduced motion. Guards and the bearer keep their posts.
+  private wander(time: number, delta: number): void {
+    if (!this.wandering || this.runs.size > 0 || reducedMotion()) return;
+    const dt = Math.min(delta, 100) / 1000;
+    const walkers = this.garrison.filter((s) => !s.post);
+    for (const s of walkers) {
+      const img = s.img;
+      if (!img.active) continue;
+      if (!s.to) {
+        if (time < s.restUntil) continue;
+        s.to = this.nextSpot(s, walkers);
+        if (!s.to) {
+          s.restUntil = time + 1000; // nowhere free just now: try again soon
+          continue;
+        }
+        img.setFlipX(s.to.x < s.x); // face the way it walks
+      }
+      const dx = s.to.x - s.x, dy = s.to.y - s.y, d = Math.hypot(dx, dy);
+      // someone close ahead: wait for them to pass
+      const blocked = walkers.some((o) => o !== s && Math.hypot(o.x - s.x, (o.y - s.y) * 1.6) < WANDER.apart * 0.75 && (o.x - s.x) * dx + (o.y - s.y) * dy > 0);
+      if (d < 1.5 || blocked) {
+        if (d < 1.5) {
+          s.x = s.to.x;
+          s.y = s.to.y;
+        }
+        // arrive (or give way): stand, settle, rest a while, sometimes turn to look the other way
+        s.to = null;
+        s.restUntil = time + 1500 + Math.random() * 3500;
+        img.setPosition(s.x, s.y).setScale(s.base).setAngle(0).setData("ground", s.y).setDepth(s.y);
+        if (Math.random() < 0.4) this.time.delayedCall(700 + Math.random() * 900, () => img.active && img.setFlipX(!img.flipX));
+        continue;
+      }
+      const step = Math.min(d, WANDER.speed * dt);
+      s.x += (dx / d) * step;
+      s.y += (dy / d) * step;
+      const before = Math.floor(s.walked / WANDER.stride);
+      s.walked += step;
+      const b = Math.abs(Math.sin((s.walked / WANDER.stride) * Math.PI)); // 0 on a footfall, 1 mid-stride
+      img.setPosition(s.x, s.y - b * 4).setScale(s.base * (1 - 0.03 * b), s.base * (1 + 0.04 * b));
+      img.setAngle((dx > 0 ? 1 : -1) * 3).setData("ground", s.y).setDepth(s.y); // a slight lean into the walk
+      if (Math.floor(s.walked / WANDER.stride) !== before && Math.floor(s.walked / WANDER.stride) % 2 === 0) this.walkDust?.emitParticleAt(s.x, s.y, 1);
+    }
+  }
+
+  // A free spot near home, on the same side of the gate corridor, apart from everyone else (where they stand or walk to)
+  private nextSpot(s: Soldier, all: Soldier[]): Pt | null {
+    const keepOut = this.corridor + 48; // the gate corridor and its guards
+    const left = s.home.x < BASE_X;
+    for (let tries = 0; tries < 8; tries++) {
+      const x = Phaser.Math.Clamp(s.home.x + (Math.random() - 0.5) * 2 * WANDER.reachX, WANDER.xMin, WANDER.xMax);
+      const y = Phaser.Math.Clamp(s.home.y + (Math.random() - 0.5) * 2 * WANDER.reachY, WANDER.yMin, WANDER.yMax);
+      if (Math.abs(x - BASE_X) < keepOut || (x < BASE_X) !== left) continue;
+      if (Math.hypot(x - s.x, y - s.y) < 20) continue;
+      const crowded = all.some((o) => o !== s && [{ x: o.x, y: o.y }, o.to].some((p) => p && Math.hypot(p.x - x, (p.y - y) * 1.6) < WANDER.apart));
+      if (!crowded) return { x, y };
+    }
+    return null;
   }
 
   // Two guards beside the gate door, a standard-bearer with the house banner, the rest in loose rows in front.
@@ -363,12 +461,21 @@ export class BattlefieldScene extends Phaser.Scene {
     const rand = rng(n * 7919 + house.id.length);
     const still = reducedMotion() || !bob;
     const add = (x: number, y: number, faceRight: boolean, post: boolean) => {
-      const img = this.soldier(x, y, house, rand, faceRight);
+      const img = this.soldier(x, y, house, rand, faceRight, (o) => this.world.add(o));
       this.world.add(img);
-      if (!still) this.tweens.add({ targets: img, y: y - 3, duration: 700 + rand() * 300, delay: rand() * 800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-      this.garrison.push({ img, x, y, post });
+      // the posts breathe in place; the others wander (see wander())
+      if (!still && post) this.tweens.add({ targets: img, y: y - 3, duration: 700 + rand() * 300, delay: rand() * 800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.garrison.push({ img, x, y, post, home: { x, y }, to: null, walked: 0, restUntil: this.time.now + 600 + rand() * 4000, base: img.scaleX });
       return img;
     };
+    this.wandering = !still;
+    if (!still) {
+      this.walkDust = this.add.particles(0, 0, "fx_dust", {
+        speed: { min: 6, max: 22 }, angle: { min: 200, max: 340 }, lifespan: { min: 300, max: 500 },
+        scale: { start: 0.22, end: 0.5 }, alpha: { start: 0.45, end: 0 }, emitting: false,
+      }).setDepth(WANDER.yMin - 1);
+      this.world.add(this.walkDust);
+    }
     const gx = Math.max(this.corridor + 46, half * 0.3); // a guard on each side of the clear path in front of the door
     add(BASE_X - gx, BASE_Y + 16, true, true);
     add(BASE_X + gx, BASE_Y + 16, false, true);
@@ -589,6 +696,13 @@ export class BattlefieldScene extends Phaser.Scene {
     const r = this.run(total);
     this.hud.toll();
     this.showState(p.state, p.king, null);
+    // The garrison cheers: a few hops each, a little out of step
+    if (!calm) {
+      this.garrison.forEach((s, i) => {
+        const y = s.img.y;
+        r.tween({ targets: s.img, y: y - 14, duration: 170, yoyo: true, repeat: p.mode === "quick" ? 0 : 2, delay: (i % 7) * 45, ease: "Quad.easeOut" });
+      });
+    }
     if (p.king && p.mode !== "quick") {
       const glow = r.add(this.add.image(W / 2, 360, "fx_glow").setTint(C.gold).setDisplaySize(520, 620).setAlpha(0));
       r.tween({ targets: glow, alpha: { from: 0, to: 0.9 }, duration: total * 0.3, yoyo: !calm, hold: total * 0.3 });
@@ -694,7 +808,7 @@ export class BattlefieldScene extends Phaser.Scene {
           ];
           const jitter = (rand() - 0.5) * 24;
           const route = [...path.slice(0, -1).map(([x, y]): [number, number] => [x, y + jitter]), spot];
-          const img = r.add(this.soldier(route[0][0], route[0][1], p.newKing.house, rand, dir > 0));
+          const img = r.add(this.soldier(route[0][0], route[0][1], p.newKing.house, rand, dir > 0, (o) => r.add(o)));
           if (leader) img.setScale(img.scale * 1.08);
           const m: Marcher = { img, base: img.scale, x: spot[0], y: spot[1] };
           army.push(m);
@@ -708,7 +822,7 @@ export class BattlefieldScene extends Phaser.Scene {
             onUpdate: () => {
               const [x, y] = along(route, pos.p);
               const b = Math.abs(Math.sin(pos.p * steps * Math.PI)); // 0 on a footfall, 1 mid-stride
-              img.setPosition(x, y - b * 6).setScale(m.base * (1 - 0.04 * b), m.base * (1 + 0.06 * b)); // stretch in the air
+              img.setPosition(x, y - b * 6).setScale(m.base * (1 - 0.04 * b), m.base * (1 + 0.06 * b)).setData("ground", y); // stretch in the air
               const step = Math.floor(pos.p * steps);
               if (step !== lastStep) {
                 lastStep = step;
@@ -717,7 +831,7 @@ export class BattlefieldScene extends Phaser.Scene {
             },
             onComplete: () => {
               // Stopping: squash, then settle
-              img.setPosition(spot[0], spot[1]);
+              img.setPosition(spot[0], spot[1]).setData("ground", spot[1]);
               r.tween({ targets: img, scaleX: m.base * 1.12, scaleY: m.base * 0.86, duration: 90, yoyo: true, ease: "Quad.easeOut" });
               dust?.emitParticleAt(spot[0], spot[1], 4);
             },
@@ -941,7 +1055,7 @@ export class BattlefieldScene extends Phaser.Scene {
     const rand = rng(n);
     for (let i = 0; i < n; i++) {
       const x = 120 + (i % 10) * 104, y = 470 + Math.floor(i / 10) * 44;
-      const img = this.soldier(x, y, house, rand, i % 2 === 0);
+      const img = this.soldier(x, y, house, rand, i % 2 === 0, (o) => this.world.add(o));
       this.world.add(img);
       this.tweens.add({ targets: img, y: y - 3, duration: 700 + rand() * 300, delay: rand() * 800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     }
