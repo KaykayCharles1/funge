@@ -1,0 +1,691 @@
+@import "tailwindcss";
+
+/* The landing page. The hero: the painted valley is the sky the page opens in, fading into a light page, with the real
+   battlefield in a frame across that line. Below it (not yet redesigned): one rule sheet,
+   printed on heavy navy board, ruled in gold and divided by crease grooves, with counters in the four house colours. */
+
+@font-face {
+  font-family: "Cinzel";
+  src: url("/fonts/cinzel.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Grenze Gotisch";
+  src: url("/fonts/grenze-gotisch.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Alegreya Sans";
+  src: url("/fonts/alegreya-sans-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Alegreya Sans";
+  src: url("/fonts/alegreya-sans-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --box: #0f1a33;
+  --box-deep: #0a1226;
+  --board: #15234a;
+  --board-hi: #1c2d5a;
+  --groove-dark: #050a18;
+  --groove-light: #33497f;
+  --foil: #e0a93a;
+  --foil-hi: #f3cf74;
+  --foil-lo: #9c6f1c;
+  --cream: #f4ead2;
+  --cream-dim: #c9c2b0;
+  --violet: #8a55e0;
+  --crimson: #d63a3c;
+  --obsidian: #4a4a58;
+  --silver: #d0d3de;
+  --sapphire: #2f73e0;
+  --display: "Grenze Gotisch", Georgia, serif;  
+  --text: "Alegreya Sans", "Segoe UI", sans-serif;
+  /* counters: every one is sized by what it is worth, with one formula per breakpoint */
+  --counter-base: 2.6rem;
+  --counter-step: 0.42rem;
+  --counter-text: 0.07rem;
+  color-scheme: dark;
+}
+
+html {
+  background: var(--box-deep);
+  scrollbar-color: var(--foil-lo) var(--box-deep);
+}
+body {
+  margin: 0;
+  background: var(--box-deep);
+  color: var(--cream);
+  font-family: var(--text);
+  font-size: 1.1875rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  caret-color: var(--foil);
+}
+::selection {
+  background: var(--foil);
+  color: var(--box);
+}
+:focus-visible {
+  outline: 3px solid var(--foil-hi);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 50;
+  background: var(--foil);
+  color: var(--box);
+  padding: 0.6rem 1rem;
+  font-weight: 700;
+  border-radius: 6px;
+}
+.skip:focus {
+  top: 1rem;
+}
+
+/* a crease groove: a dark cut with a lit edge under it and a soft fall-off, as on folded board */
+.groove {
+  height: 6px;
+  background: linear-gradient(var(--groove-dark) 0 2px, var(--groove-light) 2px 3px, rgb(5 10 24 / 0.35) 3px 100%);
+}
+
+/* ---------------- The hero: the painting is the sky the page opens in ---------------- */
+
+.hero {
+  --page: #f5f8fc;
+  --ink: #0f1a33;
+  --ink-soft: #3a4867;
+  position: relative;
+  background: var(--page);
+  color: var(--ink);
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+/* top-left logo */
+.top-logo {
+  position: absolute;
+  z-index: 5;
+  top: clamp(1rem, 2.5vw, 2rem);
+  left: clamp(1rem, 3.5vw, 3rem);
+  display: inline-block;
+  line-height: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.top-logo:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+.top-logo img {
+  display: block;
+  height: clamp(2.5rem, 5vw, 3.5rem);
+  width: auto;
+  filter: drop-shadow(0 4px 12px rgb(15 26 51 / 0.3));
+}
+
+/* buttons: pills */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 999px;
+  font-family: var(--text);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.btn--small {
+  min-height: 2.6rem;
+  padding: 0.6rem 1.15rem;
+  background: var(--ink);
+  color: #fff;
+  font-size: 1rem;
+}
+.btn--small:hover { background: #1c2d5a; }
+.btn--primary {
+  min-height: 3.5rem;
+  padding: 0.95rem 1.8rem;
+  background: #fff;
+  color: var(--ink);
+  font-size: 1.1875rem;
+  box-shadow: 0 8px 24px rgb(15 26 51 / 0.28);
+}
+.btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgb(15 26 51 / 0.32);
+}
+.btn--quiet {
+  min-height: 3.5rem;
+  padding: 0.95rem 1.5rem;
+  color: #fff;
+  font-size: 1.1875rem;
+  background: rgb(15 26 51 / 0.28);
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.75);
+}
+.btn--quiet:hover { background: rgb(15 26 51 / 0.42); }
+
+/* the open sky: logo, headline, one line, the actions */
+/* the sky band: the painting's own sky continued upward, so the words sit on clear sky and the castle stays below */
+.hero__sky {
+  position: relative;
+  z-index: 2;
+  padding: min(clamp(6.25rem, 9vw, 8rem), 13svh) 1.5rem clamp(1rem, 2vw, 1.75rem);
+  /* solid down to where the painting begins, clear over it, so the painting's own sky shows behind the buttons */
+  background: linear-gradient(to bottom, #125bce calc(100% - 21vw), rgb(18 91 206 / 0) calc(100% - 21vw));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.hero__logo {
+  margin: 0;
+  line-height: 0;
+}
+.hero__logo img {
+  width: min(clamp(12rem, 17vw, 16rem), 30svh); /* short screens: smaller, so the armies stay in view */
+  height: auto;
+  filter: drop-shadow(0 8px 16px rgb(15 26 51 / 0.3));
+}
+/* the headline is drawn like the logo: cream letters on a hard navy edge (the logo's outline colour), so the thin
+   blackletter strokes hold on bright sky; a wide faint navy glow keeps it readable wherever the sky lightens */
+.hero {
+  --logo-cream: #f8eeca;
+  --logo-navy: #0f243d;
+  --logo-gold: #fbbc28;
+}
+.hero__title {
+  margin: 0;
+  font-family: "Grenze Gotisch", Georgia, serif;
+  font-weight: 700;
+  font-size: min(clamp(3rem, 6.2vw, 7rem), 11.5svh); /* short screens: smaller, so the armies stay in view */
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  color: var(--logo-cream);
+  text-wrap: balance;
+  text-shadow: 0 0.055em 0 var(--logo-navy), 0 0 0.6em rgb(10 30 70 / 0.35);
+}
+/* one tracked label in Cinzel capitals, the three words split by gold dots */
+.hero__line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  margin: clamp(0.6rem, 1vw, 0.9rem) 0 0;
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(0.95rem, 1.2vw, 1.25rem);
+  letter-spacing: 0.16em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--logo-cream);
+  text-shadow: 0 2px 0 var(--logo-navy), 0 0 14px rgb(10 30 70 / 0.4);
+}
+.hero__line span {
+  white-space: nowrap;
+}
+.hero__line span + span::before {
+  content: "";
+  display: inline-block;
+  width: 0.38em;
+  height: 0.38em;
+  margin: 0 0.75em 0 0.6em; /* the tracking trails each word, so the left gap is a little smaller */
+  vertical-align: 0.18em;
+  border-radius: 50%;
+  background: var(--logo-gold);
+  box-shadow: 0 2px 0 var(--logo-navy);
+}
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.85rem;
+  margin-top: clamp(1.75rem, 3vw, 2.75rem);
+}
+/* the one action, in the crown's gold on the same hard navy edge; it presses down when clicked */
+.hero .btn--primary {
+  min-height: clamp(3.5rem, 4.4vw, 4.5rem);
+  padding: 0 clamp(1.8rem, 2.6vw, 2.75rem);
+  font-size: clamp(1.1875rem, 1.45vw, 1.5rem);
+  background: var(--logo-gold);
+  color: var(--logo-navy);
+  box-shadow: 0 5px 0 var(--logo-navy), 0 14px 28px rgb(10 30 70 / 0.3);
+}
+.hero .btn--primary:hover {
+  background: #ffc83d;
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 var(--logo-navy), 0 18px 32px rgb(10 30 70 / 0.32);
+}
+.hero .btn--primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 var(--logo-navy), 0 8px 16px rgb(10 30 70 / 0.25);
+}
+
+/* the painting: the whole valley, its foot fading into the light page */
+/* the painting starts under the sky band; its top edge is the same blue, so the join cannot be seen */
+.hero__art {
+  position: relative;
+  aspect-ratio: 4096 / 2313;
+  /* pull the painting up under the words: its own open sky (the top ~40%) sits behind the headline and buttons */
+  margin-top: calc(-21vw);
+  overflow: hidden;
+}
+.hero__art::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22%;
+  background: linear-gradient(to bottom, #125bce 10%, rgb(18 91 206 / 0));
+}
+.hero__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+  display: block;
+}
+.hero__art::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  background: linear-gradient(to bottom, rgb(245 248 252 / 0), var(--page) 92%);
+}
+
+/* the real battlefield, rising over the line where the painting meets the page */
+.shot {
+  --rise: 0;
+  position: relative;
+  z-index: 3;
+  width: min(64rem, calc(100% - 2.5rem));
+  margin: calc(-1 * clamp(3rem, 7vw, 6.5rem)) auto 0;
+  transform: translateY(calc((1 - var(--rise)) * 2.5rem));
+}
+.shot__frame {
+  padding: 0.5rem;
+  background: #fff;
+  border-radius: 1.25rem;
+  box-shadow: 0 24px 60px rgb(15 26 51 / 0.22), 0 4px 12px rgb(15 26 51 / 0.1);
+}
+.shot__frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.85rem;
+}
+.shot__caption {
+  margin: 1rem auto 0;
+  max-width: 40rem;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 1.0625rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shot { transform: none; }
+  .btn { transition: none; }
+}
+
+/* ---------------- The rule sheet: one board, divided by creases ---------------- */
+
+.sheet {
+  position: relative;
+  background: var(--board);
+}
+.sheet__part {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: clamp(3.25rem, 6.5vw, 5.5rem) clamp(1.25rem, 4vw, 3rem);
+}
+.sheet h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 5.5vw, 4rem);
+  line-height: 1;
+  color: var(--foil-hi);
+}
+.sheet__intro {
+  margin: 0.75rem 0 0;
+  color: var(--cream-dim);
+  font-size: 1.25rem;
+}
+
+/* the six folds of the rules: one surface divided by grooves, opening one after another */
+.folds {
+  margin-top: clamp(2.25rem, 4vw, 3.25rem);
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border: 1px solid rgb(224 169 58 / 0.55);
+  border-radius: 4px;
+  perspective: 1600px;
+  background: var(--groove-dark);
+  gap: 3px;
+}
+.fold {
+  position: relative;
+  padding: clamp(1.5rem, 2.6vw, 2.25rem);
+  background: var(--board-hi);
+  box-shadow: inset 0 1px 0 var(--groove-light);
+  transform-origin: 50% 0%;
+  backface-visibility: hidden;
+}
+.fold--open { grid-column: span 2; }
+.fold--conquer { grid-column: span 4; }
+.fold--protect { grid-column: span 3; }
+.fold--clock { grid-column: span 3; }
+.fold--win { grid-column: span 3; }
+.fold--cancel { grid-column: span 3; }
+
+.fold__head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.rule-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 2px solid var(--foil);
+  color: var(--foil-hi);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.fold h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.625rem, 2.4vw, 2rem);
+  line-height: 1.05;
+  color: var(--cream);
+}
+.fold p {
+  margin: 0.8rem 0 0;
+  max-width: 34rem;
+}
+.fold--conquer h3 {
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
+}
+
+/* a worked example: counters with the split between them */
+.split {
+  margin: clamp(1.25rem, 2.5vw, 2rem) 0 0;
+}
+.fold--conquer .split {
+  margin-top: clamp(1.5rem, 3vw, 2.5rem);
+}
+.split__caption {
+  margin: 0 0 1rem;
+  font-weight: 700;
+  color: var(--cream-dim);
+  font-size: 1rem;
+}
+.split__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(0.6rem, 1.6vw, 1.25rem);
+}
+.split__op {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  color: var(--foil);
+  line-height: 1;
+}
+.split__or {
+  font-weight: 700;
+  color: var(--cream-dim);
+}
+
+/* counters: flat printed discs punched from the board, a thin die-cut ring just outside the edge.
+   Size follows value (--v, in PUSD); colour follows who holds it. */
+.counter {
+  --size: calc(var(--counter-base) + var(--v) * var(--counter-step));
+  max-width: max(var(--size), 5.5rem); /* the caption wraps under its disc, never widens it */
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+.counter__token {
+  display: grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--c, var(--foil));
+  color: #fff;
+  font-weight: 700;
+  font-size: calc(0.95rem + var(--v) * var(--counter-text));
+  box-shadow: 0 0 0 3px var(--board-hi), 0 0 0 4px rgb(5 10 24 / 0.7);
+}
+.counter--pool .counter__token {
+  background: var(--foil);
+  color: var(--box);
+}
+.counter--obsidian .counter__token {
+  box-shadow: inset 0 0 0 2px var(--silver), 0 0 0 3px var(--board-hi), 0 0 0 4px rgb(5 10 24 / 0.7);
+}
+.counter__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cream-dim);
+  line-height: 1.2;
+}
+
+.clockface {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  margin-top: 1.25rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgb(224 169 58 / 0.6);
+  border-radius: 6px;
+  background: var(--box);
+}
+.clockface strong {
+  font-family: var(--display);
+  font-size: 2rem;
+  color: var(--foil-hi);
+  line-height: 1;
+}
+.clockface span {
+  color: var(--cream-dim);
+  font-weight: 700;
+}
+.fold__art {
+  display: block;
+  margin-top: 1.1rem;
+  height: 4.5rem;
+  width: auto;
+}
+
+/* the unfold: the sheet opens fold by fold, each panel hinging down from the crease above it, in rule order.
+   Panels are open by default; the folded start exists only while the script runs and motion is allowed. */
+.js-unfold .fold {
+  transition: transform 760ms cubic-bezier(0.16, 1, 0.3, 1), filter 760ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.js-unfold .fold:not(.is-open) {
+  transform: rotateX(-82deg);
+  filter: brightness(0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .js-unfold .fold,
+  .js-unfold .fold:not(.is-open) {
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+}
+
+/* fair by the contract: the facts set as the sheet's printed rule table */
+.facts {
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.facts li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 0.5rem clamp(1.5rem, 4vw, 4rem);
+  align-items: baseline;
+  padding: 1.5rem 0;
+  border-top: 1px solid rgb(224 169 58 / 0.4);
+}
+.facts li:last-child {
+  border-bottom: 1px solid rgb(224 169 58 / 0.4);
+}
+.facts h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.625rem, 2.4vw, 2rem);
+  line-height: 1.1;
+  color: var(--foil-hi);
+}
+.facts p {
+  margin: 0;
+  max-width: 40rem;
+}
+
+/* before you play */
+.steps {
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.steps li {
+  position: relative;
+  padding: 0 clamp(1rem, 3vw, 2.5rem) 0 0;
+}
+.steps li + li {
+  padding-left: clamp(1rem, 3vw, 2.5rem);
+  border-left: 1px solid rgb(224 169 58 / 0.4);
+}
+.steps h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.625rem, 2.4vw, 2rem);
+  color: var(--cream);
+  line-height: 1.1;
+}
+.steps p {
+  margin: 0.5rem 0 0;
+  color: var(--cream-dim);
+}
+
+/* ---------------- The close: the bottom of the box ---------------- */
+
+.close {
+  position: relative;
+  background: var(--box-deep);
+  text-align: center;
+  padding: clamp(4rem, 8vw, 6.5rem) 1.25rem clamp(2.5rem, 5vw, 4rem);
+  border-top: 2px solid var(--foil);
+}
+.close__keep {
+  display: block;
+  margin: 0 auto 1.25rem;
+  height: clamp(7rem, 14vw, 10rem);
+  width: auto;
+}
+.close h2 {
+  margin: 0 0 2rem;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 5.5vw, 4rem);
+  line-height: 1;
+  color: var(--foil-hi);
+}
+.close__note {
+  margin: 1rem 0 0;
+  color: var(--cream-dim);
+  font-weight: 700;
+}
+.close footer {
+  margin-top: clamp(3rem, 6vw, 4.5rem);
+  color: var(--cream-dim);
+  font-size: 0.95rem;
+}
+
+/* ---------------- Smaller screens ---------------- */
+
+@media (max-width: 64rem) {
+  .folds { grid-template-columns: repeat(2, 1fr); }
+  .fold--open, .fold--protect, .fold--clock, .fold--win, .fold--cancel { grid-column: span 1; }
+  .fold--conquer { grid-column: span 2; }
+  .fold--protect, .fold--clock, .fold--win, .fold--cancel { grid-column: span 1; }
+  .facts li { grid-template-columns: 1fr; }
+}
+/* phones: the hero stacks the sky band over the whole painting (all four armies stay in the picture), the frame under it;
+   armies stay in the picture), the band under it */
+@media (max-width: 47.5rem) {
+  :root {
+    --counter-base: 2.2rem;
+    --counter-step: 0.27rem;
+    --counter-text: 0.04rem;
+  }
+  /* phones: the sky becomes a soft band holding the logo, headline and actions; the whole painting under it */
+  .top-logo { top: 1rem; left: 1rem; }
+  .top-logo img { height: 2.25rem; }
+  .hero__sky {
+    padding: 5.5rem 1.25rem 2rem;
+    background: #125bce;
+  }
+  .hero__logo img { width: min(15rem, 70vw); }
+  .hero__title { font-size: clamp(2.6rem, 12vw, 3.5rem); }
+  /* the line breaks after "Protect"; the dot before the third phrase is dropped */
+  .hero__line { font-size: 0.85rem; letter-spacing: 0.12em; }
+  .hero__line span:last-child { flex-basis: 100%; }
+  .hero__line span:last-child::before { display: none; }
+  .hero__actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 22rem; }
+  .hero__art { min-height: 0; max-height: none; margin-top: -2px; }
+  .shot { margin-top: -1.75rem; width: calc(100% - 1.5rem); }
+  .shot__frame { padding: 0.3rem; border-radius: 0.9rem; }
+  .shot__frame img { border-radius: 0.65rem; }
+  .folds { grid-template-columns: 1fr; }
+  .fold--conquer { grid-column: span 1; }
+  .split__row { flex-wrap: nowrap; gap: 0.4rem; }
+  .counter { max-width: max(var(--size), 4.5rem); }
+  .split__op { font-size: 1.6rem; }
+  .counter__label { font-size: 0.85rem; }
+  .steps { grid-template-columns: 1fr; gap: 1.5rem; }
+  .steps li, .steps li + li { padding: 1.5rem 0 0; border-left: 0; border-top: 1px solid rgb(224 169 58 / 0.4); }
+}

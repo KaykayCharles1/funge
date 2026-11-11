@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import type { Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
@@ -28,4 +29,13 @@ function csp(): Plugin {
 
 export default defineConfig({
   plugins: [tailwindcss(), csp()],
+  build: {
+    // Two pages: the game (index.html) and the landing page (landing.html)
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        landing: fileURLToPath(new URL("./landing.html", import.meta.url)),
+      },
+    },
+  },
 });

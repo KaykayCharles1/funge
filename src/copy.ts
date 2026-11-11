@@ -70,6 +70,70 @@ export const COPY = {
   },
   
   // The Kingdom page. Change the wording here only.
+  // The landing page (landing.html): the game presented as a board game, the valley as the box lid and the rules as the
+  // rule sheet. Plain, short sentences; real numbers only.
+  landing: {
+    pageTitle: "Funge · Battle for the throne",
+    description: "A battle for the throne game on Bitcoin Cash. One Kingdom, one King, one PUSD Treasury. The last king wins it all.",
+    title: "Funge",
+    tagline: "Conquer the throne. The last king wins the pool.",
+    // The hero (built first, section by section)
+    logoAlt: "Funge",
+    navLabel: "Page sections",
+    heroTitle: "The last king wins it all",
+    // read as one line; the gold dots between the words are drawn by the page
+    heroLine: ["Conquer", "Protect", "Reclaim the throne"],
+    heroSecondary: "How it works",
+    shotAlt: "The Funge battlefield: a castle with violet flags, Queen Amina's violet army in front of it, the king plate, the Treasury and the clock at the top.",
+    shotCaption: "The live battlefield. Every conquest, protect and payout plays out here.",
+    specs: [
+      { icon: "shield", label: "Four houses" },
+      { icon: "bell", label: "A 10:00 clock" },
+      { icon: "coin", label: "One PUSD pool" },
+    ],
+    specsLabel: "What is in the box",
+    join: "Play Now",
+    joinNote: "Watch the round, then take the throne",
+    rulesTitle: "How a round is played",
+    rulesIntro: "Six rules. That is the whole game.",
+    rules: [
+      { title: "Open the kingdom", text: "The first king pays 10.00 PUSD. All of it goes into the pool." },
+      { title: "Conquer the throne", text: "Pay the throne's value plus 2%. The king you dethrone gets most of it back; the rest grows the pool." },
+      { title: "Protect your walls", text: "The king can add 1, 5 or 10 PUSD to the throne's value, twice per reign. It all goes into the pool. Not in the last 30 seconds." },
+      { title: "Mind the clock", text: "The clock starts at 10:00. Every conquest adds a minute, up to 10:00. Protecting does not." },
+      { title: "Win the pool", text: "When the clock runs out, the last king takes the whole pool and a trophy." },
+      { title: "Change your mind early", text: "Until someone conquers, the king may cancel the round and take every coin back." },
+    ],
+    // The worked example under the conquest rule: a throne worth 10.00
+    splitCaption: "A conquest of a throne worth 10.00",
+    splitPaid: "You pay",
+    splitBack: "Back to the old king",
+    splitPool: "Into the pool",
+    openCaption: "Opening the kingdom",
+    openPaid: "The first king pays",
+    openPool: "Into the pool",
+    protectCaption: "A protect: one amount, all of it into the pool",
+    protectAdd: "The king adds",
+    protectOr: "or",
+    clockCaption: "Each conquest",
+    clockAdd: "+1:00",
+    clockCap: "up to 10:00",
+    trustTitle: "Fair by the contract",
+    trust: [
+      { title: "The contract pays the king", text: "The payout rule lives in the Bitcoin Cash contract. The game server only keeps the clock; it cannot send the pool anywhere else." },
+      { title: "No one can hold the pool hostage", text: "If the server ever disappears, anyone can settle the round after 12 quiet blocks, and the last king is still paid." },
+      { title: "Every number is on the chain", text: "Each move is a transaction anyone can check: who paid, how much, and where it went." },
+    ],
+    startTitle: "Before you play",
+    start: [
+      { title: "Open a wallet", text: "Create the game wallet in your browser in one tap, or connect your own wallet through WizardConnect." },
+      { title: "Bring PUSD", text: "Fund it with PUSD for your moves and a little BCH for network fees." },
+      { title: "Join the battle", text: "Watch the live round, pick your king or queen, and take the throne." },
+    ],
+    closing: "Take your righful place as the King of Funge",
+    valleyAlt: "Four armies in violet, crimson, black and blue march along roads toward a silver-roofed castle in a green valley.",
+  },
+
   kingdom: {
     tagline: "Take the throne. The last king standing wins the pool.",
     waiting: "Waiting for the first king",

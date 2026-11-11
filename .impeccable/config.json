@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "cinzel",
+        "createdAt": "2026-11-11T19:37:25.976Z",
+        "reason": "user confirmed: Charles asked for Cinzel on the hero line (2026-11-11); DESIGN.md is rewritten after hero approval"
+      }
+    ]
+  }
+}
