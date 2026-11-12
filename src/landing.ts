@@ -101,13 +101,17 @@ const unit = 10n ** BigInt(CONFIG.pusdDecimals);
 const pusd = (v: bigint) => (v % unit === 0n ? String(v / unit) : (Number(v) / Number(unit)).toFixed(CONFIG.pusdDecimals));
 const NUMBERS: HowtoNumbers = { open: pusd(K.openingPrice), fee: `${K.feePercent}%`, cut: `${K.cutPercent}%` };
 
+// The timeline's node: a small crown
+const crown = () => svg("0 0 24 24", ["M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2 1.8 8z", "M3.5 20.5h17"], { class: "howto__crown" });
+
 // How a round is played. A tall track holds a sticky stage; while the stage is pinned, the scroll position walks
 // through the five steps. Left: the image panel with the title under it. Right: the timeline of steps, an ordered list.
 function howto(): HTMLElement {
   const H = L.howto;
   const steps = H.steps.map((s, i) =>
     h("li", { class: "howto__step", "data-i": String(i) },
-      h("button", { class: "howto__node", type: "button", "aria-label": H.goTo(i + 1, s.title) }),
+      // the step's mark on the road; a button that jumps to the step
+      h("button", { class: "howto__mark", type: "button", "data-i": String(i), "aria-label": H.goTo(i + 1, s.title) }),
       h("article", { class: "howto__card" },
         h("span", { class: "howto__no", "aria-hidden": "true" }, String(i + 1).padStart(2, "0")),
         h("h3", {}, s.title),
@@ -121,7 +125,15 @@ function howto(): HTMLElement {
       h("h2", { class: "howto__title", id: "howto-title" }, H.title),
       h("p", { class: "howto__subtitle" }, H.subtitle),
     ),
-    h("div", { class: "howto__timeline" }, h("ol", { class: "howto__steps", "aria-label": H.stepsLabel }, ...steps)),
+    // The timeline. The column (the road, its gold fill and the steps) slides up past the crown, which stays put:
+    // one transform, from the scroll progress. The connector from the crown points at the active card.
+    h("div", { class: "howto__timeline" },
+      h("div", { class: "howto__column" },
+        h("div", { class: "howto__road", "aria-hidden": "true" }, h("div", { class: "howto__fill" })),
+        h("ol", { class: "howto__steps", "aria-label": H.stepsLabel }, ...steps),
+      ),
+      h("div", { class: "howto__node", "aria-hidden": "true" }, crown()),
+    ),
   );
   return h("section", { class: "howto", id: "howto", "aria-labelledby": "howto-title" }, h("div", { class: "howto__track" }, stage));
 }
@@ -176,6 +188,22 @@ function howtoScroll(): void {
       requestAnimationFrame(update);
     }
   };
+  // A mark jumps to its step: pinned, to the middle of that step's stretch; stacked, to its row
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  section.addEventListener("click", (e) => {
+    const mark = (e.target as Element).closest<HTMLElement>(".howto__mark");
+    if (!mark) return;
+    const i = Number(mark.dataset.i);
+    const behavior: ScrollBehavior = reduce.matches ? "auto" : "smooth";
+    if (!pinned.matches) {
+      items[i]?.scrollIntoView({ block: "center", behavior });
+      return;
+    }
+    const total = len.intro + items.length * len.step + len.end;
+    const top = track.getBoundingClientRect().top + window.scrollY;
+    const range = track.offsetHeight - window.innerHeight;
+    window.scrollTo({ top: top + range * ((len.intro + (i + 0.5) * len.step) / total), behavior });
+  });
   readLengths();
   setStep(0);
   window.addEventListener("scroll", request, { passive: true });

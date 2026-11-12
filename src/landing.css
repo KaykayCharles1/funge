@@ -414,52 +414,187 @@ body {
   color: var(--cream-dim);
 }
 
-/* right: the timeline (step 2 turns this into the gold road, the fixed node and the sliding column) */
+/* right: the timeline. The crown stays put at --node-y; the column (the road, its gold fill and the five steps) slides
+   up past it, one translate from the scroll progress --s (0 = step 1 starts, 5 = step 5 ends). Each step is one
+   --pitch tall, so the move is even; a card's mark sits --mark below its top. */
 .howto__timeline {
+  --node-y: 38%;
+  --pitch: clamp(10.5rem, 27svh, 15rem);
+  --mark: 1.75rem;
+  --road-x: 1.25rem;
+  --card-x: 4.25rem;
+  position: relative;
   min-width: 0;
   align-self: stretch;
   overflow: hidden;
+  /* steps that have passed fade out at the top; the step after next fades in at the foot */
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+}
+.howto__column {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--node-y) - var(--mark));
+  /* step i's mark meets the crown in the middle of its stretch (s = i + 0.5) */
+  transform: translate3d(0, calc((0.5 - var(--s)) * var(--pitch)), 0);
+  will-change: transform;
+}
+/* the road runs from step 1's mark to step 5's; the gold fill is the part already travelled */
+.howto__road {
+  position: absolute;
+  left: calc(var(--road-x) - 1px);
+  top: var(--mark);
+  width: 2px;
+  height: calc(4 * var(--pitch));
+  background: color-mix(in srgb, var(--foil-lo) 45%, transparent);
+  border-radius: 1px;
+}
+.howto__fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--foil-lo), var(--logo-gold));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--logo-gold) 60%, transparent);
+  transform-origin: top;
+  transform: scaleY(calc(clamp(0, var(--s) - 0.5, 4) / 4));
+  will-change: transform;
 }
 .howto__steps {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 1rem;
 }
 .howto__step {
-  opacity: 0.45;
-  transition: opacity 300ms ease;
+  position: relative;
+  height: var(--pitch);
+  padding-left: var(--card-x);
 }
-.howto__step[aria-current] {
-  opacity: 1;
+/* only the active card and the next one show; the marks stay on the road for all five */
+.howto__card { opacity: 0; }
+.howto__step[aria-current] .howto__card { opacity: 1; }
+.howto__step[aria-current] + .howto__step .howto__card { opacity: 0.42; }
+/* a step's mark: a small diamond on the road, gold once reached; the button around it is a 2.75rem target */
+.howto__mark {
+  position: absolute;
+  left: calc(var(--road-x) - 1.375rem);
+  top: calc(var(--mark) - 1.375rem);
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
 }
+.howto__mark::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.7rem;
+  height: 0.7rem;
+  translate: -50% -50%;
+  rotate: 45deg;
+  background: var(--box-deep);
+  border: 2px solid var(--foil-lo);
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.howto__step:has(~ [aria-current]) .howto__mark::before,
+.howto__step[aria-current] .howto__mark::before {
+  background: var(--logo-gold);
+  border-color: var(--logo-gold);
+}
+.howto__mark:hover::before { border-color: var(--foil-hi); }
+
+/* the crown that stays put, and its connector to the active card */
 .howto__node {
-  display: none; /* step 2 */
+  position: absolute;
+  z-index: 2;
+  left: var(--road-x);
+  top: var(--node-y);
+  width: 2.5rem;
+  height: 2.5rem;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--logo-navy);
+  border: 2px solid var(--logo-gold);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--logo-gold) 18%, transparent), 0 0 18px color-mix(in srgb, var(--logo-gold) 55%, transparent);
+  pointer-events: none;
 }
+.howto__node::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: calc(var(--card-x) - var(--road-x) - 1.25rem);
+  height: 2px;
+  translate: 0 -50%;
+  background: linear-gradient(to right, var(--logo-gold), var(--foil-lo));
+}
+.howto__crown {
+  width: 1.3rem;
+  height: 1.3rem;
+  fill: var(--logo-gold);
+  stroke: var(--logo-gold);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* a card: navy with a thin gold trim and gold corner flourishes */
 .howto__card {
-  padding: 1rem 1.25rem;
-  background: var(--box);
-  border: 1px solid var(--foil-lo);
-  border-radius: 0.5rem;
+  position: relative;
+  padding: 1.1rem 1.4rem 1.2rem;
+  background: color-mix(in srgb, var(--box) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foil) 55%, transparent);
+  border-radius: 0.4rem;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--box-deep) 60%, transparent);
+  transform-origin: left top;
+  transition: opacity 300ms ease, transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+.howto__card::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  background: var(--foil);
+  pointer-events: none;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform=''%3E%3Cpath d='M1.5 19V8.5a7 7 0 0 1 7-7H19' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M8 5.2l2.8 2.8L8 10.8 5.2 8z'/%3E%3C/g%3E%3C/svg%3E") top left / 1.25rem no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate(90 10 10)'%3E%3Cpath d='M1.5 19V8.5a7 7 0 0 1 7-7H19' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M8 5.2l2.8 2.8L8 10.8 5.2 8z'/%3E%3C/g%3E%3C/svg%3E") top right / 1.25rem no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate(180 10 10)'%3E%3Cpath d='M1.5 19V8.5a7 7 0 0 1 7-7H19' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M8 5.2l2.8 2.8L8 10.8 5.2 8z'/%3E%3C/g%3E%3C/svg%3E") bottom right / 1.25rem no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate(270 10 10)'%3E%3Cpath d='M1.5 19V8.5a7 7 0 0 1 7-7H19' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M8 5.2l2.8 2.8L8 10.8 5.2 8z'/%3E%3C/g%3E%3C/svg%3E") bottom left / 1.25rem no-repeat;
+}
+/* the next card waits a little smaller */
+.howto__step[aria-current] + .howto__step .howto__card { transform: scale(0.94); }
 .howto__no {
+  display: block;
   font-family: "Cinzel", Georgia, serif;
   font-weight: 700;
+  font-size: 1.125rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
   color: var(--foil);
 }
 .howto__card h3 {
-  margin: 0.15rem 0 0.35rem;
+  margin: 0.4rem 0 0.4rem;
   font-family: var(--display);
   font-weight: 700;
-  font-size: 1.5rem;
-  line-height: 1.1;
+  font-size: clamp(1.5rem, 1.9vw, 1.875rem);
+  line-height: 1.05;
   color: var(--logo-cream);
 }
 .howto__card p {
   margin: 0;
+  max-width: 34rem;
   font-size: 1.0625rem;
   line-height: 1.45;
+  color: var(--cream);
+}
+/* the active card's words fade in and rise a little (no scramble) */
+.howto__step[aria-current] .howto__card > * {
+  animation: howto-rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.howto__step[aria-current] .howto__card > h3 { animation-delay: 40ms; }
+.howto__step[aria-current] .howto__card > p { animation-delay: 80ms; }
+@keyframes howto-rise {
+  from { opacity: 0; transform: translateY(12px); }
 }
 
 /* no pinning on narrow screens or with reduced motion: the stage is a plain block and the steps stack (step 4 styles
@@ -476,7 +611,13 @@ body {
     padding-block: clamp(3rem, 8vw, 5rem);
   }
   .howto__frame { width: min(100%, 30rem); }
-  .howto__timeline { overflow: visible; }
+  .howto__timeline { overflow: visible; mask-image: none; }
+  .howto__column { position: static; transform: none; }
+  .howto__road, .howto__node { display: none; }
+  .howto__step { height: auto; padding-left: 0; }
+  .howto__step + .howto__step { margin-top: 1.25rem; }
+  .howto__card, .howto__step[aria-current] + .howto__step .howto__card { opacity: 1; transform: none; }
+  .howto__mark { display: none; }
 }
 
 /* ---------------- Smaller screens ---------------- */
