@@ -1,8 +1,9 @@
-// The landing page (landing.html): Funge presented as a board game. The painted valley is the box lid; the rules,
-// the fairness facts and the first steps are one rule sheet below it. Every word comes from COPY.landing.
-// Its one action is Join live battle, which opens the battlefield.
+// The landing page (landing.html). The hero: the painted valley is the sky the page opens in. Below it, "How a round
+// is played": a pinned section where scrolling walks through the five moves. Every word comes from COPY.landing, and
+// every rule number from the rule constants. Its one action is Play Now, which opens the battlefield.
 import "./landing.css";
-import { COPY } from "./copy.ts";
+import { COPY, type HowtoNumbers } from "./copy.ts";
+import { CONFIG } from "./config.ts"; // plain constants only: no wallet, chain or Phaser code comes with it
 
 const L = COPY.landing;
 const BATTLE = "/?mode=battlefield";
@@ -33,32 +34,6 @@ function svg(viewBox: string, paths: string[], attrs: Record<string, string> = {
 
 // The one drawn icon: an arrow into the battle
 const arrow = () => svg("0 0 24 24", ["M4 12h14", "M13 6l6 6-6 6"], { fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "stroke-linejoin": "round" });
-
-const money = (v: number) => v.toFixed(2);
-const groove = () => h("div", { class: "groove", "aria-hidden": "true" });
-const joinButton = () => h("a", { class: "btn btn--primary", href: BATTLE }, L.join, arrow());
-
-// A punch-out counter: its size follows what it is worth, its colour who holds it
-// (a house colour for a player, gold for the pool)
-type Holder = "pool" | "violet" | "crimson" | "obsidian" | "sapphire";
-function counter(value: number, label: string, holder: Holder): HTMLElement {
-  const el = h("div", { class: `counter counter--${holder}` },
-    h("span", { class: "counter__token num" }, money(value)),
-    h("span", { class: "counter__label" }, label),
-  );
-  el.style.setProperty("--v", String(value));
-  if (holder !== "pool") el.style.setProperty("--c", `var(--${holder})`);
-  return el;
-}
-const op = (sign: string) => h("span", { class: "split__op" }, sign);
-
-// A worked example: a caption, then the counters with their split. The figure's label reads it as one sentence.
-function split(caption: string, spoken: string, ...row: HTMLElement[]): HTMLElement {
-  return h("figure", { class: "split", "aria-label": `${caption}: ${spoken}` },
-    h("figcaption", { class: "split__caption" }, caption),
-    h("div", { class: "split__row", "aria-hidden": "true" }, ...row),
-  );
-}
 
 // The hero: the painted valley is the sky the page opens in. The logo and one line sit in its open sky, the painting
 // fades into the light page, and the real battlefield rises in a frame across that line.
@@ -120,100 +95,104 @@ function rise(): void {
   update();
 }
 
-function rules(): HTMLElement {
-  const kinds = ["open", "conquer", "protect", "clock", "win", "cancel"] as const;
-  const folds = L.rules.map((r, i) => {
-    const kind = kinds[i]!;
-    const fold = h("article", { class: `fold fold--${kind}` },
-      h("div", { class: "fold__head" }, h("span", { class: "rule-no", "aria-hidden": "true" }, String(i + 1)), h("h3", {}, r.title)),
-      h("p", {}, r.text),
-    );
-    if (kind === "open") {
-      fold.append(split(L.openCaption, `${L.openPaid} 10.00 = ${L.openPool} 10.00`,
-        counter(10, L.openPaid, "violet"), op("="), counter(10, L.openPool, "pool")));
-    }
-    if (kind === "conquer") {
-      // A throne worth 10.00. The numbers check each other: 10.20 = 9.20 + 1.00.
-      fold.append(split(L.splitCaption, `${L.splitPaid} 10.20 = ${L.splitBack} 9.20 + ${L.splitPool} 1.00`,
-        counter(10.2, L.splitPaid, "sapphire"), op("="), counter(9.2, L.splitBack, "crimson"), op("+"), counter(1, L.splitPool, "pool")));
-    }
-    if (kind === "protect") {
-      const or = () => h("span", { class: "split__or" }, L.protectOr);
-      fold.append(split(L.protectCaption, `${L.protectAdd} 1.00 ${L.protectOr} 5.00 ${L.protectOr} 10.00`,
-        counter(1, L.protectAdd, "obsidian"), or(), counter(5, L.protectAdd, "obsidian"), or(), counter(10, L.protectAdd, "obsidian")));
-    }
-    if (kind === "clock") {
-      fold.append(h("div", { class: "clockface" },
-        h("strong", { class: "num" }, L.clockAdd),
-        h("span", { class: "nowrap" }, L.clockCaption),
-        h("span", { class: "nowrap num" }, L.clockCap),
-      ));
-    }
-    if (kind === "win") {
-      fold.append(h("img", { class: "fold__art", src: `${ASSETS}treasure/chest.webp`, alt: "", height: "72" }));
-    }
-    return fold;
-  });
-  return h("section", { class: "sheet__part", id: "rules", "aria-labelledby": "rules-title" },
-    h("h2", { id: "rules-title" }, L.rulesTitle),
-    h("p", { class: "sheet__intro" }, L.rulesIntro),
-    h("div", { class: "folds" }, ...folds),
+// The rule numbers, read from the contract settings so the page can never drift from the game
+const K = CONFIG.kingdom;
+const unit = 10n ** BigInt(CONFIG.pusdDecimals);
+const pusd = (v: bigint) => (v % unit === 0n ? String(v / unit) : (Number(v) / Number(unit)).toFixed(CONFIG.pusdDecimals));
+const NUMBERS: HowtoNumbers = { open: pusd(K.openingPrice), fee: `${K.feePercent}%`, cut: `${K.cutPercent}%` };
+
+// How a round is played. A tall track holds a sticky stage; while the stage is pinned, the scroll position walks
+// through the five steps. Left: the image panel with the title under it. Right: the timeline of steps, an ordered list.
+function howto(): HTMLElement {
+  const H = L.howto;
+  const steps = H.steps.map((s, i) =>
+    h("li", { class: "howto__step", "data-i": String(i) },
+      h("button", { class: "howto__node", type: "button", "aria-label": H.goTo(i + 1, s.title) }),
+      h("article", { class: "howto__card" },
+        h("span", { class: "howto__no", "aria-hidden": "true" }, String(i + 1).padStart(2, "0")),
+        h("h3", {}, s.title),
+        h("p", {}, s.text(NUMBERS)),
+      ),
+    ),
   );
-}
-
-function fair(): HTMLElement {
-  return h("section", { class: "sheet__part", id: "fair", "aria-labelledby": "fair-title" },
-    h("h2", { id: "fair-title" }, L.trustTitle),
-    h("ul", { class: "facts" }, ...L.trust.map((t) => h("li", {}, h("h3", {}, t.title), h("p", {}, t.text)))),
+  const stage = h("div", { class: "howto__stage" },
+    h("div", { class: "howto__media" },
+      h("div", { class: "howto__frame" }), // the five images go here (step 3)
+      h("h2", { class: "howto__title", id: "howto-title" }, H.title),
+      h("p", { class: "howto__subtitle" }, H.subtitle),
+    ),
+    h("div", { class: "howto__timeline" }, h("ol", { class: "howto__steps", "aria-label": H.stepsLabel }, ...steps)),
   );
+  return h("section", { class: "howto", id: "howto", "aria-labelledby": "howto-title" }, h("div", { class: "howto__track" }, stage));
 }
 
-function start(): HTMLElement {
-  return h("section", { class: "sheet__part", id: "start", "aria-labelledby": "start-title" },
-    h("h2", { id: "start-title" }, L.startTitle),
-    h("ol", { class: "steps" }, ...L.start.map((s) => h("li", {}, h("h3", {}, s.title), h("p", {}, s.text)))),
-  );
-}
-
-// The rule sheet: one board, its parts divided by crease grooves
-function sheet(): HTMLElement {
-  return h("div", { class: "sheet" }, groove(), rules(), groove(), fair(), groove(), start(), groove());
-}
-
-function close(): HTMLElement {
-  return h("section", { class: "close", "aria-labelledby": "close-title" },
-    h("img", { class: "close__keep", src: `${ASSETS}castle/keep.webp`, alt: "" }),
-    h("h2", { id: "close-title" }, L.closing),
-    joinButton(),
-    h("p", { class: "close__note" }, L.joinNote),
-  );
-}
-
-// The signature motion: the rule sheet unfolds as you scroll. Each panel hinges down from the crease above it the
-// moment it comes into view; panels arriving together (one row on a wide screen) open in rule order, a beat apart.
-// Panels are open by default; the folded start exists only while this script runs and motion is allowed.
-function unfold(): void {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
-  const folds = Array.from(document.querySelectorAll<HTMLElement>(".fold"));
-  const io = new IntersectionObserver((entries) => {
-    const arriving = entries.filter((e) => e.isIntersecting).map((e) => e.target as HTMLElement);
-    arriving.sort((a, b) => folds.indexOf(a) - folds.indexOf(b));
-    arriving.forEach((el, i) => {
-      el.style.transitionDelay = `${i * 120}ms`;
-      el.classList.add("is-open");
-      io.unobserve(el);
-    });
-  }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
-  document.documentElement.classList.add("js-unfold");
-  for (const f of folds) io.observe(f);
+// Scroll position -> progress. Native scroll is never touched: this only reads it, once per frame, and writes the
+// progress (--p, 0 to 1 over the whole track) and the active step (data-step, aria-current). The scroll lengths are
+// CSS variables on .howto, read again on resize. Pinned only from 700px wide and without reduced motion.
+const PINNED = "(min-width: 43.75rem) and (prefers-reduced-motion: no-preference)";
+function howtoScroll(): void {
+  const section = document.querySelector<HTMLElement>(".howto");
+  const track = section?.querySelector<HTMLElement>(".howto__track");
+  const stage = section?.querySelector<HTMLElement>(".howto__stage");
+  if (!section || !track || !stage) return;
+  const items = Array.from(section.querySelectorAll<HTMLElement>(".howto__step"));
+  const pinned = window.matchMedia(PINNED);
+  let len = { intro: 0, step: 0.6, end: 1 };
+  const readLengths = () => {
+    const css = getComputedStyle(section);
+    const n = (name: string, fallback: number) => {
+      const v = parseFloat(css.getPropertyValue(name));
+      return Number.isFinite(v) ? v : fallback;
+    };
+    len = { intro: n("--howto-intro", 0), step: n("--howto-step", 0.6), end: n("--howto-end", 1) };
+  };
+  let active = -1;
+  const setStep = (i: number) => {
+    if (i === active) return;
+    active = i;
+    stage.dataset.step = String(i);
+    items.forEach((el, j) => (j === i ? el.setAttribute("aria-current", "step") : el.removeAttribute("aria-current")));
+  };
+  const update = () => {
+    ticking = false;
+    if (!pinned.matches) return; // stacked rows: the active row is set by its own rule (step 4)
+    const r = track.getBoundingClientRect();
+    const range = r.height - window.innerHeight;
+    const p = range > 0 ? Math.min(1, Math.max(0, -r.top / range)) : 0;
+    stage.style.setProperty("--p", p.toFixed(4));
+    // where the steps sit on the track, in screens: [intro][steps x 5][end]
+    const total = len.intro + items.length * len.step + len.end;
+    const s = (p * total - len.intro) / len.step; // 0 at step 1's start, 5 at the end of step 5
+    stage.style.setProperty("--s", Math.min(items.length, Math.max(0, s)).toFixed(4));
+    // the step changes halfway through each step's stretch; a small margin stops it flickering at the boundary
+    const HOLD = 0.08;
+    const lo = active - HOLD, hi = active + 1 + HOLD;
+    if (active < 0 || s < lo || s > hi) setStep(Math.min(items.length - 1, Math.max(0, Math.floor(s))));
+  };
+  let ticking = false;
+  const request = () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+  };
+  readLengths();
+  setStep(0);
+  window.addEventListener("scroll", request, { passive: true });
+  window.addEventListener("resize", () => { readLengths(); request(); });
+  pinned.addEventListener("change", request);
+  update();
 }
 
 document.title = L.pageTitle;
 document.head.append(h("meta", { name: "description", content: L.description }));
 document.getElementById("landing")!.append(
-  h("a", { class: "skip", href: "#rules" }, L.rulesTitle),
+  h("a", { class: "skip", href: "#howto" }, L.howto.title),
   hero(),
-  h("main", {}, sheet(), close()),
+  h("main", {},
+    howto(),
+    // the "Fair Game Rules" section goes here (later); its rule strings are kept in COPY.landing
+  ),
 );
-unfold();
 rise();
+howtoScroll();
