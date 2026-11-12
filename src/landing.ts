@@ -101,6 +101,9 @@ const unit = 10n ** BigInt(CONFIG.pusdDecimals);
 const pusd = (v: bigint) => (v % unit === 0n ? String(v / unit) : (Number(v) / Number(unit)).toFixed(CONFIG.pusdDecimals));
 const NUMBERS: HowtoNumbers = { open: pusd(K.openingPrice), fee: `${K.feePercent}%`, cut: `${K.cutPercent}%` };
 
+// The five paintings, in step order (public/assets/howto, built by tools/build_howto.py)
+const HOWTO_IMAGES = ["howto-1-first-king", "howto-2-protect", "howto-3-conqueror", "howto-4-reclaim", "howto-5-treasury"];
+
 // The timeline's node: a small crown
 const crown = () => svg("0 0 24 24", ["M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2 1.8 8z", "M3.5 20.5h17"], { class: "howto__crown" });
 
@@ -121,7 +124,18 @@ function howto(): HTMLElement {
   );
   const stage = h("div", { class: "howto__stage" },
     h("div", { class: "howto__media" },
-      h("div", { class: "howto__frame" }), // the five images go here (step 3)
+      // the five paintings, stacked; no src until needed (see howtoScroll), so only the first loads early
+      h("div", { class: "howto__frame" },
+        ...H.steps.map((s, i) => h("img", {
+          class: "howto__img",
+          "data-i": String(i),
+          "data-src": `${ASSETS}howto/${HOWTO_IMAGES[i]}.webp`,
+          alt: s.alt,
+          width: "1200",
+          height: "1200",
+          decoding: "async",
+        })),
+      ),
       h("h2", { class: "howto__title", id: "howto-title" }, H.title),
       h("p", { class: "howto__subtitle" }, H.subtitle),
     ),
@@ -148,6 +162,42 @@ function howtoScroll(): void {
   const stage = section?.querySelector<HTMLElement>(".howto__stage");
   if (!section || !track || !stage) return;
   const items = Array.from(section.querySelectorAll<HTMLElement>(".howto__step"));
+  const imgs = Array.from(section.querySelectorAll<HTMLImageElement>(".howto__img"));
+  // An image gets its src only when it is needed: the first as the section comes near, the next one whenever a step
+  // becomes active, so the fade never waits on the network
+  const load = (i: number) => {
+    const img = imgs[i];
+    if (img && !img.src && img.dataset.src) img.src = img.dataset.src;
+  };
+  // The painting for step i fades in over the current one; only the shown painting is exposed to screen readers
+  let shown = -1;
+  let near = false; // nothing loads until the section is within a screen of the view
+  const show = (i: number) => {
+    const img = imgs[i];
+    if (!near || !img || i === shown) return;
+    load(i);
+    const apply = () => {
+      if (stage.dataset.step !== String(i)) return; // the visitor moved on while it decoded
+      imgs.forEach((el, j) => {
+        el.classList.toggle("is-active", j === i);
+        el.classList.toggle("is-prev", j === shown);
+        if (j === i) el.removeAttribute("aria-hidden");
+        else el.setAttribute("aria-hidden", "true");
+      });
+      shown = i;
+    };
+    if (img.complete && img.naturalWidth) apply();
+    else img.decode().catch(() => {}).then(apply);
+  };
+  const approach = new IntersectionObserver((entries) => {
+    if (!entries.some((e) => e.isIntersecting)) return;
+    near = true;
+    approach.disconnect();
+    const i = Math.max(0, Number(stage.dataset.step ?? 0));
+    show(i);
+    load(i + 1);
+  }, { rootMargin: "100% 0px" });
+  approach.observe(section);
   const pinned = window.matchMedia(PINNED);
   let len = { intro: 0, step: 0.6, end: 1 };
   const readLengths = () => {
@@ -164,6 +214,10 @@ function howtoScroll(): void {
     active = i;
     stage.dataset.step = String(i);
     items.forEach((el, j) => (j === i ? el.setAttribute("aria-current", "step") : el.removeAttribute("aria-current")));
+    if (near) {
+      show(i);
+      load(i + 1);
+    }
   };
   const update = () => {
     ticking = false;
