@@ -164,18 +164,6 @@ body {
   font-size: 1rem;
 }
 .btn--small:hover { background: #1c2d5a; }
-.btn--primary {
-  min-height: 3.5rem;
-  padding: 0.95rem 1.8rem;
-  background: #fff;
-  color: var(--ink);
-  font-size: 1.1875rem;
-  box-shadow: 0 8px 24px rgb(15 26 51 / 0.28);
-}
-.btn--primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgb(15 26 51 / 0.32);
-}
 .btn--quiet {
   min-height: 3.5rem;
   padding: 0.95rem 1.5rem;
@@ -258,23 +246,24 @@ body {
   gap: 0.85rem;
   margin-top: clamp(1.75rem, 3vw, 2.75rem);
 }
-/* the one action, in the crown's gold on the same hard navy edge; it presses down when clicked */
-.hero .btn--primary {
+/* the one action (the hero and the closing), in the crown's gold on the logo's hard navy edge; it presses down when
+   clicked */
+.btn--primary {
   min-height: clamp(3.5rem, 4.4vw, 4.5rem);
   padding: 0 clamp(1.8rem, 2.6vw, 2.75rem);
   font-size: clamp(1.1875rem, 1.45vw, 1.5rem);
   background: var(--logo-gold);
   color: var(--logo-navy);
-  box-shadow: 0 5px 0 var(--logo-navy), 0 14px 28px rgb(10 30 70 / 0.3);
+  box-shadow: 0 5px 0 var(--logo-navy), 0 14px 28px color-mix(in srgb, var(--logo-navy) 35%, transparent);
 }
-.hero .btn--primary:hover {
-  background: #ffc83d;
+.btn--primary:hover {
+  background: color-mix(in srgb, var(--logo-gold) 82%, var(--logo-cream));
   transform: translateY(-2px);
-  box-shadow: 0 7px 0 var(--logo-navy), 0 18px 32px rgb(10 30 70 / 0.32);
+  box-shadow: 0 7px 0 var(--logo-navy), 0 18px 32px color-mix(in srgb, var(--logo-navy) 38%, transparent);
 }
-.hero .btn--primary:active {
+.btn--primary:active {
   transform: translateY(3px);
-  box-shadow: 0 2px 0 var(--logo-navy), 0 8px 16px rgb(10 30 70 / 0.25);
+  box-shadow: 0 2px 0 var(--logo-navy), 0 8px 16px color-mix(in srgb, var(--logo-navy) 30%, transparent);
 }
 
 /* the painting: the whole valley, its foot fading into the light page */
@@ -634,27 +623,169 @@ body {
   from { opacity: 0; transform: translateY(12px); }
 }
 
-/* no pinning on narrow screens or with reduced motion: the stage is a plain block and the steps stack (step 4 styles
-   them as rows with the image above the text) */
+/* The closing, over the last stretch of the track (--e from 0 to 1). The paintings and cards fade out first; one
+   gold line grows down the middle with the crown riding its tip (--k); then the question and Play Now rise in (--q).
+   Every part is opacity or transform, worked out from --e, so scrolling back plays it in reverse. */
+.howto__media,
+.howto__timeline {
+  opacity: calc(1 - clamp(0, var(--e) / 0.35, 1));
+}
+.howto__stage[data-end] .howto__media,
+.howto__stage[data-end] .howto__timeline {
+  pointer-events: none;
+}
+.howto__slot {
+  display: none; /* stacked rows only */
+}
+.howto__end {
+  --k: clamp(0, (var(--e) - 0.15) / 0.4, 1);
+  --q: clamp(0, (var(--e) - 0.5) / 0.3, 1);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(2rem, 9svh, 5.5rem) 1.5rem clamp(2.5rem, 12svh, 7rem);
+  text-align: center;
+  pointer-events: none;
+}
+.howto__stage[data-end] .howto__end {
+  pointer-events: auto;
+}
+.howto__line {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 4rem;
+  width: 2px;
+  margin-bottom: 2.75rem;
+}
+.howto__line::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 1px;
+  background: linear-gradient(to bottom, transparent, var(--foil-lo) 12%, var(--logo-gold));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--logo-gold) 70%, transparent), 0 0 28px color-mix(in srgb, var(--logo-gold) 35%, transparent);
+  transform-origin: top;
+  transform: scaleY(var(--k));
+}
+/* the crown rides the tip of the line: its wrapper is the line's height, moved up by what is not yet drawn */
+.howto__line-crown {
+  position: absolute;
+  inset: 0;
+  transform: translateY(calc((var(--k) - 1) * 100%));
+  opacity: clamp(0, var(--k) * 4, 1);
+}
+.howto__line-crown .howto__crown {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 50%;
+  box-sizing: border-box;
+  width: 3rem;
+  height: 3rem;
+  padding: 0.65rem;
+  border-radius: 50%;
+  background: var(--logo-navy);
+  border: 2px solid var(--logo-gold);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--logo-gold) 18%, transparent), 0 0 26px color-mix(in srgb, var(--logo-gold) 65%, transparent);
+}
+.howto__question,
+.howto__play {
+  opacity: var(--q);
+  transform: translateY(calc((1 - var(--q)) * 1rem));
+}
+.howto__question {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1;
+  color: var(--logo-cream);
+  text-shadow: 0 0.055em 0 var(--logo-navy), 0 0 0.6em color-mix(in srgb, var(--box-deep) 60%, transparent);
+  text-wrap: balance;
+}
+.howto__play {
+  margin-top: clamp(1.5rem, 3.5svh, 2.25rem);
+}
+/* the button keeps its own hover lift on top of the rise */
+.howto__play:hover {
+  transform: translateY(-2px);
+}
+
+/* Stacked (narrow screens, or reduced motion): no pinning. The title, then one row per step with its painting above
+   the card, then the closing. The row crossing the middle of the screen is bright, the others dimmed. */
 @media (max-width: 43.6875rem), (prefers-reduced-motion: reduce) {
   .howto__track { height: auto; }
   .howto__stage {
+    --e: 1; /* the closing is simply shown */
+    --field-h: calc(100vw * 941 / 1672); /* the dusk field at its own shape, across the top, fading into navy */
     position: static;
+    background:
+      linear-gradient(to bottom, var(--box-deep), transparent 6rem, transparent calc(var(--field-h) * 0.4), var(--box-deep) var(--field-h)),
+      linear-gradient(color-mix(in srgb, var(--box) 70%, transparent), color-mix(in srgb, var(--box) 70%, transparent)),
+      url("/assets/backgrounds/field_dusk.webp") top center / 100% auto no-repeat,
+      var(--box-deep);
     height: auto;
     overflow: visible;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
-    row-gap: 2.5rem;
-    padding-block: clamp(3rem, 8vw, 5rem);
+    justify-items: center;
+    row-gap: clamp(2rem, 6vw, 3rem);
+    padding-block: clamp(3.5rem, 10vw, 6rem);
   }
-  .howto__frame { width: min(100%, 30rem); }
-  .howto__timeline { overflow: visible; mask-image: none; }
+  .howto__media,
+  .howto__timeline,
+  .howto__end {
+    width: 100%;
+    max-width: 34rem;
+  }
+  .howto__frame { display: none; } /* its paintings move into the rows */
+  .howto__media { opacity: 1; }
+  .howto__timeline { opacity: 1; overflow: visible; mask-image: none; }
   .howto__column { position: static; transform: none; }
-  .howto__road, .howto__node { display: none; }
-  .howto__step { height: auto; padding-left: 0; }
-  .howto__step + .howto__step { margin-top: 1.25rem; }
-  .howto__card, .howto__step[aria-current] + .howto__step .howto__card { opacity: 1; transform: none; }
-  .howto__mark { display: none; }
+  .howto__road, .howto__node, .howto__mark { display: none; }
+  .howto__step {
+    height: auto;
+    padding-left: 0;
+    opacity: 0.45;
+    transition: opacity 300ms ease;
+  }
+  .howto__step[aria-current] { opacity: 1; }
+  .howto__step + .howto__step { margin-top: clamp(2.5rem, 8vw, 3.5rem); }
+  .howto__card,
+  .howto__step[aria-current] + .howto__step .howto__card { opacity: 1; transform: none; }
+  .howto__slot { display: block; }
+  .howto__slot .howto__img {
+    position: relative;
+    inset: auto;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    margin-bottom: 1rem;
+    opacity: 1;
+    border: 2px solid var(--foil);
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 0.3rem var(--box-deep), 0 0 0 calc(0.3rem + 1px) var(--foil-lo);
+    transition: none;
+  }
+  .howto__end {
+    position: static;
+    padding: 0;
+    pointer-events: auto;
+  }
+  .howto__line { flex: none; height: clamp(5rem, 18vw, 8rem); margin-bottom: 2.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .howto__step,
+  .howto__card { transition: none; }
+  .howto__step[aria-current] .howto__card > * { animation: none; }
+}
+/* phones: the question and the button fill the width */
+@media (max-width: 43.6875rem) {
+  .howto__question { font-size: clamp(2.25rem, 10vw, 3rem); }
+  .howto__play { width: 100%; max-width: 22rem; }
 }
 
 /* ---------------- Smaller screens ---------------- */

@@ -113,6 +113,8 @@ function howto(): HTMLElement {
   const H = L.howto;
   const steps = H.steps.map((s, i) =>
     h("li", { class: "howto__step", "data-i": String(i) },
+      // stacked rows: the step's painting is moved here, above its card (see howtoScroll)
+      h("div", { class: "howto__slot" }),
       // the step's mark on the road; a button that jumps to the step
       h("button", { class: "howto__mark", type: "button", "data-i": String(i), "aria-label": H.goTo(i + 1, s.title) }),
       h("article", { class: "howto__card" },
@@ -148,66 +150,65 @@ function howto(): HTMLElement {
       ),
       h("div", { class: "howto__node", "aria-hidden": "true" }, crown()),
     ),
+    // The closing: the timeline narrows to one glowing gold line with the crown at its foot, then the question and the
+    // one action. Pinned, it fades in over the last stretch of the track; stacked, it is the section's last block.
+    h("div", { class: "howto__end" },
+      h("div", { class: "howto__line", "aria-hidden": "true" }, h("div", { class: "howto__line-crown" }, crown())),
+      h("h2", { class: "howto__question", id: "howto-end" }, H.closing),
+      h("a", { class: "btn btn--primary howto__play", href: BATTLE }, L.join, arrow()),
+    ),
   );
   return h("section", { class: "howto", id: "howto", "aria-labelledby": "howto-title" }, h("div", { class: "howto__track" }, stage));
 }
 
-// Scroll position -> progress. Native scroll is never touched: this only reads it, once per frame, and writes the
-// progress (--p, 0 to 1 over the whole track) and the active step (data-step, aria-current). The scroll lengths are
-// CSS variables on .howto, read again on resize. Pinned only from 700px wide and without reduced motion.
+// Scroll position -> progress. Native scroll is never touched: this only reads it, once per frame, and writes
+//   --s  where the steps are, 0 when step 1 starts to 5 when step 5 ends (the column slides by it),
+//   --e  how far the closing is, 0 to 1 over the last stretch of the track,
+//   data-step and aria-current  the active step.
+// The scroll lengths are CSS variables on .howto, read again on resize.
+// Two modes. Pinned (700px wide and up, motion allowed): the stage sticks and the scroll walks through the steps.
+// Stacked (narrow screens, or reduced motion): no pinning; each painting sits above its own card, and the row nearest
+// the middle of the screen is the active one.
 const PINNED = "(min-width: 43.75rem) and (prefers-reduced-motion: no-preference)";
 function howtoScroll(): void {
   const section = document.querySelector<HTMLElement>(".howto");
   const track = section?.querySelector<HTMLElement>(".howto__track");
   const stage = section?.querySelector<HTMLElement>(".howto__stage");
-  if (!section || !track || !stage) return;
+  const frame = section?.querySelector<HTMLElement>(".howto__frame");
+  if (!section || !track || !stage || !frame) return;
   const items = Array.from(section.querySelectorAll<HTMLElement>(".howto__step"));
+  const slots = Array.from(section.querySelectorAll<HTMLElement>(".howto__slot"));
   const imgs = Array.from(section.querySelectorAll<HTMLImageElement>(".howto__img"));
-  // An image gets its src only when it is needed: the first as the section comes near, the next one whenever a step
-  // becomes active, so the fade never waits on the network
+  const play = section.querySelector<HTMLElement>(".howto__play");
+  const pinned = window.matchMedia(PINNED);
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  // Images get their src only when needed. Pinned: the first as the section comes near, then each next one as the
+  // step before it becomes active, so a fade never waits on the network. Stacked: all of them, with native lazy loading.
+  let near = false;
   const load = (i: number) => {
     const img = imgs[i];
     if (img && !img.src && img.dataset.src) img.src = img.dataset.src;
   };
-  // The painting for step i fades in over the current one; only the shown painting is exposed to screen readers
+  // Pinned: the painting for step i fades in over the current one; only the shown one is exposed to screen readers
   let shown = -1;
-  let near = false; // nothing loads until the section is within a screen of the view
   const show = (i: number) => {
     const img = imgs[i];
-    if (!near || !img || i === shown) return;
+    if (!near || !pinned.matches || !img || i === shown) return;
     load(i);
     const apply = () => {
-      if (stage.dataset.step !== String(i)) return; // the visitor moved on while it decoded
+      if (stage.dataset.step !== String(i) || !pinned.matches) return; // moved on while it decoded
       imgs.forEach((el, j) => {
         el.classList.toggle("is-active", j === i);
         el.classList.toggle("is-prev", j === shown);
-        if (j === i) el.removeAttribute("aria-hidden");
-        else el.setAttribute("aria-hidden", "true");
+        el.toggleAttribute("aria-hidden", j !== i);
       });
       shown = i;
     };
     if (img.complete && img.naturalWidth) apply();
     else img.decode().catch(() => {}).then(apply);
   };
-  const approach = new IntersectionObserver((entries) => {
-    if (!entries.some((e) => e.isIntersecting)) return;
-    near = true;
-    approach.disconnect();
-    const i = Math.max(0, Number(stage.dataset.step ?? 0));
-    show(i);
-    load(i + 1);
-  }, { rootMargin: "100% 0px" });
-  approach.observe(section);
-  const pinned = window.matchMedia(PINNED);
-  let len = { intro: 0, step: 0.6, end: 1 };
-  const readLengths = () => {
-    const css = getComputedStyle(section);
-    const n = (name: string, fallback: number) => {
-      const v = parseFloat(css.getPropertyValue(name));
-      return Number.isFinite(v) ? v : fallback;
-    };
-    len = { intro: n("--howto-intro", 0), step: n("--howto-step", 0.6), end: n("--howto-end", 1) };
-  };
+
   let active = -1;
   const setStep = (i: number) => {
     if (i === active) return;
@@ -219,51 +220,115 @@ function howtoScroll(): void {
       load(i + 1);
     }
   };
+
+  let len = { intro: 0, step: 0.6, end: 1 };
+  const readLengths = () => {
+    const css = getComputedStyle(section);
+    const n = (name: string, fallback: number) => {
+      const v = parseFloat(css.getPropertyValue(name));
+      return Number.isFinite(v) ? v : fallback;
+    };
+    len = { intro: n("--howto-intro", 0), step: n("--howto-step", 0.6), end: n("--howto-end", 1) };
+  };
+  const total = () => len.intro + items.length * len.step + len.end;
+  // The scroll position for a point on the track, given in screens from the track's start
+  const scrollFor = (screens: number) => {
+    const top = track.getBoundingClientRect().top + window.scrollY;
+    return top + (track.offsetHeight - window.innerHeight) * (screens / total());
+  };
+
+  let ticking = false;
   const update = () => {
     ticking = false;
-    if (!pinned.matches) return; // stacked rows: the active row is set by its own rule (step 4)
+    if (!pinned.matches) return;
     const r = track.getBoundingClientRect();
     const range = r.height - window.innerHeight;
     const p = range > 0 ? Math.min(1, Math.max(0, -r.top / range)) : 0;
-    stage.style.setProperty("--p", p.toFixed(4));
-    // where the steps sit on the track, in screens: [intro][steps x 5][end]
-    const total = len.intro + items.length * len.step + len.end;
-    const s = (p * total - len.intro) / len.step; // 0 at step 1's start, 5 at the end of step 5
+    const at = p * total(); // screens into the track: [intro][steps x 5][end]
+    const s = (at - len.intro) / len.step;
+    const e = Math.min(1, Math.max(0, (at - len.intro - items.length * len.step) / len.end));
     stage.style.setProperty("--s", Math.min(items.length, Math.max(0, s)).toFixed(4));
+    stage.style.setProperty("--e", e.toFixed(4));
+    stage.toggleAttribute("data-end", e >= 0.5); // the closing takes clicks once it is mostly in
     // the step changes halfway through each step's stretch; a small margin stops it flickering at the boundary
     const HOLD = 0.08;
-    const lo = active - HOLD, hi = active + 1 + HOLD;
-    if (active < 0 || s < lo || s > hi) setStep(Math.min(items.length - 1, Math.max(0, Math.floor(s))));
+    if (active < 0 || s < active - HOLD || s > active + 1 + HOLD) setStep(Math.min(items.length - 1, Math.max(0, Math.floor(s))));
   };
-  let ticking = false;
   const request = () => {
     if (!ticking) {
       ticking = true;
       requestAnimationFrame(update);
     }
   };
+
+  // Stacked: the row crossing the middle of the screen is the active one
+  const middle = new IntersectionObserver((entries) => {
+    if (pinned.matches) return;
+    for (const en of entries) if (en.isIntersecting) setStep(items.indexOf(en.target as HTMLElement));
+  }, { rootMargin: "-45% 0px -45% 0px" });
+
+  // Put the paintings where the mode wants them: all in the frame (pinned) or one above each card (stacked)
+  const applyMode = () => {
+    readLengths();
+    imgs.forEach((el) => el.classList.remove("is-active", "is-prev"));
+    shown = -1;
+    if (pinned.matches) {
+      for (const img of imgs) {
+        frame.append(img);
+        img.removeAttribute("loading");
+      }
+      items.forEach((el) => middle.unobserve(el));
+      const i = Math.max(0, active);
+      active = -1;
+      setStep(i);
+      update();
+    } else {
+      imgs.forEach((img, i) => {
+        slots[i]?.append(img);
+        img.setAttribute("loading", "lazy");
+        img.removeAttribute("aria-hidden"); // each row's painting belongs to its own step
+        load(i);
+      });
+      stage.style.removeProperty("--s");
+      stage.style.removeProperty("--e");
+      stage.removeAttribute("data-end");
+      items.forEach((el) => middle.observe(el));
+    }
+  };
+
   // A mark jumps to its step: pinned, to the middle of that step's stretch; stacked, to its row
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  section.addEventListener("click", (e) => {
-    const mark = (e.target as Element).closest<HTMLElement>(".howto__mark");
+  section.addEventListener("click", (ev) => {
+    const mark = (ev.target as Element).closest<HTMLElement>(".howto__mark");
     if (!mark) return;
     const i = Number(mark.dataset.i);
     const behavior: ScrollBehavior = reduce.matches ? "auto" : "smooth";
-    if (!pinned.matches) {
-      items[i]?.scrollIntoView({ block: "center", behavior });
-      return;
-    }
-    const total = len.intro + items.length * len.step + len.end;
-    const top = track.getBoundingClientRect().top + window.scrollY;
-    const range = track.offsetHeight - window.innerHeight;
-    window.scrollTo({ top: top + range * ((len.intro + (i + 0.5) * len.step) / total), behavior });
+    if (!pinned.matches) items[i]?.scrollIntoView({ block: "center", behavior });
+    else window.scrollTo({ top: scrollFor(len.intro + (i + 0.5) * len.step), behavior });
   });
-  readLengths();
-  setStep(0);
+  // Tabbing to Play Now before the closing is in view brings the closing in, so the focus is never on something unseen
+  play?.addEventListener("focus", () => {
+    if (pinned.matches && !stage.hasAttribute("data-end")) {
+      window.scrollTo({ top: scrollFor(len.intro + items.length * len.step + 0.8 * len.end), behavior: "auto" });
+    }
+  });
+
+  const approach = new IntersectionObserver((entries) => {
+    if (!entries.some((en) => en.isIntersecting)) return;
+    near = true;
+    approach.disconnect();
+    if (pinned.matches) {
+      const i = Math.max(0, active);
+      show(i);
+      load(i + 1);
+    }
+  }, { rootMargin: "100% 0px" });
+  approach.observe(section);
+
+  applyMode();
+  setStep(Math.max(0, active));
   window.addEventListener("scroll", request, { passive: true });
   window.addEventListener("resize", () => { readLengths(); request(); });
-  pinned.addEventListener("change", request);
-  update();
+  pinned.addEventListener("change", applyMode);
 }
 
 document.title = L.pageTitle;
