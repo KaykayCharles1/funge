@@ -97,7 +97,7 @@ export const COPY = {
   },
   
   // The Kingdom page. Change the wording here only.
-  // The landing page (landing.html): the game presented as a board game, the valley as the box lid and the rules as the
+  // The landing page (index.html, at /): the game presented as a board game, the valley as the box lid and the rules as the
   // rule sheet. Plain, short sentences; real numbers only.
   landing: {
     pageTitle: "Funge · Battle for the throne",

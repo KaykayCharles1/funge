@@ -30,11 +30,11 @@ function csp(): Plugin {
 export default defineConfig({
   plugins: [tailwindcss(), csp()],
   build: {
-    // Two pages: the game (index.html) and the landing page (landing.html)
+    // Two pages: the landing page at / (index.html) and the game at /play/ (play/index.html)
     rollupOptions: {
       input: {
-        main: fileURLToPath(new URL("./index.html", import.meta.url)),
-        landing: fileURLToPath(new URL("./landing.html", import.meta.url)),
+        landing: fileURLToPath(new URL("./index.html", import.meta.url)),
+        play: fileURLToPath(new URL("./play/index.html", import.meta.url)),
       },
     },
   },

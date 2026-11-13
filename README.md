@@ -26,7 +26,7 @@ Needs Node 24 (it runs the TypeScript scripts directly).
     node scripts/gen-referee-key.ts                 chipnet referee key; the private part goes in .referee.chipnet.json (git ignores it)
     node scripts/deploy-kingdom.ts                  deploy a game from the creator wallet (.wallet.chipnet.json, git ignores it); uses that key
     npm run server                                  the referee server, on 127.0.0.1:8787
-    npm run dev                                     the page, on http://localhost:5173
+    npm run dev                                     the landing page on http://localhost:5173, the game on http://localhost:5173/play/
 
 For quick tests, shorten the keeper wait when starting the server, and use the 5:00 demo clock (both refused on mainnet, the keeper wait only):
 

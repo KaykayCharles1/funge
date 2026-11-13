@@ -1,4 +1,4 @@
-// The landing page (landing.html). The hero: the painted valley is the sky the page opens in. Below it, "How a round
+// The landing page (index.html, at /). The hero: the painted valley is the sky the page opens in. Below it, "How a round
 // is played": a pinned section where scrolling walks through the five moves. Every word comes from COPY.landing, and
 // every rule number from the rule constants. Its one action is Play Now, which opens the battlefield.
 import "./landing.css";
@@ -8,7 +8,7 @@ import { CONFIG } from "./config.ts"; // plain constants only: no wallet, chain 
 import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
 
 const L = COPY.landing;
-const BATTLE = "/?mode=battlefield";
+const BATTLE = "/play/?mode=battlefield"; // the game page (play/index.html)
 const ASSETS = `${import.meta.env.BASE_URL}assets/`;
 
 // Build the page with the DOM, so no copy is ever parsed as HTML
