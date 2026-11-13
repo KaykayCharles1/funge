@@ -942,9 +942,11 @@ body {
   padding: 0 clamp(0.75rem, 3vw, 2rem) clamp(4rem, 10vw, 8rem);
 }
 .rules__scroll {
+  --travel: 0px; /* set by the page: how far the bottom roller travels between closed and open */
+  --open-ms: 1900ms;
+  --close-ms: 900ms;
   width: min(72rem, 100%);
   margin: 0 auto;
-  filter: drop-shadow(0 24px 40px color-mix(in srgb, black 45%, transparent));
 }
 .rules__rod {
   position: relative;
@@ -953,8 +955,13 @@ body {
   border-style: solid;
   border-width: 0 var(--rod-end);
   border-image: url("/assets/rules/roller.webp") 0 280 fill / 0 var(--rod-end) / 0 stretch;
+  filter: drop-shadow(0 6px 8px color-mix(in srgb, black 45%, transparent));
 }
-.rules__rod--bottom { transform: scaleY(-1); } /* lit from the top left; turned over, its sheen faces the sheet */
+/* lit from the top left; turned over, its sheen faces the sheet */
+.rules__rod--bottom {
+  transform: scaleY(-1);
+  transition: transform var(--open-ms) cubic-bezier(0.45, 0.05, 0.3, 1);
+}
 
 /* the parchment: the logo's cream, a little warmer at the edges, with a fine paper grain; it shades where it rolls
    onto each roller */
@@ -968,6 +975,25 @@ body {
     linear-gradient(to right, color-mix(in srgb, var(--foil-lo) 22%, transparent), transparent 9%, transparent 91%, color-mix(in srgb, var(--foil-lo) 22%, transparent)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.3 0 0 0 0 0.1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 45%, var(--logo-cream), var(--cream) 70%);
+  box-shadow: 0 24px 50px color-mix(in srgb, black 40%, transparent);
+  /* open: the whole sheet (the extra room at the sides lets its shadow show; the foot is under the roller) */
+  clip-path: inset(0 -4rem 0 -4rem);
+  transition: clip-path var(--open-ms) cubic-bezier(0.45, 0.05, 0.3, 1);
+}
+
+/* Closed: the bottom roller rests just under the top one, and the sheet shows only down to its middle. Opening, the
+   roller rolls down to its place and the sheet follows it (the same timing, so the sheet's edge stays under the
+   roller); closing is quicker. */
+.rules__scroll[data-state="closed"] .rules__rod--bottom {
+  transform: translateY(calc(var(--rod-h) * 0.85 - var(--travel))) scaleY(-1);
+}
+.rules__scroll[data-state="closed"] .rules__sheet {
+  clip-path: inset(0 -4rem calc(100% - var(--rod-h) * 0.85) -4rem);
+}
+.rules__scroll[data-state="closed"] .rules__rod--bottom,
+.rules__scroll[data-state="closed"] .rules__sheet {
+  transition-duration: var(--close-ms);
+  transition-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 /* the heading in the display face, navy ink, over a gold rule with a diamond in it */

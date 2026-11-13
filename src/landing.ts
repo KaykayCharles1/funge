@@ -216,6 +216,51 @@ function rules(): HTMLElement {
   );
 }
 
+// The scroll opens by itself when the visitor arrives and rolls shut when they leave. The top roller stays put; the
+// bottom one rolls down to its place and back, and the sheet shows down to it (both CSS transitions, so a change of
+// mind half way reverses smoothly). The page keeps the open scroll's height throughout, so nothing below it moves.
+// It counts as arrived once the closed scroll is in the upper half of the screen (so the visitor sees it unroll) and
+// some of it is still below the top 30%; it counts as left once it is all but off screen (a gap between the two, so it never flutters at an edge).
+// Never with reduced motion: the scroll is simply open.
+const RULES_OPEN_MS = 1900; // the opening, at least
+const RULES_OPEN_MAX_MS = 3000; // and at most
+const RULES_OPEN_MS_PER_PX = 1.6; // per pixel the roller travels
+function rulesScroll(): void {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const scroll = document.querySelector<HTMLElement>(".rules__scroll");
+  const top = scroll?.querySelector<HTMLElement>(".rules__rod--top");
+  const bottom = scroll?.querySelector<HTMLElement>(".rules__rod--bottom");
+  if (!scroll || !top || !bottom) return;
+  // how far the bottom roller travels: from its place up to the top roller (the layout ignores transforms). A longer
+  // scroll (one column on a phone) takes longer to open, so the roller moves at about the same speed on any screen.
+  const measure = () => {
+    const travel = bottom.offsetTop - top.offsetTop;
+    scroll.style.setProperty("--travel", `${travel}px`);
+    scroll.style.setProperty("--open-ms", `${Math.round(Math.min(RULES_OPEN_MAX_MS, Math.max(RULES_OPEN_MS, travel * RULES_OPEN_MS_PER_PX)))}ms`);
+  };
+  measure();
+  new ResizeObserver(measure).observe(scroll);
+  scroll.dataset.state = "closed";
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const r = scroll.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const open = scroll.dataset.state === "open";
+    if (!open && r.top < vh * 0.5 && r.bottom > vh * 0.3) scroll.dataset.state = "open";
+    else if (open && (r.top > vh * 0.92 || r.bottom < vh * 0.08)) scroll.dataset.state = "closed";
+  };
+  window.addEventListener("scroll", () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+  }, { passive: true });
+  window.addEventListener("resize", update, { passive: true });
+  // already on screen when the page loads: open after the closed scroll has been drawn once, so the opening plays
+  requestAnimationFrame(() => requestAnimationFrame(update));
+}
+
 // How to Play. A tall track holds a sticky stage; while the stage is pinned, the scroll position plays the section
 // like the reference clip: the panel grows in, shifts left as the timeline draws in, the steps pass the crown, and the
 // exit turns the timeline into the closing. The heading stays at the top of the stage throughout.
@@ -711,3 +756,4 @@ document.getElementById("landing")!.append(
 rise();
 battleLoop();
 howtoScroll();
+rulesScroll();
