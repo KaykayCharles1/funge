@@ -41,6 +41,11 @@ function hero(): HTMLElement {
   const logo = h("a", { class: "top-logo", href: "#top", "aria-label": L.logoAlt },
     h("img", { src: `${ASSETS}landing/funge-logo.webp`, alt: "", width: "708", height: "420" })
   );
+  // top right: a question mark that takes the visitor to How to Play (and plays it); its name shows on hover
+  const help = h("a", { class: "help", href: "#howto", "aria-label": L.howto.title },
+    svg("0 0 24 24", ["M8.6 9.2a3.4 3.4 0 1 1 4.9 3.05c-.95.47-1.5 1.25-1.5 2.25v.5", "M12 18.4v.1"], { fill: "none", stroke: "currentColor", "stroke-width": "2.6", "stroke-linecap": "round", "stroke-linejoin": "round" }),
+    h("span", { class: "help__tip", "aria-hidden": "true" }, L.howto.title),
+  );
   const sky = h("div", { class: "hero__sky" },
     // h("h1", { class: "hero__logo" }, h("img", { src: `${ASSETS}landing/funge-logo.webp`, alt: L.logoAlt, width: "708", height: "420", fetchpriority: "high" })),
     h("h1", { class: "hero__title" }, L.heroTitle),
@@ -71,7 +76,7 @@ function hero(): HTMLElement {
     ),
     h("figcaption", { class: "shot__caption" }, L.shotCaption),
   );
-  return h("header", { class: "hero", id: "top" }, logo, sky, painting, shot);
+  return h("header", { class: "hero", id: "top" }, logo, help, sky, painting, shot);
 }
 
 // The battlefield frame rises a little as the page scrolls past the painting (never with reduced motion)
@@ -104,11 +109,26 @@ const NUMBERS: HowtoNumbers = { open: pusd(K.openingPrice), fee: `${K.feePercent
 // The five paintings, in step order (public/assets/howto, built by tools/build_howto.py)
 const HOWTO_IMAGES = ["howto-1-first-king", "howto-2-protect", "howto-3-conqueror", "howto-4-reclaim", "howto-5-treasury"];
 
+// Autoplay, timed like the reference clip. A move is a smooth scroll to the next spot; a hold is a pause there.
+const AUTOPLAY_GROW_MS = 750; // the panel grows in, in the middle
+const AUTOPLAY_INTRO_HOLD_MS = 1450; // and holds there
+const AUTOPLAY_SHIFT_MS = 600; // the shift into two columns, landing on step 1
+const AUTOPLAY_STEP_MS = 5000; // each step holds (time to read it)
+const AUTOPLAY_MOVE_MS = 450; // the move from one step to the next
+const AUTOPLAY_EXIT_MS = 800; // the exit into the closing
+const AUTOPLAY_RESUME_MS = 1500; // how soon it resumes after the mouse leaves the timeline
+
+// The intro stretch (--howto-intro): the panel grows in up to GROW_END of it, holds, and shifts left from SHIFT_START
+const GROW_END = 0.35;
+const SHIFT_START = 0.55;
+
 // The timeline's node: a small crown
 const crown = () => svg("0 0 24 24", ["M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2 1.8 8z", "M3.5 20.5h17"], { class: "howto__crown" });
 
-// How a round is played. A tall track holds a sticky stage; while the stage is pinned, the scroll position walks
-// through the five steps. Left: the image panel with the title under it. Right: the timeline of steps, an ordered list.
+// How to Play. A tall track holds a sticky stage; while the stage is pinned, the scroll position plays the section
+// like the reference clip: the panel grows in, shifts left as the timeline draws in, the steps pass the crown, and the
+// exit turns the timeline into the closing. The heading stays at the top of the stage throughout.
+// Left: the image panel. Right: the steps, an ordered list.
 function howto(): HTMLElement {
   const H = L.howto;
   const steps = H.steps.map((s, i) =>
@@ -125,6 +145,7 @@ function howto(): HTMLElement {
     ),
   );
   const stage = h("div", { class: "howto__stage" },
+    h("h2", { class: "howto__title", id: "howto-title" }, H.title),
     h("div", { class: "howto__media" },
       // the five paintings, stacked; no src until needed (see howtoScroll), so only the first loads early
       h("div", { class: "howto__frame" },
@@ -138,8 +159,6 @@ function howto(): HTMLElement {
           decoding: "async",
         })),
       ),
-      h("h2", { class: "howto__title", id: "howto-title" }, H.title),
-      h("p", { class: "howto__subtitle" }, H.subtitle),
     ),
     // The timeline. The column (the road, its gold fill and the steps) slides up past the crown, which stays put:
     // one transform, from the scroll progress. The connector from the crown points at the active card.
@@ -148,10 +167,10 @@ function howto(): HTMLElement {
         h("div", { class: "howto__road", "aria-hidden": "true" }, h("div", { class: "howto__fill" })),
         h("ol", { class: "howto__steps", "aria-label": H.stepsLabel }, ...steps),
       ),
-      h("div", { class: "howto__node", "aria-hidden": "true" }, crown()),
+      h("div", { class: "howto__node", "aria-hidden": "true" }, h("span", { class: "howto__flash" }), crown()),
     ),
-    // The closing: the timeline narrows to one glowing gold line with the crown at its foot, then the question and the
-    // one action. Pinned, it fades in over the last stretch of the track; stacked, it is the section's last block.
+    // The closing: the timeline, moved to the middle, runs down to the crown; then the question and the one action.
+    // Pinned, it plays over the last stretch of the track; stacked, it is the section's last block.
     h("div", { class: "howto__end" },
       h("div", { class: "howto__line", "aria-hidden": "true" }, h("div", { class: "howto__line-crown" }, crown())),
       h("h2", { class: "howto__question", id: "howto-end" }, H.closing),
@@ -162,14 +181,16 @@ function howto(): HTMLElement {
 }
 
 // Scroll position -> progress. Native scroll is never touched: this only reads it, once per frame, and writes
-//   --s  where the steps are, 0 when step 1 starts to 5 when step 5 ends (the column slides by it),
-//   --e  how far the closing is, 0 to 1 over the last stretch of the track,
-//   data-step and aria-current  the active step.
-// The scroll lengths are CSS variables on .howto, read again on resize.
-// Two modes. Pinned (700px wide and up, motion allowed): the stage sticks and the scroll walks through the steps.
+//   --grow   the panel growing in (0 to 1), --shift  the move into two columns (0 to 1),
+//   --s      where the steps are (0 when step 1's stretch starts, 5 when step 5's ends),
+//   --e      the exit into the closing (0 to 1),
+//   data-step and aria-current  the active step, data-moving  while the column is between two steps.
+// The track is [intro][5 steps][end]; the lengths are CSS variables on .howto, read again on resize.
+// Two modes. Pinned (700px wide and up, motion allowed): the stage sticks and the scroll plays the section.
 // Stacked (narrow screens, or reduced motion): no pinning; each painting sits above its own card, and the row nearest
 // the middle of the screen is the active one.
 const PINNED = "(min-width: 43.75rem) and (prefers-reduced-motion: no-preference)";
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 function howtoScroll(): void {
   const section = document.querySelector<HTMLElement>(".howto");
   const track = section?.querySelector<HTMLElement>(".howto__track");
@@ -180,17 +201,19 @@ function howtoScroll(): void {
   const slots = Array.from(section.querySelectorAll<HTMLElement>(".howto__slot"));
   const imgs = Array.from(section.querySelectorAll<HTMLImageElement>(".howto__img"));
   const play = section.querySelector<HTMLElement>(".howto__play");
+  const flash = section.querySelector<HTMLElement>(".howto__flash");
   const pinned = window.matchMedia(PINNED);
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   // Images get their src only when needed. Pinned: the first as the section comes near, then each next one as the
-  // step before it becomes active, so a fade never waits on the network. Stacked: all of them, with native lazy loading.
+  // step before it becomes active, so a change never waits on the network. Stacked: all, with native lazy loading.
   let near = false;
   const load = (i: number) => {
     const img = imgs[i];
     if (img && !img.src && img.dataset.src) img.src = img.dataset.src;
   };
-  // Pinned: the painting for step i fades in over the current one; only the shown one is exposed to screen readers
+  // Pinned: the shown painting squashes flat and the next one opens out of the same line, like the reference.
+  // Only the shown painting is exposed to screen readers.
   let shown = -1;
   const show = (i: number) => {
     const img = imgs[i];
@@ -198,11 +221,20 @@ function howtoScroll(): void {
     load(i);
     const apply = () => {
       if (stage.dataset.step !== String(i) || !pinned.matches) return; // moved on while it decoded
+      const old = imgs[shown];
       imgs.forEach((el, j) => {
-        el.classList.toggle("is-active", j === i);
-        el.classList.toggle("is-prev", j === shown);
+        if (j !== i && j !== shown) el.classList.remove("is-active", "is-in", "is-out");
         el.toggleAttribute("aria-hidden", j !== i);
       });
+      if (old && old !== img) {
+        old.classList.remove("is-active", "is-in");
+        old.classList.add("is-out");
+        old.addEventListener("animationend", () => old.classList.remove("is-out"), { once: true });
+        img.classList.add("is-active", "is-in");
+        img.addEventListener("animationend", () => img.classList.remove("is-in"), { once: true });
+      } else {
+        img.classList.add("is-active");
+      }
       shown = i;
     };
     if (img.complete && img.naturalWidth) apply();
@@ -221,38 +253,58 @@ function howtoScroll(): void {
     }
   };
 
-  let len = { intro: 0, step: 0.6, end: 1 };
+  let len = { intro: 0.6, step: 0.6, end: 1 };
   const readLengths = () => {
     const css = getComputedStyle(section);
     const n = (name: string, fallback: number) => {
       const v = parseFloat(css.getPropertyValue(name));
       return Number.isFinite(v) ? v : fallback;
     };
-    len = { intro: n("--howto-intro", 0), step: n("--howto-step", 0.6), end: n("--howto-end", 1) };
+    len = { intro: n("--howto-intro", 0.6), step: n("--howto-step", 0.6), end: n("--howto-end", 1) };
   };
   const total = () => len.intro + items.length * len.step + len.end;
-  // The scroll position for a point on the track, given in screens from the track's start
+  const stepAt = (i: number) => len.intro + (i + 0.5) * len.step; // a step's middle, in screens from the track's start
+  // The scroll position for a point on the track, in screens from its start; and the other way round
   const scrollFor = (screens: number) => {
     const top = track.getBoundingClientRect().top + window.scrollY;
     return top + (track.offsetHeight - window.innerHeight) * (screens / total());
   };
+  const position = () => {
+    const r = track.getBoundingClientRect();
+    const range = r.height - window.innerHeight;
+    return range > 0 ? clamp01(-r.top / range) * total() : 0;
+  };
 
+  let moving = false;
   let ticking = false;
   const update = () => {
     ticking = false;
     if (!pinned.matches) return;
-    const r = track.getBoundingClientRect();
-    const range = r.height - window.innerHeight;
-    const p = range > 0 ? Math.min(1, Math.max(0, -r.top / range)) : 0;
-    const at = p * total(); // screens into the track: [intro][steps x 5][end]
+    const at = position(); // screens into the track
+    const intro = len.intro > 0 ? clamp01(at / len.intro) : 1;
+    const grow = clamp01(intro / GROW_END);
+    const shift = clamp01((intro - SHIFT_START) / (1 - SHIFT_START));
     const s = (at - len.intro) / len.step;
-    const e = Math.min(1, Math.max(0, (at - len.intro - items.length * len.step) / len.end));
+    const e = clamp01((at - len.intro - items.length * len.step) / len.end);
+    stage.style.setProperty("--grow", grow.toFixed(4));
+    stage.style.setProperty("--shift", shift.toFixed(4));
     stage.style.setProperty("--s", Math.min(items.length, Math.max(0, s)).toFixed(4));
     stage.style.setProperty("--e", e.toFixed(4));
-    stage.toggleAttribute("data-end", e >= 0.5); // the closing takes clicks once it is mostly in
+    stage.toggleAttribute("data-end", e >= 0.75); // the closing takes clicks once it is in
+    stage.toggleAttribute("data-cards", shift >= 0.6 && e === 0); // the active card's words rise in once it is shown
+
     // the step changes halfway through each step's stretch; a small margin stops it flickering at the boundary
     const HOLD = 0.08;
     if (active < 0 || s < active - HOLD || s > active + 1 + HOLD) setStep(Math.min(items.length - 1, Math.max(0, Math.floor(s))));
+
+    // the crown dims while the column is between two steps and flashes when the next card arrives
+    const nearest = Math.min(items.length - 1, Math.max(0, Math.round(s - 0.5)));
+    const nowMoving = s > 0.5 && s < items.length - 0.5 && Math.abs(s - (nearest + 0.5)) > 0.06;
+    if (nowMoving !== moving) {
+      moving = nowMoving;
+      stage.toggleAttribute("data-moving", moving);
+      if (!moving) flash?.animate([{ opacity: 0.9, transform: "scale(0.6)" }, { opacity: 0, transform: "scale(1.9)" }], { duration: 450, easing: "ease-out" });
+    }
   };
   const request = () => {
     if (!ticking) {
@@ -270,7 +322,7 @@ function howtoScroll(): void {
   // Put the paintings where the mode wants them: all in the frame (pinned) or one above each card (stacked)
   const applyMode = () => {
     readLengths();
-    imgs.forEach((el) => el.classList.remove("is-active", "is-prev"));
+    imgs.forEach((el) => el.classList.remove("is-active", "is-in", "is-out"));
     shown = -1;
     if (pinned.matches) {
       for (const img of imgs) {
@@ -278,6 +330,7 @@ function howtoScroll(): void {
         img.removeAttribute("loading");
       }
       items.forEach((el) => middle.unobserve(el));
+      moving = false;
       const i = Math.max(0, active);
       active = -1;
       setStep(i);
@@ -289,27 +342,27 @@ function howtoScroll(): void {
         img.removeAttribute("aria-hidden"); // each row's painting belongs to its own step
         load(i);
       });
-      stage.style.removeProperty("--s");
-      stage.style.removeProperty("--e");
-      stage.removeAttribute("data-end");
+      for (const v of ["--grow", "--shift", "--s", "--e"]) stage.style.removeProperty(v);
+      for (const a of ["data-end", "data-moving", "data-cards"]) stage.removeAttribute(a);
       items.forEach((el) => middle.observe(el));
     }
   };
 
-  // A mark jumps to its step: pinned, to the middle of that step's stretch; stacked, to its row
+  // A mark jumps to its step, and so does the dimmed next card (a click on it moves on, like its mark):
+  // pinned, to the middle of that step's stretch; stacked, to its row
   section.addEventListener("click", (ev) => {
-    const mark = (ev.target as Element).closest<HTMLElement>(".howto__mark");
-    if (!mark) return;
-    const i = Number(mark.dataset.i);
+    const target = ev.target as Element;
+    const mark = target.closest<HTMLElement>(".howto__mark");
+    const next = pinned.matches ? target.closest<HTMLElement>(".howto__step:not([aria-current])") : null;
+    if (!mark && !(next && target.closest(".howto__card"))) return;
+    const i = Number((mark ?? next)!.dataset.i);
     const behavior: ScrollBehavior = reduce.matches ? "auto" : "smooth";
     if (!pinned.matches) items[i]?.scrollIntoView({ block: "center", behavior });
-    else window.scrollTo({ top: scrollFor(len.intro + (i + 0.5) * len.step), behavior });
+    else window.scrollTo({ top: scrollFor(stepAt(i)), behavior });
   });
   // Tabbing to Play Now before the closing is in view brings the closing in, so the focus is never on something unseen
   play?.addEventListener("focus", () => {
-    if (pinned.matches && !stage.hasAttribute("data-end")) {
-      window.scrollTo({ top: scrollFor(len.intro + items.length * len.step + 0.8 * len.end), behavior: "auto" });
-    }
+    if (pinned.matches && !stage.hasAttribute("data-end")) window.scrollTo({ top: scrollFor(total()), behavior: "auto" });
   });
 
   const approach = new IntersectionObserver((entries) => {
@@ -328,7 +381,229 @@ function howtoScroll(): void {
   setStep(Math.max(0, active));
   window.addEventListener("scroll", request, { passive: true });
   window.addEventListener("resize", () => { readLengths(); request(); });
-  pinned.addEventListener("change", applyMode);
+
+  // The autoplay route, in screens: grow in and hold, shift onto step 1, each next step, then the exit to the closing
+  const route = (): Stop[] => [
+    ...(len.intro > 0 ? [{ at: len.intro * GROW_END, move: AUTOPLAY_GROW_MS, hold: AUTOPLAY_INTRO_HOLD_MS }] : []),
+    { at: stepAt(0), move: AUTOPLAY_SHIFT_MS, hold: AUTOPLAY_STEP_MS },
+    ...items.slice(1).map((_, k) => ({ at: stepAt(k + 1), move: AUTOPLAY_MOVE_MS, hold: AUTOPLAY_STEP_MS })),
+    { at: total(), move: AUTOPLAY_EXIT_MS, hold: 0 },
+  ];
+  const heading = section.querySelector<HTMLElement>(".howto__title")!;
+  const auto = autoplay({ section, track, heading, pinned, route, position, scrollFor, total });
+  pinned.addEventListener("change", () => {
+    applyMode();
+    auto.reset();
+  });
+
+  // The help button at the top of the page: brings the visitor to the start of the section and plays it at once
+  document.querySelector<HTMLElement>(".help")?.addEventListener("click", (ev) => {
+    if (!pinned.matches) return; // stacked: the plain link to #howto is enough
+    ev.preventDefault();
+    auto.startNow();
+  });
+}
+
+// Autoplay. It moves the real scroll position along the route (a smooth scroll through the pinned range only), so what
+// is shown and where the page is always agree. It follows the visitor's direction:
+//   scrolling down, it takes over as soon as the How to Play heading is on screen: it glides the page to where the
+//   section pins and plays on from there (a scroll down during a hold moves on from wherever the page now is);
+//   scrolling up, it lets go and does not start again until the visitor scrolls down.
+// A click or tap, or an upward key, lets go too. A mouse over the timeline pauses it until a moment after the mouse
+// leaves. It stops on the closing. Native scrolling is never blocked. Never with reduced motion: no pinning then.
+type Stop = { at: number; move: number; hold: number }; // where (screens into the track), the move there, the hold (ms)
+type AutoplayContext = {
+  section: HTMLElement;
+  track: HTMLElement;
+  heading: HTMLElement;
+  pinned: MediaQueryList;
+  route: () => Stop[];
+  position: () => number;
+  scrollFor: (screens: number) => number;
+  total: () => number;
+};
+function autoplay(c: AutoplayContext) {
+  const timeline = c.section.querySelector<HTMLElement>(".howto__timeline");
+  type State = "idle" | "playing" | "paused" | "done";
+  let state: State = "idle";
+  // the state is also on the section (data-auto), for styling and for checking it in the browser
+  const setState = (next: State) => {
+    state = next;
+    c.section.dataset.auto = next;
+  };
+  let hovered = false;
+  let timer = 0; // a hold
+  let resumeTimer = 0;
+  let frame = 0; // the scroll animation
+  let left = 0; // what is left of the current hold
+  let heldSince = 0;
+  let pending = -1; // a move that a pause interrupted: the route stop it was going to
+  let ours = -1; // the scroll position our own animation last set, so its scroll events are not taken for the visitor's
+  let oursAt = 0; // when it set it (its scroll event follows within a frame or two)
+  let lastY = window.scrollY;
+  let handsOffUntil = 0; // after a click or tap (a mark, the scrollbar), the visitor's own scrolling is left alone
+
+  // the heading on screen, and the closing not yet reached
+  const inReach = () => {
+    if (!c.pinned.matches || document.hidden) return false;
+    const r = c.heading.getBoundingClientRect();
+    return r.bottom > 0 && r.top < window.innerHeight && c.position() < c.total() - 0.01;
+  };
+  const pinnedNow = () => c.track.getBoundingClientRect().top <= 1;
+  const clear = () => {
+    clearTimeout(timer);
+    clearTimeout(resumeTimer);
+    cancelAnimationFrame(frame);
+    frame = 0;
+  };
+  // the next stop from here (a stop we are already at counts as the next one, so its hold plays)
+  const nextStop = () => {
+    const at = c.position();
+    return c.route().findIndex((st) => st.at > at - 0.01);
+  };
+  // a smooth scroll to a page position, then what comes next
+  const glide = (to: number, ms: number, then: () => void) => {
+    const from = window.scrollY;
+    const start = performance.now();
+    const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      ours = Math.round(from + (to - from) * ease(t));
+      oursAt = performance.now();
+      window.scrollTo(0, ours);
+      if (t < 1) frame = requestAnimationFrame(step);
+      else {
+        frame = 0;
+        then();
+      }
+    };
+    frame = requestAnimationFrame(step);
+  };
+  const hold = (k: number, ms: number) => {
+    clearTimeout(timer);
+    left = ms;
+    heldSince = performance.now();
+    timer = window.setTimeout(() => moveTo(k + 1), ms);
+  };
+  const moveTo = (k: number) => {
+    const stop = c.route()[k];
+    if (!stop) {
+      setState("done");
+      return;
+    }
+    pending = k;
+    left = 0;
+    glide(c.scrollFor(stop.at), stop.move, () => {
+      pending = -1;
+      if (k >= c.route().length - 1) setState("done");
+      else hold(k, stop.hold);
+    });
+  };
+  const play = () => {
+    if (!inReach()) return;
+    clear();
+    setState("playing");
+    // not pinned yet (the heading has only just come on screen): glide to where the section pins first
+    if (!pinnedNow()) {
+      const to = c.scrollFor(0);
+      const ms = Math.min(1200, Math.max(400, Math.abs(to - window.scrollY) * 0.9));
+      return glide(to, ms, () => play());
+    }
+    if (pending >= 0) return moveTo(pending); // finish the move a pause interrupted
+    const k = nextStop();
+    if (k < 0) {
+      setState("done");
+      return;
+    }
+    const route = c.route();
+    if (Math.abs(route[k]!.at - c.position()) < 0.01) hold(k, left > 0 ? left : route[k]!.hold);
+    else moveTo(k);
+  };
+  const pause = () => {
+    if (state !== "playing") return;
+    const moving = frame !== 0;
+    clear();
+    left = moving ? 0 : Math.max(0, left - (performance.now() - heldSince));
+    setState("paused");
+  };
+  // the visitor takes over: let go, and wait for them to scroll down again
+  const letGo = () => {
+    clear();
+    pending = -1;
+    left = 0;
+    if (state !== "done") setState("idle");
+  };
+
+  // The visitor's own scrolling, told apart from ours by where our animation last put the page
+  const onScroll = () => {
+    const y = window.scrollY;
+    const dir = Math.sign(y - lastY);
+    lastY = y;
+    if (dir === 0 || (Math.abs(y - ours) < 2 && performance.now() - oursAt < 150)) return; // our own move
+    if (performance.now() < handsOffUntil) return;
+    if (dir < 0) {
+      if (state === "done" && c.position() < c.total() - 0.05) setState("idle"); // back up from the closing
+      if (state === "playing" || state === "paused") letGo();
+      return;
+    }
+    // scrolling down (a deliberate scroll counts even with the mouse resting over the timeline)
+    if (state === "done") return;
+    if (state === "playing" && frame !== 0) return; // already moving that way
+    // during a hold, a scroll down moves on from wherever the page now is (but not the tail of a fling that just
+    // brought it here)
+    if (state === "playing" && performance.now() - heldSince < 800) return;
+    if (inReach()) {
+      left = 0;
+      pending = -1;
+      play();
+    }
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("pointerdown", () => {
+    handsOffUntil = performance.now() + 1200;
+    letGo();
+  }, { passive: true });
+  window.addEventListener("touchstart", letGo, { passive: true });
+  window.addEventListener("keydown", (ev) => {
+    if (["ArrowUp", "PageUp", "Home"].includes(ev.key) || (ev.key === " " && ev.shiftKey)) letGo();
+  });
+
+  // A mouse over the timeline pauses it; it resumes a moment after the mouse leaves
+  timeline?.addEventListener("pointerenter", (ev) => {
+    if (ev.pointerType !== "mouse") return;
+    hovered = true;
+    clearTimeout(resumeTimer);
+    pause();
+  });
+  timeline?.addEventListener("pointerleave", (ev) => {
+    if (ev.pointerType !== "mouse") return;
+    hovered = false;
+    if (state === "paused") resumeTimer = window.setTimeout(() => state === "paused" && play(), AUTOPLAY_RESUME_MS);
+  });
+
+  // A hidden tab holds the timer; coming back resumes it
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pause();
+    else if (state === "paused" && !hovered) play();
+  });
+
+  return {
+    // Start at once (the help button): from anywhere above, it glides to the section and plays it
+    startNow: () => {
+      letGo();
+      setState("playing");
+      clear();
+      if (!c.pinned.matches) return;
+      const to = c.scrollFor(0);
+      const ms = Math.min(1400, Math.max(400, Math.abs(to - window.scrollY) * 0.6));
+      glide(to, ms, () => play());
+    },
+    reset: () => {
+      clear();
+      pending = -1;
+      setState("idle");
+    },
+  };
 }
 
 document.title = L.pageTitle;

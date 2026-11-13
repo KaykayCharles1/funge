@@ -135,6 +135,72 @@ body {
   filter: drop-shadow(0 4px 12px rgb(15 26 51 / 0.3));
 }
 
+/* top right: the help button, a question mark in the logo's navy and gold; its name shows below it on hover or focus */
+.help {
+  position: absolute;
+  z-index: 5;
+  top: clamp(1rem, 2.5vw, 2rem);
+  right: clamp(1rem, 3.5vw, 3rem);
+  display: grid;
+  place-items: center;
+  width: clamp(2.75rem, 4vw, 3.25rem);
+  height: clamp(2.75rem, 4vw, 3.25rem);
+  border-radius: 50%;
+  background: var(--logo-navy);
+  border: 2px solid var(--logo-gold);
+  color: var(--logo-gold);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--logo-navy) 80%, black), 0 10px 22px color-mix(in srgb, var(--logo-navy) 35%, transparent);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.help svg {
+  width: 58%;
+  height: 58%;
+}
+.help:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--logo-navy) 80%, black), 0 14px 26px color-mix(in srgb, var(--logo-navy) 40%, transparent);
+}
+.help:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--logo-navy) 80%, black), 0 6px 14px color-mix(in srgb, var(--logo-navy) 30%, transparent);
+}
+.help__tip {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.4rem;
+  background: var(--logo-navy);
+  border: 1px solid color-mix(in srgb, var(--logo-gold) 60%, transparent);
+  color: var(--logo-cream);
+  font-family: var(--text);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+/* the tip's small arrow, under the button */
+.help__tip::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  right: calc(clamp(2.75rem, 4vw, 3.25rem) / 2 - 0.4rem);
+  border: 0.4rem solid transparent;
+  border-bottom-color: var(--logo-navy);
+}
+.help:hover .help__tip,
+.help:focus-visible .help__tip {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .help, .help__tip { transition: none; }
+}
+
 /* buttons: pills */
 .btn {
   display: inline-flex;
@@ -349,7 +415,7 @@ body {
 
 .howto {
   /* scroll lengths, in screen heights, on top of the one screen the stage fills */
-  --howto-intro: 0; /* room for a later centred intro; 0 = start in two columns */
+  --howto-intro: 0.6; /* the intro: the panel grows in centred, then shifts left as the timeline draws in */
   --howto-step: 0.6; /* per step */
   --howto-steps: 5;
   --howto-end: 1; /* the closing (step 4) */
@@ -361,17 +427,25 @@ body {
 }
 /* the stage: pinned for the length of the track; the dusk field under a navy wash, darker at the top and foot */
 .howto__stage {
-  --p: 0;
+  /* the progress, written by the scroll script (see howtoScroll in landing.ts) */
+  --grow: 0;
+  --shift: 0;
   --s: 0;
+  --e: 0;
+  /* the exit, from --e: the panel shrinks away (--x), the timeline glides to the middle (--m) */
+  --x: clamp(0, var(--e) / 0.35, 1);
+  --m: clamp(0, var(--e) / 0.4, 1);
+  --gap: clamp(2rem, 5vw, 5rem);
   position: sticky;
   top: 0;
   height: 100svh;
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr); /* the row is the screen: a tall timeline never pushes the title off it */
+  grid-template-rows: auto minmax(0, 1fr); /* the heading, then the panel and timeline in what is left of the screen */
+  row-gap: clamp(1rem, 3svh, 2rem);
   align-items: center;
-  column-gap: clamp(2rem, 5vw, 5rem);
+  column-gap: var(--gap);
   padding: clamp(1.5rem, 5svh, 3.5rem) max(1.5rem, calc((100% - 72rem) / 2));
   background:
     linear-gradient(to bottom, var(--box-deep), transparent 20%, transparent 80%, var(--box-deep)),
@@ -382,16 +456,23 @@ body {
 /* left: the square image panel in a gold-trimmed frame, the title and subtitle under it */
 .howto__media {
   min-width: 0;
+  /* intro: centred over the middle of the stage until the shift; exit: shrinks into itself and goes */
+  transform: translateX(calc((1 - var(--shift)) * (50% + var(--gap) / 2))) scale(calc(1 - 0.9 * var(--x)));
+  transform-origin: 50% 40%;
+  opacity: calc(1 - var(--x));
 }
 .howto__frame {
   position: relative;
   /* square, as large as the column allows while the title still fits under it on the screen */
-  width: min(100%, calc(100svh - 16rem));
+  width: min(100%, calc(100svh - 13rem));
   aspect-ratio: 1;
   border: 2px solid var(--foil);
   border-radius: 0.5rem;
   background: var(--board);
   box-shadow: 0 0 0 0.4rem var(--box-deep), 0 0 0 calc(0.4rem + 1px) var(--foil-lo), 0 24px 60px color-mix(in srgb, var(--box-deep) 70%, transparent);
+  /* intro: grows in from a small panel */
+  transform: scale(calc(0.25 + 0.75 * var(--grow)));
+  opacity: clamp(0, var(--grow) * 4, 1);
 }
 .howto__frame::after {
   content: "";
@@ -402,8 +483,8 @@ body {
   pointer-events: none;
   mask: var(--corner-tl) top left / 2rem no-repeat, var(--corner-tr) top right / 2rem no-repeat, var(--corner-br) bottom right / 2rem no-repeat, var(--corner-bl) bottom left / 2rem no-repeat;
 }
-/* the five paintings, stacked; each shows whole at 1:1. The new one fades in over the one it replaces, which stays
-   underneath until the fade is done, so the panel never dips to its background. Opacity only. */
+/* the five paintings, stacked; each shows whole at 1:1. A change works like the reference: the shown painting squashes
+   flat into a line, and the next one opens out of the same line. Transform only. */
 .howto__img {
   position: absolute;
   inset: 0.35rem;
@@ -412,34 +493,40 @@ body {
   border-radius: 0.3rem;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 0s linear 520ms; /* a replaced image vanishes only after the new one is in */
-}
-.howto__img.is-prev {
-  z-index: 1;
-  opacity: 1;
 }
 .howto__img.is-active {
   z-index: 2;
   opacity: 1;
-  transition: opacity 520ms ease;
+}
+.howto__img.is-out {
+  z-index: 3;
+  opacity: 1;
+  animation: howto-squash 170ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+.howto__img.is-in {
+  animation: howto-open 260ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both;
+}
+@keyframes howto-squash {
+  to { transform: scaleY(0.015); }
+}
+@keyframes howto-open {
+  from { transform: scaleY(0.015); }
 }
 
+/* the heading: across the top of the stage, so it stays at the top of the screen while the section plays */
 .howto__title {
-  margin: clamp(1.25rem, 3svh, 2rem) 0 0;
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin: 0;
+  text-align: center;
   font-family: var(--display);
   font-weight: 700;
-  font-size: clamp(2.25rem, 3.6vw, 3.5rem);
+  font-size: clamp(2.5rem, 4.4vw, 4rem);
   line-height: 1;
   color: var(--logo-cream);
   text-shadow: 0 0.055em 0 var(--logo-navy);
   text-wrap: balance;
 }
-.howto__subtitle {
-  margin: 0.6rem 0 0;
-  font-size: clamp(1.125rem, 1.3vw, 1.3125rem);
-  color: var(--cream-dim);
-}
-
 /* right: the timeline. The crown stays put at --node-y; the column (the road, its gold fill and the five steps) slides
    up past it, one translate from the scroll progress --s (0 = step 1 starts, 5 = step 5 ends). Each step is one
    --pitch tall, so the move is even; a card's mark sits --mark below its top. */
@@ -455,6 +542,22 @@ body {
   overflow: hidden;
   /* steps that have passed fade out at the top; the step after next fades in at the foot */
   mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  /* exit: glides left until the road is on the stage's middle line, then hands over to the closing's line */
+  transform: translateX(calc(-1 * var(--m) * (var(--gap) / 2 + var(--road-x))));
+  opacity: calc(1 - clamp(0, (var(--e) - 0.4) / 0.08, 1));
+}
+/* the lit line above the crown, from the top of the timeline; it draws down with the shift */
+.howto__timeline::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--road-x) - 1px);
+  top: 0;
+  width: 2px;
+  height: var(--node-y);
+  background: linear-gradient(to bottom, transparent, var(--foil-lo) 30%, var(--logo-gold));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--logo-gold) 55%, transparent);
+  transform-origin: top;
+  transform: scaleY(var(--shift));
 }
 .howto__column {
   position: absolute;
@@ -462,7 +565,7 @@ body {
   right: 0;
   top: calc(var(--node-y) - var(--mark));
   /* step i's mark meets the crown in the middle of its stretch (s = i + 0.5) */
-  transform: translate3d(0, calc((0.5 - var(--s)) * var(--pitch)), 0);
+  transform: translate3d(0, calc((0.5 - clamp(0.5, var(--s), 4.5)) * var(--pitch)), 0);
   will-change: transform;
 }
 /* the road runs from step 1's mark to step 5's; the gold fill is the part already travelled */
@@ -474,6 +577,13 @@ body {
   height: calc(4 * var(--pitch));
   background: color-mix(in srgb, var(--foil-lo) 45%, transparent);
   border-radius: 1px;
+  transform-origin: top;
+  transform: scaleY(var(--shift)); /* draws down with the shift */
+}
+/* intro: the steps slide in from the right with the shift; exit: they fade first */
+.howto__steps {
+  transform: translateX(calc((1 - var(--shift)) * 60%));
+  opacity: calc(var(--shift) * (1 - clamp(0, var(--e) / 0.2, 1)));
 }
 .howto__fill {
   position: absolute;
@@ -481,7 +591,7 @@ body {
   background: linear-gradient(to bottom, var(--foil-lo), var(--logo-gold));
   box-shadow: 0 0 10px color-mix(in srgb, var(--logo-gold) 60%, transparent);
   transform-origin: top;
-  transform: scaleY(calc(clamp(0, var(--s) - 0.5, 4) / 4));
+  transform: scaleY(calc((clamp(0.5, var(--s), 4.5) - 0.5) / 4));
   will-change: transform;
 }
 .howto__steps {
@@ -547,6 +657,18 @@ body {
   border: 2px solid var(--logo-gold);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--logo-gold) 18%, transparent), 0 0 18px color-mix(in srgb, var(--logo-gold) 55%, transparent);
   pointer-events: none;
+  opacity: calc(var(--shift) * var(--node-dim, 1));
+  transition: opacity 120ms ease;
+}
+/* dim while the column moves between two steps; a flash when the next card arrives (played by the script) */
+.howto__stage[data-moving] { --node-dim: 0.5; }
+.howto__flash {
+  position: absolute;
+  inset: -0.4rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--logo-gold) 85%, transparent), transparent);
+  opacity: 0;
+  pointer-events: none;
 }
 .howto__node::after {
   content: "";
@@ -587,8 +709,12 @@ body {
   pointer-events: none;
   mask: var(--corner-tl) top left / 1.25rem no-repeat, var(--corner-tr) top right / 1.25rem no-repeat, var(--corner-br) bottom right / 1.25rem no-repeat, var(--corner-bl) bottom left / 1.25rem no-repeat;
 }
-/* the next card waits a little smaller */
+/* the next card waits a little smaller; pinned, a click on it moves on to it, so it brightens under the mouse */
 .howto__step[aria-current] + .howto__step .howto__card { transform: scale(0.94); }
+@media (min-width: 43.75rem) and (prefers-reduced-motion: no-preference) {
+  .howto__step[aria-current] + .howto__step .howto__card { cursor: pointer; }
+  .howto__step[aria-current] + .howto__step .howto__card:hover { opacity: 0.7; }
+}
 .howto__no {
   display: block;
   font-family: "Cinzel", Georgia, serif;
@@ -613,23 +739,20 @@ body {
   line-height: 1.45;
   color: var(--cream);
 }
-/* the active card's words fade in and rise a little (no scramble) */
-.howto__step[aria-current] .howto__card > * {
+/* the active card's words fade in and rise a little */
+.howto__stage[data-cards] .howto__step[aria-current] .howto__card > * {
   animation: howto-rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.howto__step[aria-current] .howto__card > h3 { animation-delay: 40ms; }
-.howto__step[aria-current] .howto__card > p { animation-delay: 80ms; }
+.howto__stage[data-cards] .howto__step[aria-current] .howto__card > h3 { animation-delay: 40ms; }
+.howto__stage[data-cards] .howto__step[aria-current] .howto__card > p { animation-delay: 80ms; }
 @keyframes howto-rise {
   from { opacity: 0; transform: translateY(12px); }
 }
 
-/* The closing, over the last stretch of the track (--e from 0 to 1). The paintings and cards fade out first; one
-   gold line grows down the middle with the crown riding its tip (--k); then the question and Play Now rise in (--q).
+/* The closing, over the last stretch of the track (--e from 0 to 1), like the reference's exit: the cards fade, the
+   panel shrinks away and the timeline glides to the middle (above); there the closing's line takes over at the crown's
+   height and runs on down with the crown riding its tip (--k); then the question and Play Now rise in (--q).
    Every part is opacity or transform, worked out from --e, so scrolling back plays it in reverse. */
-.howto__media,
-.howto__timeline {
-  opacity: calc(1 - clamp(0, var(--e) / 0.35, 1));
-}
 .howto__stage[data-end] .howto__media,
 .howto__stage[data-end] .howto__timeline {
   pointer-events: none;
@@ -638,14 +761,14 @@ body {
   display: none; /* stacked rows only */
 }
 .howto__end {
-  --k: clamp(0, (var(--e) - 0.15) / 0.4, 1);
-  --q: clamp(0, (var(--e) - 0.5) / 0.3, 1);
+  --k: calc(0.38 + 0.62 * clamp(0, (var(--e) - 0.4) / 0.35, 1));
+  --q: clamp(0, (var(--e) - 0.75) / 0.2, 1);
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(2rem, 9svh, 5.5rem) 1.5rem clamp(2.5rem, 12svh, 7rem);
+  padding: calc(clamp(1.5rem, 5svh, 3.5rem) + clamp(4rem, 9svh, 6rem)) 1.5rem clamp(2.5rem, 12svh, 7rem);
   text-align: center;
   pointer-events: none;
 }
@@ -658,6 +781,7 @@ body {
   min-height: 4rem;
   width: 2px;
   margin-bottom: 2.75rem;
+  opacity: clamp(0, (var(--e) - 0.38) / 0.06, 1);
 }
 .howto__line::before {
   content: "";
@@ -719,6 +843,8 @@ body {
   .howto__track { height: auto; }
   .howto__stage {
     --e: 1; /* the closing is simply shown */
+    --grow: 1;
+    --shift: 1;
     --field-h: calc(100vw * 941 / 1672); /* the dusk field at its own shape, across the top, fading into navy */
     position: static;
     background:
@@ -740,9 +866,10 @@ body {
     width: 100%;
     max-width: 34rem;
   }
-  .howto__frame { display: none; } /* its paintings move into the rows */
-  .howto__media { opacity: 1; }
-  .howto__timeline { opacity: 1; overflow: visible; mask-image: none; }
+  .howto__media { display: none; } /* its paintings move into the rows */
+  .howto__media, .howto__timeline, .howto__steps { opacity: 1; transform: none; }
+  .howto__timeline { overflow: visible; mask-image: none; }
+  .howto__timeline::before { display: none; }
   .howto__column { position: static; transform: none; }
   .howto__road, .howto__node, .howto__mark { display: none; }
   .howto__step {
@@ -780,7 +907,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .howto__step,
   .howto__card { transition: none; }
-  .howto__step[aria-current] .howto__card > * { animation: none; }
+  .howto__img.is-in, .howto__img.is-out { animation: none; }
 }
 /* phones: the question and the button fill the width */
 @media (max-width: 43.6875rem) {

@@ -135,10 +135,9 @@ export const COPY = {
       { title: "Join the battle", text: "Watch the live round, pick your king or queen, and take the throne." },
     ],
     closing: "Take your righful place as the King of Funge",
-    // How a round is played: the pinned section. The numbers come from the rule constants (src/config.ts).
+    // How to Play: the pinned section (its title is also the help button's label at the top of the page). The numbers come from the rule constants (src/config.ts).
     howto: {
-      title: "How a round is played",
-      subtitle: "Five moves. That is the whole game.",
+      title: "How to Play",
       stepsLabel: "The five moves",
       // the label of a timeline node, for screen readers
       goTo: (n: number, title: string) => `Step ${n}: ${title}`,
