@@ -1,244 +1,311 @@
 ---
 name: Funge
-description: A king-of-the-hill game on Bitcoin Cash, presented as the board game it is.
+description: A king-of-the-hill game on Bitcoin Cash, its landing page told as a painted medieval world in navy and gold.
 colors:
+  sky: "#125bce"
   box: "#0f1a33"
   box-deep: "#0a1226"
   board: "#15234a"
-  board-hi: "#1c2d5a"
-  groove-dark: "#050a18"
-  groove-light: "#33497f"
   foil: "#e0a93a"
   foil-hi: "#f3cf74"
   foil-lo: "#9c6f1c"
   cream: "#f4ead2"
-  cream-dim: "#c9c2b0"
-  violet: "#8a55e0"
-  crimson: "#d63a3c"
-  obsidian: "#4a4a58"
-  sapphire: "#2f73e0"
-  silver: "#d0d3de"
+  logo-cream: "#f8eeca"
+  logo-navy: "#0f243d"
+  logo-gold: "#fbbc28"
 typography:
-  display:
+  hero:
     fontFamily: "Grenze Gotisch, Georgia, serif"
-    fontSize: "clamp(5rem, 12vw, 11rem)"
-    fontWeight: 900
-    lineHeight: 0.85
+    fontSize: "min(clamp(3rem, 6.2vw, 7rem), 11.5svh)"
+    fontWeight: 700
+    lineHeight: 0.95
     letterSpacing: "-0.01em"
   headline:
     fontFamily: "Grenze Gotisch, Georgia, serif"
-    fontSize: "clamp(2.5rem, 5.5vw, 4rem)"
+    fontSize: "clamp(2.5rem, 4.4vw, 4rem)"
     fontWeight: 700
     lineHeight: 1
   title:
     fontFamily: "Grenze Gotisch, Georgia, serif"
-    fontSize: "clamp(1.625rem, 2.4vw, 2rem)"
+    fontSize: "clamp(1.5rem, 1.9vw, 1.875rem)"
     fontWeight: 700
-    lineHeight: 1.1
+    lineHeight: 1.05
+  caps:
+    fontFamily: "Cinzel, Georgia, serif"
+    fontSize: "clamp(0.95rem, 1.2vw, 1.25rem)"
+    fontWeight: 700
+    letterSpacing: "0.16em"
+    textTransform: "uppercase"
   body:
     fontFamily: "Alegreya Sans, Segoe UI, sans-serif"
     fontSize: "1.1875rem"
     fontWeight: 400
     lineHeight: 1.55
-  label:
+  small-body:
     fontFamily: "Alegreya Sans, Segoe UI, sans-serif"
-    fontSize: "0.95rem"
-    fontWeight: 700
-    lineHeight: 1.2
-  figure:
+    fontSize: "1.0625rem"
+    fontWeight: 400
+    lineHeight: 1.5
+  button:
     fontFamily: "Alegreya Sans, Segoe UI, sans-serif"
+    fontSize: "clamp(1.1875rem, 1.45vw, 1.5rem)"
     fontWeight: 700
-    fontFeature: "\"tnum\" 1, \"lnum\" 1"
+    lineHeight: 1
 rounded:
-  plate: "4px"
-  frame: "6px"
+  card: "0.4rem"
+  frame: "0.5rem"
+  pill: "999px"
   disc: "50%"
 spacing:
-  crease-gap: "3px"
-  groove: "6px"
-  lid-inset: "clamp(0.75rem, 1.6vw, 1.5rem)"
-  fold-pad: "clamp(1.5rem, 2.6vw, 2.25rem)"
-  part-pad-block: "clamp(3.25rem, 6.5vw, 5.5rem)"
-  part-pad-inline: "clamp(1.25rem, 4vw, 3rem)"
-  sheet-max: "76rem"
+  section-gap: "clamp(4rem, 10vw, 8rem)"
+  side-gutter: "clamp(1rem, 3.5vw, 3rem)"
+  content-max: "72rem"
+  faq-max: "52rem"
+  reading-max: "34rem"
+  touch-min: "2.75rem"
 components:
-  button-seal:
-    backgroundColor: "{colors.foil}"
-    textColor: "{colors.box}"
-    typography: "{typography.headline}"
-    rounded: "{rounded.frame}"
-    padding: "0.85rem 1.6rem 0.85rem 1.8rem"
-    height: "3.75rem"
-  button-seal-hover:
-    backgroundColor: "{colors.foil-hi}"
-  fold-panel:
-    backgroundColor: "{colors.board-hi}"
-    textColor: "{colors.cream}"
-    padding: "{spacing.fold-pad}"
-  counter-token:
-    backgroundColor: "{colors.foil}"
-    textColor: "{colors.box}"
-    typography: "{typography.figure}"
+  button-primary:
+    backgroundColor: "{colors.logo-gold}"
+    textColor: "{colors.logo-navy}"
+    typography: "{typography.button}"
+    rounded: "{rounded.pill}"
+    height: "clamp(3.5rem, 4.4vw, 4.5rem)"
+    shadow: "0 5px 0 {colors.logo-navy}"
+  corner-button:
+    backgroundColor: "{colors.logo-navy}"
+    textColor: "{colors.logo-gold}"
+    border: "2px solid {colors.logo-gold}"
     rounded: "{rounded.disc}"
-    size: "calc(var(--counter-base) + var(--v) * var(--counter-step))"
-  rule-number:
-    textColor: "{colors.foil-hi}"
-    rounded: "{rounded.disc}"
-    size: "2.5rem"
-  tagline-plate:
-    backgroundColor: "rgb(15 26 51 / 0.9)"
-    textColor: "{colors.cream}"
-    rounded: "{rounded.plate}"
-    padding: "0.55rem 1rem 0.6rem"
-  clockface:
-    backgroundColor: "{colors.box}"
-    textColor: "{colors.foil-hi}"
+    size: "clamp(2.1rem, 3vw, 2.6rem)"
+  tooltip:
+    backgroundColor: "{colors.logo-navy}"
+    textColor: "{colors.logo-cream}"
+    border: "1px solid logo-gold at 60%"
+    rounded: "{rounded.card}"
+  gold-frame:
+    backgroundColor: "{colors.board}"
+    border: "2px solid {colors.foil}"
     rounded: "{rounded.frame}"
-    padding: "0.55rem 0.9rem"
+  card:
+    backgroundColor: "box at 92%"
+    border: "1px solid foil at 55%"
+    rounded: "{rounded.card}"
+  parchment:
+    backgroundColor: "{colors.logo-cream}"
+    textColor: "{colors.logo-navy}"
+  faq-item:
+    backgroundColor: "box at 92%"
+    border: "1px solid foil at 35%"
+    rounded: "{rounded.card}"
 ---
 
 # Design System: Funge
 
 ## Overview
 
-**Creative North Star: "The Box Lid and the Rule Sheet"**
+**Creative North Star: "A Painted Kingdom in Navy and Gold"**
 
-Funge is shown as the board game it is. The painted valley is the box lid, framed in gold with printed corner marks and the title pressed into the sky as foil. Everything below the lid is one rule sheet printed on heavy navy board: ruled in gold hairlines, divided by crease grooves, its six rule panels hinging open along those creases as they scroll into view. Numbers are carried by punch-out counters in the four house colours, and a counter's size is what it is worth.
+The landing page tells Funge as a painted medieval world. It opens in the daylight sky over the valley painting, where the four armies stand. Below that, the page falls into night navy. Everything after the hero lives on that navy ground, trimmed in gold the way the Funge logo is: cream letters on a hard navy edge, with crown gold.
 
-The world is dark, warm-on-cool and printed: navy board, gold foil and cream ink. Depth comes from print and fold, not from floating cards; panels are cut from one surface and separated by dark grooves with a lit edge. Density is generous and calm, with a few large blackletter headings over short, plain rule text.
+The page is a sequence of scenes, not a document:
+1. **The hero:** the valley painting.
+2. **How to Play:** a pinned scene on the dusk battlefield with a gold timeline.
+3. **The battle loop:** a recording of the real battlefield in a gold frame.
+4. **The Fair Game Rules:** a parchment scroll between two painted rollers. It is the one light surface below the hero.
+5. **The FAQ:** navy panels.
+6. **The footer:** King Satoshi on his throne.
 
-Scope boundary: this system covers the landing page only (`landing.html`, `src/landing.ts`, `src/landing.css`). The game pages (`index.html` with `src/kingdomMode.ts`, and the Phaser battlefield in `src/battlefield/`) keep their own older look and are not governed by this file. Do not restyle them from it without a separate decision.
+Scope boundary: this system covers the landing page only (`index.html` at `/`, `src/landing.ts`, `src/landing.css`). The game page (`play/index.html` at `/play/`, with `src/kingdomMode.ts`) and the Phaser battlefield in `src/battlefield/` keep their own older look and are not governed by this file. Do not restyle them from it without a separate decision.
 
-**Key Characteristics:**
-- Navy board surfaces, gold foil for type and trim, cream for reading text.
-- One surface, divided by creases: grooves and 3px dark gaps, never separate floating cards.
-- Blackletter-hybrid display (Grenze Gotisch) over a humanist sans (Alegreya Sans); tabular figures for every amount.
-- Counters sized by value with one formula per breakpoint; colour says who holds the money.
-- The rules unfold panel by panel on scroll; static under reduced motion.
-- Self-hosted fonts and the game's own art only.
+**Key characteristics:**
+- Night-navy ground, gold trim and cream type, all taken from the logo.
+- The game's own paintings carry the scenes: the valley, the dusk field, the five How to Play paintings, the roller, the throne.
+- A blackletter-hybrid for headings (Grenze Gotisch), Cinzel capitals for small labels and numerals, a humanist sans for reading (Alegreya Sans).
+- One gold button, Play Now, which appears three times: in the hero, at the end of How to Play, and in the footer.
+- Motion is driven by scrolling and can always be played back in reverse. Under reduced motion, everything is shown at once and open.
+- Self-hosted fonts and the game's own art only. Icons are drawn as inline SVG.
 
 ## Colors
 
-A printed-board palette: three steps of deep navy, a three-step gold foil, two creams for ink, and the four house colours reserved for counters.
+The palette is the logo's three colours plus a three-step gold and three steps of navy.
 
-### Primary
-- **Pressed Gold Foil** (foil): the seal button face, the lid frame and band borders, the rule-number rings, the split operators, the pool's counters, selection and caret. At 40 to 70% alpha it draws every hairline rule on the sheet.
-- **Lit Foil** (foil-hi): the face of foil type (the title, section headings, fact headings, clock figures), the corner marks, the hover face of the seal, and the focus ring.
-- **Foil Rim** (foil-lo): the dark edge of pressed foil (title stroke, seal outer ring) and the scrollbar thumb. Never a text colour on navy.
+### The logo's colours (sampled from the logo)
+- **Logo Cream** (logo-cream): every heading on navy, the hero line, tooltips, FAQ questions. Also the parchment's centre.
+- **Logo Navy** (logo-navy): the hard edge under cream headings (a text shadow 0.055em down), the face of the round buttons and tooltips, the ink of Play Now and of the parchment.
+- **Logo Gold** (logo-gold): the face of Play Now, the borders and icons of the round buttons, the How to Play crown, the reached timeline marks, the open FAQ diamond, the gold corner flourishes on frames.
 
-### Secondary
-The four house colours appear only as counter faces, with white figures (all at least 4.5:1).
-- **House Violet** (violet), **House Crimson** (crimson), **House Sapphire** (sapphire): flat counter discs for a player's money.
-- **House Obsidian** (obsidian): flat counter disc, always with an inner **Flag Silver** (silver) ring so it reads against the navy board. Silver has no other role.
+### Gold foil (three steps)
+- **Foil** (foil): frame borders, card trims (at 35 to 75%), Cinzel step numbers, FAQ group titles.
+- **Foil High** (foil-hi): the focus outline and the FAQ step numbers.
+- **Foil Low** (foil-lo): the dark gold for lines (the timeline road, the rules divider, the outer ring of frames), the scrollbar thumb, and the parchment's edge shading. Mixed with logo navy, it is the Roman numerals and rule titles on the parchment.
 
-### Neutral
-- **Box Navy** (box): the lid's board, the box-side band, the clockface, and the ink on gold.
-- **Box Bottom** (box-deep): page background, and the closing section as the bottom of the box.
-- **Sheet Board** (board): the rule sheet's surface.
-- **Raised Panel** (board-hi): each fold panel; also the ring that separates a counter from the board.
-- **Groove Cut** (groove-dark) and **Groove Light** (groove-light): the two edges of a crease; the cut fills the 3px gaps between panels and the light line sits on every panel's top edge.
-- **Cream Ink** (cream): body text and panel headings.
-- **Dim Cream Ink** (cream-dim): intros, captions, counter labels, step text, footer.
+### Navy (three steps)
+- **Box Deep** (box-deep): the page background from the foot of the hero down.
+- **Box** (box): card and FAQ panel faces, at 92%. Also the wash over the dusk field, at 70%.
+- **Board** (board): the inside of the gold frames and the face of an open FAQ item.
 
-### Named Rules
-**The Colour Means Holder Rule.** A house colour on a counter says which player holds that money; gold says it is the pool. House colours are never used for decoration, borders or text.
+### Sky
+- **Sky** (sky, #125bce): the hero's band above the painting, matched to the painting's own top edge so the join cannot be seen.
 
-**The Gold Is Printed Rule.** Gold is foil or a ruled line: a type face, a frame, a hairline, the seal. It is never a background wash or a gradient fill on large areas.
+### Reading text
+- **Cream** (cream): body text on navy (cards, FAQ answers).
+
+### Named rules
+**The Logo Colour Rule.** Headings, buttons and round controls use the logo's own cream, navy and gold. New controls take these three before anything else.
+
+**The One Light Surface Rule.** Below the hero, the parchment scroll is the only light surface, and its text is navy ink. Everything else is navy with cream text.
+
+**The Gold Is Trim Rule.** Gold is a border, a line, an icon, a numeral or the Play Now face. It is never a large background area.
 
 ## Typography
 
-**Display Font:** Grenze Gotisch, variable 100-900, self-hosted (with Georgia, serif)
-**Body Font:** Alegreya Sans 400 and 700, self-hosted (with Segoe UI, sans-serif)
-
-**Character:** A blackletter-hybrid box title and rule headings give the old-game, printed-box voice; the humanist sans keeps the rules plain and quick to read. Figures are always tabular lining numerals.
+**Headings:** Grenze Gotisch, variable 100 to 900, self-hosted (falls back to Georgia, serif)
+**Labels and numerals:** Cinzel, variable, self-hosted (falls back to Georgia, serif)
+**Reading:** Alegreya Sans 400 and 700, self-hosted (falls back to Segoe UI, sans-serif)
 
 ### Hierarchy
-- **Display** (900, clamp(5rem, 12vw, 11rem); phones clamp(4.5rem, 24vw, 7rem); 0.85): the box title only, in foil.
-- **Headline** (700, clamp(2.5rem, 5.5vw, 4rem), 1): section headings on the sheet and in the close, in lit foil. The seal button uses the display face at 700, clamp(1.5rem, 2.4vw, 1.875rem).
-- **Title** (700, clamp(1.625rem, 2.4vw, 2rem), 1.05 to 1.1): fold, fact and step headings. The lead rule (conquer) steps up to clamp(2rem, 3.4vw, 2.75rem).
-- **Body** (400, 1.1875rem, 1.55): rule and fact text, held to 34rem in panels and 40rem in facts. Intros at 1.25rem in dim cream.
-- **Label** (700, 0.95rem, 1.2): counter labels, captions (1rem), spec strip items (1.0625rem), footer. Sentence case, no tracking.
+- **Hero** (Grenze Gotisch 700, min(clamp(3rem, 6.2vw, 7rem), 11.5svh), line height 0.95): the hero headline only. It shrinks on short screens so the armies stay in view. On phones it is clamp(2.6rem, 12vw, 3.5rem).
+- **Headline** (Grenze Gotisch 700, clamp(2.5rem, 4.4vw, 4rem), line height 1):
+  - the section headings: How to Play, Fair Game Rules, FAQ;
+  - the How to Play closing question, set larger at clamp(2.5rem, 5vw, 4.5rem);
+  - the footer's closing line, at clamp(2.25rem, 4.6vw, 3.75rem).
+- **Title** (Grenze Gotisch 700, clamp(1.5rem, 1.9vw, 1.875rem), line height 1.05): the How to Play card titles.
+- **Caps** (Cinzel 700, uppercase, tracked 0.16em): the hero line (three words split by gold dots), the FAQ group names, the seal's line. Cinzel also sets:
+  - the How to Play step numbers;
+  - the rule titles, in title case, at clamp(1.05rem, 1.35vw, 1.2rem);
+  - the Roman numerals.
+- **Body** (Alegreya Sans 400, 1.1875rem, line height 1.55): the page default. Cards, rules and FAQ answers use 1.0625rem, at line height 1.45 to 1.55.
+- **Strong** (Alegreya Sans 700): buttons, tooltips, FAQ questions (1.125rem).
 
-### Named Rules
-**The Tabular Money Rule.** Every amount, time and count is set with tabular lining figures, at two decimals for PUSD.
+### Named rules
+**The Hard Edge Rule.** Cream headings on navy or sky carry the logo's hard navy edge (`text-shadow: 0 0.055em 0 var(--logo-navy)`). Where they sit on the painting, a soft glow is added as well.
 
-**The Two Faces Rule.** The display face is for the title, headings, rule numbers, the seal, operators and the clock figure; everything a visitor reads in sentences is the sans.
+**The Reading Width Rule.** Reading text is held to about 34rem in cards and the rules, and 42rem in FAQ answers.
 
 ## Layout
 
-The page is a lid and a sheet. The lid fills the first viewport minus 3rem (calc(100svh - 3rem), between 36rem and 64rem tall) so the sheet's first crease shows below it; inside a box-navy inset (lid-inset) sits the gold-framed art, with the title upper left over the painted sky and the box-side band along the bottom edge carrying the spec strip left and the seal right. The seal lifts 2.25rem out of the band.
+**The hero** fills the first screen:
+- **Sky band:** a band of sky holds the headline, the hero line and Play Now, centred.
+- **Painting:** the whole valley painting (4096 / 2313) is pulled up under the band, so its own open sky sits behind the words. Its foot fades into box-deep.
+- **Logo and buttons:** the logo sits top left. The two round buttons sit top right: How to Play first, then Rules, with their feet on the logo's foot line.
 
-The sheet is centred at 76rem with clamp-driven part padding, its parts separated by full-width 6px grooves. The rules sit in a 6-column grid of folds (open 2, conquer 4, then four panels of 3), cut from one surface with 3px dark gaps inside a gold hairline border. Facts are a two-column rule table (1fr / 1.6fr) between gold hairlines; steps are three columns split by gold hairlines.
+**How to Play** is a pinned stage, one screen tall, over a scroll track:
+- The heading runs across the top.
+- The square painting panel is on the left and the timeline is on the right, centred at 72rem.
+- The crown stays put while the column of steps slides past it.
+- At the end, the panel shrinks away, a gold line draws down with the crown riding its tip, and the question and Play Now rise in.
+- Below 43.75rem, or under reduced motion, it stacks: one row per step, its painting above its card, then the closing.
 
-At 64rem the folds go to two columns (conquer spans both) and facts stack. At 47.5rem (phones) the lid becomes a portrait box: title and tagline on navy board, then the whole valley at its native 4096 / 2313 aspect under a gold line, then the band stacked; folds and steps go to one column, and the counter formula tightens.
+**The battle loop** is a 16:9 video in a gold frame, up to 64rem wide.
 
-## Elevation & Depth
+**The Fair Game Rules:**
+- The parchment sheet hangs between two rollers, up to 72rem wide.
+- The ten rules sit in two columns, each numbered with a Roman numeral hung in the margin.
+- Below 900px, the rules form one column at 34rem.
+- Below 700px, the rollers are thinner and the numerals lead the titles inline.
 
-Depth is printed and folded, not floated. Surfaces sit flat; separation comes from crease grooves (a 2px dark cut, a 1px lit line, a soft fall-off), the lit top edge of each panel, and thin die-cut rings. Shadows are reserved for things that sit on top of the art or rise from the board: the foil title, the tagline plate and the seal.
+**The FAQ** is one 52rem column with three groups.
 
-### Shadow Vocabulary
-- **Foil press** (`text-shadow: 0 -1px 0 #fff3c9, 0 2px 0 var(--foil-lo), 0 6px 14px rgb(10 18 38 / 0.45)` with a 2px foil-lo stroke): the box title only.
-- **Seal rings** (`box-shadow: 0 0 0 3px var(--box), 0 0 0 4px var(--foil-lo), 0 10px 22px rgb(10 18 38 / 0.5)`): the one action.
-- **Plate fall-off** (`box-shadow: 0 6px 14px rgb(10 18 38 / 0.35)`): the tagline plate over the sky.
-- **Die-cut ring** (`box-shadow: 0 0 0 3px var(--board-hi), 0 0 0 4px rgb(5 10 24 / 0.7)`): every counter.
-- **Panel lit edge** (`box-shadow: inset 0 1px 0 var(--groove-light)`): every fold panel.
+**The footer** is centred: the throne painting (up to 56rem, its edges fading into the page), the closing line, Play Now, and the X link under a hairline.
 
-### Named Rules
-**The One Board Rule.** Panels are cut from one surface: a shared border, 3px groove-dark gaps, no per-panel radius or drop shadow.
+### Breakpoints
+- 47.5rem: the hero becomes phone layout (sky band, then the whole painting, buttons stacked full width).
+- 43.6875rem: How to Play stacks.
+- 900px: the rules form one column.
+- 700px: the rules and the FAQ use phone sizes.
 
-**The Flat Counter Rule.** Counters are flat printed discs with a die-cut ring; no gradients, bevels or drop shadows on them.
+## Elevation and depth
+
+Depth comes from the paintings, gold frames and hard logo edges, not from floating cards.
+
+### Shadow vocabulary
+- **Hard edge** (`0 5px 0 logo-navy`, plus a soft navy fall-off): Play Now and the round buttons, the logo's pressed look. Hover lifts by 2px and deepens the edge. Pressing pushes down and flattens it.
+- **Frame rings** (`0 0 0 0.4rem box-deep, 0 0 0 calc(0.4rem + 1px) foil-lo, 0 24px 60px box-deep at 70%`): the How to Play painting panel and the battle loop.
+- **Card fall-off** (`0 18px 40px box-deep at 60%`): How to Play cards.
+- **Glow** (logo-gold at 55 to 70%, 10 to 28px): the timeline's lit line, the crown and the closing line only.
+- **Paper shadow** (`0 24px 50px black at 40%`): the parchment sheet. The rollers carry a drop shadow.
+
+### Named rules
+**The Gold Glow Rule.** Glow is reserved for the How to Play timeline and its crown. Nothing else glows.
 
 ## Shapes
-
-Square-cut board with barely softened corners: 4px for plates and the fold grid, 6px for the lid frame, the seal, the clockface and the skip link. Circles only for counters and rule-number rings. Lines are gold: 2px for the lid frame, band top and close top; 1px at 40 to 70% alpha for rules on the sheet. The lid carries four drawn gold corner marks (a double rounded L, mirrored per corner).
+- **Corners:** 0.4rem for cards, FAQ panels and tooltips; 0.5rem for the gold frames; pills for buttons; circles for the round buttons, the crown and the FAQ step numbers.
+- **Diamonds:** the timeline marks and the FAQ's open or shut mark are small rotated squares. The rules divider has a diamond in its centre.
+- **Corner flourishes:** gold flourishes (a rounded corner stroke with a small diamond, `--corner-tl/tr/br/bl`), drawn as masks so they take the element's colour. They sit on the gold frames (2rem) and How to Play cards (1.25rem).
 
 ## Components
 
-### Buttons
-The seal: the one action, gold and plainly a button.
-- **Shape:** gently cut corners (6px), 2px lit-foil border, at least 3.75rem tall.
-- **Primary:** foil face, box-navy display type at 700 with a drawn arrow icon, ringed in box navy then foil rim.
-- **Hover / Focus:** lit-foil face and a 2px lift over 180ms on cubic-bezier(0.16, 1, 0.3, 1); returns on press. Focus is the global 3px lit-foil outline at 3px offset.
-- **Placement:** rises out of the lid band; repeated once in the close.
+### Play Now (button-primary)
+The one action. Logo gold face, logo navy text in Alegreya Sans 700 with a drawn arrow, a pill shape at least 3.5rem tall, and a hard navy edge under it.
+- **Hover:** the face lightens toward cream and lifts 2px over 160ms on cubic-bezier(0.16, 1, 0.3, 1).
+- **Active:** it presses 3px down.
+- **Where:** the hero, the end of How to Play, and the footer. It links to `/play/?mode=battlefield`.
 
-### Fold Panels
-- **Corner Style:** none per panel; the grid carries a 4px radius and gold hairline.
-- **Background:** raised panel navy with a lit top edge.
-- **Internal Padding:** fold-pad.
-- **Head:** a rule-number ring (2.5rem circle, 2px foil ring, lit-foil display numeral) beside a cream title.
+### Round buttons (corner-button and social)
+Logo navy discs with a 2px logo gold ring and a gold SVG icon:
+- the question mark (How to Play);
+- the scroll (Fair Game Rules);
+- the X logo in the footer.
 
-### Counters (signature)
-- **Size:** calc(base + value x step); desktop 2.6rem + v x 0.42rem with text 0.95rem + v x 0.07rem; phones 2.2rem + v x 0.27rem with text 0.95rem + v x 0.04rem. The caption wraps under the disc, never widens it.
-- **Colour:** house colour with white figures for a player; foil with box-navy figures for the pool; obsidian adds the silver inner ring.
-- **Splits:** counters set in a row with display-face foil operators (= and +) or a bold dim-cream "or", under a bold dim-cream caption, read aloud as one sentence.
+Each one's name shows as a tooltip on hover or focus: navy, a gold hairline, cream bold text and a small arrow. The touch area is always at least 2.75rem, even when the disc is drawn smaller (1.8rem on phones). The X button fills gold on hover.
 
-### Tagline Plate
-A box-navy plate at 90% over the painted sky, 1px gold border at 70%, 4px corners, bold text balanced to 36rem. On phones the tagline prints straight on the board with no plate.
+### Gold frame
+A board navy panel with a 2px foil border at 0.5rem corners, the frame rings, and gold corner flourishes. It holds the How to Play paintings and the battle loop.
 
-### Spec Strip
-Bold items with 1.75rem game-art icons, divided by 1px gold hairlines at 45%.
+### How to Play card and timeline
+- **Card:** box navy at 92%, a 1px foil trim at 55%, corner flourishes, a Cinzel step number in foil, a Grenze title in logo cream, and cream body text.
+- **Timeline:** a 2px road in foil-lo that fills gold as the steps pass. Each step has a diamond mark on the road with a 2.75rem target around it. A fixed crown node with a glow and a connector points at the active card.
+- **Cards in view:** only the active card and the next one show (the next one at 42% and scaled to 0.94).
 
-### Clockface
-Box-navy inset with a 1px gold border at 60% and 6px corners; a 2rem lit-foil display figure followed by dim-cream bold notes.
+### Parchment scroll
+- **Rollers:** one painted image (`public/assets/rules/roller.webp`), drawn as a border image so the gold ends keep their shape and only the shaft stretches.
+- **Sheet:** a logo-cream radial gradient with a fine fractal-noise grain, warmer at the edges, and shaded where it rolls onto each roller.
+- **Text:** navy ink, a Grenze heading over a gold divider with a diamond, ten Cinzel rule titles with Roman numerals, and a gold wax seal with the crown at the foot.
 
-### Motion: the unfold
-Each fold starts hinged up (rotateX(-82deg), brightness 0.45) from its top crease and opens over 760ms on cubic-bezier(0.16, 1, 0.3, 1) as it enters the view; panels arriving together open in rule order 120ms apart. Panels are open by default; the folded start exists only while the script runs and motion is allowed.
+### FAQ item
+A native `<details name="faq">`, so only one answer is open at a time. It is a box navy panel with a foil hairline at 35%, which brightens on hover.
+- **Open:** a board face, a 75% trim, and the diamond filled gold and turned.
+- **Steps:** answers can hold numbered steps on small gold-tinted discs.
+- **Motion:** where the browser supports it, answers slide open over 280ms.
+
+### Footer throne
+A painting with no frame. A four-sided gradient mask fades its edges into box-deep, deepest at the foot, where the closing line follows.
+
+## Motion
+- **The hero:** no motion apart from button lifts.
+- **How to Play:** driven by the scroll position (custom properties `--grow`, `--shift`, `--s`, `--e`), using transforms and opacity only, so scrolling back plays it in reverse.
+  - Paintings change by squashing flat into a line (170ms) and opening out of it (260ms).
+  - Card words rise in over 320ms.
+  - An autoplay glides through the steps when the visitor arrives scrolling down, and lets go when they scroll up, click or tap.
+- **The battle loop:** rises 2.5rem as it scrolls in.
+- **The parchment scroll:**
+  - **Opening:** it unrolls when its top passes 50% of the screen, over 1.9 to 3 seconds scaled by its height (1.6ms per pixel), on cubic-bezier(0.45, 0.05, 0.3, 1). The sheet's clipped edge stays under the moving roller.
+  - **Closing:** it rolls shut over 900ms when it leaves the screen.
+- **Easing:** the standard ease-out is cubic-bezier(0.16, 1, 0.3, 1), used for hovers, cards, FAQ and marks.
+- **Reduced motion:** no pinning, no autoplay, no unrolling (the scroll stays open), no slides. Everything is shown at once.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** print the sheet on navy board (board, board-hi) with cream ink and gold rules.
-- **Do** size every counter with the one formula for its breakpoint, and show every payment as a split whose numbers add up.
-- **Do** set every amount in tabular lining figures at two decimals.
-- **Do** separate sheet parts with the crease groove and panels with 3px groove-dark gaps.
-- **Do** keep the seal the only gold-faced button, with the foil press reserved for the box title.
-- **Do** keep the unfold static under prefers-reduced-motion, with panels open when the script does not run.
-- **Do** use self-hosted fonts and the game's own art; draw icons as SVG.
+- **Do** take colours for new headings and controls from the logo: cream, navy, gold.
+- **Do** give cream headings the logo's hard navy edge.
+- **Do** keep Play Now the only gold-faced button, and keep every other control a navy disc or panel with gold trim.
+- **Do** frame paintings and video in the gold frame with corner flourishes.
+- **Do** keep touch targets at least 2.75rem, and keep a visible focus outline (3px foil-hi, 3px offset).
+- **Do** keep motion on transform and opacity, reversible with scrolling, and fully static under reduced motion.
+- **Do** take every word from `COPY.landing` in `src/copy.ts`, and every rule number from the rule constants.
+- **Do** use self-hosted fonts and the game's own art, and draw icons as inline SVG.
 
 ### Don't:
-- **Don't** print the rule sheet on cream paper; cream is ink, not a surface.
-- **Don't** use house colours for anything but counters.
-- **Don't** float panels as separate cards with their own radius and drop shadow.
-- **Don't** give counters gradients, bevels or drop shadows.
-- **Don't** round corners beyond 6px except the circles of counters and rule numbers.
-- **Don't** apply this system to the game pages (index.html, src/battlefield/) without a separate decision.
+- **Don't** add a second light surface below the hero; the parchment is the only one.
+- **Don't** use gold as a large background, or glow anything outside the How to Play timeline.
+- **Don't** put a hard border or frame around the throne painting; it fades into the page.
+- **Don't** load the game's code (libauth, Phaser, `src/lib/kingdom.ts`) into the landing page; it stays a small bundle.
+- **Don't** apply this system to the game page (`play/index.html`, `src/battlefield/`) without a separate decision.
+
+## Leftovers in the code
+`landing.css` still declares tokens and classes from the earlier box-lid design that nothing on the page uses any more:
+- the colours `--board-hi`, `--cream-dim`, `--violet`, `--crimson`, `--obsidian`, `--silver` and `--sapphire`;
+- the button styles `.btn--small` and `.btn--quiet`.
+
+They can be removed in a clean-up pass.

@@ -1,9 +1,24 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-10T16:04:03.963Z",
+  "generatedAt": "2026-11-13T22:03:45.000Z",
   "title": "Design System: Funge",
   "extensions": {
     "colorMeta": {
+      "sky": {
+        "role": "neutral",
+        "displayName": "Hero Sky",
+        "canonical": "oklch(50.2% 0.191 260.2)",
+        "tonalRamp": [
+          "oklch(15% 0.071 260.2)",
+          "oklch(25% 0.120 260.2)",
+          "oklch(36% 0.172 260.2)",
+          "oklch(47% 0.191 260.2)",
+          "oklch(58% 0.191 260.2)",
+          "oklch(70% 0.145 260.2)",
+          "oklch(82% 0.086 260.2)",
+          "oklch(95% 0.048 260.2)"
+        ]
+      },
       "box": {
         "role": "neutral",
         "displayName": "Box Navy",
@@ -21,7 +36,7 @@
       },
       "box-deep": {
         "role": "neutral",
-        "displayName": "Box Bottom",
+        "displayName": "Box Deep",
         "canonical": "oklch(18.7% 0.043 266.0)",
         "tonalRamp": [
           "oklch(15% 0.016 266.0)",
@@ -36,7 +51,7 @@
       },
       "board": {
         "role": "neutral",
-        "displayName": "Sheet Board",
+        "displayName": "Board",
         "canonical": "oklch(26.8% 0.075 266.5)",
         "tonalRamp": [
           "oklch(15% 0.028 266.5)",
@@ -44,89 +59,44 @@
           "oklch(36% 0.067 266.5)",
           "oklch(47% 0.075 266.5)",
           "oklch(58% 0.075 266.5)",
-          "oklch(70% 0.056 266.5)",
+          "oklch(70% 0.057 266.5)",
           "oklch(82% 0.034 266.5)",
           "oklch(95% 0.019 266.5)"
         ]
       },
-      "board-hi": {
-        "role": "neutral",
-        "displayName": "Raised Panel",
-        "canonical": "oklch(30.9% 0.084 266.1)",
-        "tonalRamp": [
-          "oklch(15% 0.031 266.1)",
-          "oklch(25% 0.052 266.1)",
-          "oklch(36% 0.075 266.1)",
-          "oklch(47% 0.084 266.1)",
-          "oklch(58% 0.084 266.1)",
-          "oklch(70% 0.063 266.1)",
-          "oklch(82% 0.038 266.1)",
-          "oklch(95% 0.021 266.1)"
-        ]
-      },
-      "groove-dark": {
-        "role": "neutral",
-        "displayName": "Groove Cut",
-        "canonical": "oklch(14.8% 0.032 265.1)",
-        "tonalRamp": [
-          "oklch(15% 0.012 265.1)",
-          "oklch(25% 0.020 265.1)",
-          "oklch(36% 0.029 265.1)",
-          "oklch(47% 0.032 265.1)",
-          "oklch(58% 0.032 265.1)",
-          "oklch(70% 0.024 265.1)",
-          "oklch(82% 0.014 265.1)",
-          "oklch(95% 0.008 265.1)"
-        ]
-      },
-      "groove-light": {
-        "role": "neutral",
-        "displayName": "Groove Light",
-        "canonical": "oklch(41.5% 0.095 265.7)",
-        "tonalRamp": [
-          "oklch(15% 0.035 265.7)",
-          "oklch(25% 0.059 265.7)",
-          "oklch(36% 0.085 265.7)",
-          "oklch(47% 0.095 265.7)",
-          "oklch(58% 0.095 265.7)",
-          "oklch(70% 0.071 265.7)",
-          "oklch(82% 0.043 265.7)",
-          "oklch(95% 0.024 265.7)"
-        ]
-      },
       "foil": {
         "role": "primary",
-        "displayName": "Pressed Gold Foil",
+        "displayName": "Gold Foil",
         "canonical": "oklch(76.7% 0.138 81.0)",
         "tonalRamp": [
-          "oklch(15% 0.052 81.0)",
-          "oklch(25% 0.086 81.0)",
+          "oklch(15% 0.051 81.0)",
+          "oklch(25% 0.087 81.0)",
           "oklch(36% 0.124 81.0)",
           "oklch(47% 0.138 81.0)",
           "oklch(58% 0.138 81.0)",
-          "oklch(70% 0.104 81.0)",
+          "oklch(70% 0.105 81.0)",
           "oklch(82% 0.062 81.0)",
           "oklch(95% 0.035 81.0)"
         ]
       },
       "foil-hi": {
         "role": "primary",
-        "displayName": "Lit Foil",
+        "displayName": "Foil High",
         "canonical": "oklch(86.7% 0.118 88.3)",
         "tonalRamp": [
-          "oklch(15% 0.044 88.3)",
-          "oklch(25% 0.073 88.3)",
+          "oklch(15% 0.043 88.3)",
+          "oklch(25% 0.074 88.3)",
           "oklch(36% 0.106 88.3)",
           "oklch(47% 0.118 88.3)",
           "oklch(58% 0.118 88.3)",
-          "oklch(70% 0.088 88.3)",
+          "oklch(70% 0.089 88.3)",
           "oklch(82% 0.053 88.3)",
           "oklch(95% 0.029 88.3)"
         ]
       },
       "foil-lo": {
         "role": "primary",
-        "displayName": "Foil Rim",
+        "displayName": "Foil Low",
         "canonical": "oklch(57.4% 0.110 77.5)",
         "tonalRamp": [
           "oklch(15% 0.041 77.5)",
@@ -134,17 +104,17 @@
           "oklch(36% 0.099 77.5)",
           "oklch(47% 0.110 77.5)",
           "oklch(58% 0.110 77.5)",
-          "oklch(70% 0.082 77.5)",
+          "oklch(70% 0.083 77.5)",
           "oklch(82% 0.049 77.5)",
           "oklch(95% 0.027 77.5)"
         ]
       },
       "cream": {
         "role": "neutral",
-        "displayName": "Cream Ink",
+        "displayName": "Cream",
         "canonical": "oklch(93.9% 0.033 88.1)",
         "tonalRamp": [
-          "oklch(15% 0.013 88.1)",
+          "oklch(15% 0.012 88.1)",
           "oklch(25% 0.021 88.1)",
           "oklch(36% 0.030 88.1)",
           "oklch(47% 0.033 88.1)",
@@ -154,308 +124,274 @@
           "oklch(95% 0.008 88.1)"
         ]
       },
-      "cream-dim": {
-        "role": "neutral",
-        "displayName": "Dim Cream Ink",
-        "canonical": "oklch(81.5% 0.026 89.2)",
+      "logo-cream": {
+        "role": "primary",
+        "displayName": "Logo Cream",
+        "canonical": "oklch(94.8% 0.048 94.3)",
         "tonalRamp": [
-          "oklch(15% 0.010 89.2)",
-          "oklch(25% 0.016 89.2)",
-          "oklch(36% 0.023 89.2)",
-          "oklch(47% 0.026 89.2)",
-          "oklch(58% 0.026 89.2)",
-          "oklch(70% 0.019 89.2)",
-          "oklch(82% 0.012 89.2)",
-          "oklch(95% 0.006 89.2)"
+          "oklch(15% 0.018 94.3)",
+          "oklch(25% 0.030 94.3)",
+          "oklch(36% 0.043 94.3)",
+          "oklch(47% 0.048 94.3)",
+          "oklch(58% 0.048 94.3)",
+          "oklch(70% 0.037 94.3)",
+          "oklch(82% 0.022 94.3)",
+          "oklch(95% 0.012 94.3)"
         ]
       },
-      "violet": {
-        "role": "secondary",
-        "displayName": "House Violet",
-        "canonical": "oklch(57.9% 0.202 297.2)",
+      "logo-navy": {
+        "role": "primary",
+        "displayName": "Logo Navy",
+        "canonical": "oklch(25.7% 0.055 254.1)",
         "tonalRamp": [
-          "oklch(15% 0.076 297.2)",
-          "oklch(25% 0.126 297.2)",
-          "oklch(36% 0.182 297.2)",
-          "oklch(47% 0.202 297.2)",
-          "oklch(58% 0.202 297.2)",
-          "oklch(70% 0.152 297.2)",
-          "oklch(82% 0.091 297.2)",
-          "oklch(95% 0.051 297.2)"
+          "oklch(15% 0.020 254.1)",
+          "oklch(25% 0.034 254.1)",
+          "oklch(36% 0.049 254.1)",
+          "oklch(47% 0.055 254.1)",
+          "oklch(58% 0.055 254.1)",
+          "oklch(70% 0.041 254.1)",
+          "oklch(82% 0.025 254.1)",
+          "oklch(95% 0.014 254.1)"
         ]
       },
-      "crimson": {
-        "role": "secondary",
-        "displayName": "House Crimson",
-        "canonical": "oklch(58.4% 0.193 24.9)",
+      "logo-gold": {
+        "role": "primary",
+        "displayName": "Logo Gold",
+        "canonical": "oklch(83.1% 0.162 82.6)",
         "tonalRamp": [
-          "oklch(15% 0.072 24.9)",
-          "oklch(25% 0.121 24.9)",
-          "oklch(36% 0.174 24.9)",
-          "oklch(47% 0.193 24.9)",
-          "oklch(58% 0.193 24.9)",
-          "oklch(70% 0.145 24.9)",
-          "oklch(82% 0.087 24.9)",
-          "oklch(95% 0.048 24.9)"
-        ]
-      },
-      "obsidian": {
-        "role": "secondary",
-        "displayName": "House Obsidian",
-        "canonical": "oklch(41.4% 0.023 285.3)",
-        "tonalRamp": [
-          "oklch(15% 0.009 285.3)",
-          "oklch(25% 0.014 285.3)",
-          "oklch(36% 0.021 285.3)",
-          "oklch(47% 0.023 285.3)",
-          "oklch(58% 0.023 285.3)",
-          "oklch(70% 0.017 285.3)",
-          "oklch(82% 0.010 285.3)",
-          "oklch(95% 0.006 285.3)"
-        ]
-      },
-      "sapphire": {
-        "role": "secondary",
-        "displayName": "House Sapphire",
-        "canonical": "oklch(57.3% 0.180 259.6)",
-        "tonalRamp": [
-          "oklch(15% 0.068 259.6)",
-          "oklch(25% 0.113 259.6)",
-          "oklch(36% 0.162 259.6)",
-          "oklch(47% 0.180 259.6)",
-          "oklch(58% 0.180 259.6)",
-          "oklch(70% 0.135 259.6)",
-          "oklch(82% 0.081 259.6)",
-          "oklch(95% 0.045 259.6)"
-        ]
-      },
-      "silver": {
-        "role": "secondary",
-        "displayName": "Flag Silver",
-        "canonical": "oklch(86.8% 0.015 273.8)",
-        "tonalRamp": [
-          "oklch(15% 0.006 273.8)",
-          "oklch(25% 0.010 273.8)",
-          "oklch(36% 0.014 273.8)",
-          "oklch(47% 0.015 273.8)",
-          "oklch(58% 0.015 273.8)",
-          "oklch(70% 0.012 273.8)",
-          "oklch(82% 0.007 273.8)",
-          "oklch(95% 0.004 273.8)"
+          "oklch(15% 0.060 82.6)",
+          "oklch(25% 0.102 82.6)",
+          "oklch(36% 0.146 82.6)",
+          "oklch(47% 0.162 82.6)",
+          "oklch(58% 0.162 82.6)",
+          "oklch(70% 0.123 82.6)",
+          "oklch(82% 0.073 82.6)",
+          "oklch(95% 0.041 82.6)"
         ]
       }
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Box Title",
-        "purpose": "The foil-pressed FUNGE on the lid; used once."
+      "hero": {
+        "displayName": "Hero Headline",
+        "purpose": "The hero headline only, cream on a hard navy edge over the sky."
       },
       "headline": {
         "displayName": "Section Heading",
-        "purpose": "Rule sheet section headings and the close, in lit foil."
+        "purpose": "How to Play, Fair Game Rules, FAQ, the closing question and the footer line."
       },
       "title": {
-        "displayName": "Rule Heading",
-        "purpose": "Fold, fact and step headings."
+        "displayName": "Card Title",
+        "purpose": "How to Play card titles."
+      },
+      "caps": {
+        "displayName": "Cinzel Capitals",
+        "purpose": "The hero line, FAQ group names, the seal's line; Cinzel also sets step numbers, rule titles and Roman numerals."
       },
       "body": {
-        "displayName": "Rule Text",
-        "purpose": "Sentences on the sheet, held to 34-40rem."
+        "displayName": "Body",
+        "purpose": "The page default; cards, rules and FAQ answers use 1.0625rem."
       },
-      "label": {
-        "displayName": "Label",
-        "purpose": "Counter labels, captions, spec strip, footer."
+      "small-body": {
+        "displayName": "Card and Answer Text",
+        "purpose": "How to Play cards, rules and FAQ answers, held to 34-42rem."
       },
-      "figure": {
-        "displayName": "Figures",
-        "purpose": "Every amount, time and count; tabular lining numerals."
+      "button": {
+        "displayName": "Button",
+        "purpose": "Play Now; Alegreya Sans 700."
       }
     },
     "shadows": [
       {
-        "name": "foil-press",
-        "value": "0 -1px 0 #fff3c9, 0 2px 0 var(--foil-lo), 0 6px 14px rgb(10 18 38 / 0.45)",
-        "purpose": "Text-shadow with a 2px foil-lo stroke; the box title only."
+        "name": "hard-edge",
+        "value": "0 5px 0 var(--logo-navy), 0 14px 28px color-mix(in srgb, var(--logo-navy) 35%, transparent)",
+        "purpose": "Play Now and the round buttons: the logo's pressed look. Hover deepens it, press flattens it."
       },
       {
-        "name": "seal-rings",
-        "value": "0 0 0 3px var(--box), 0 0 0 4px var(--foil-lo), 0 10px 22px rgb(10 18 38 / 0.5)",
-        "purpose": "The one action rising out of the band."
+        "name": "heading-edge",
+        "value": "0 0.055em 0 var(--logo-navy)",
+        "purpose": "Text-shadow under every cream heading."
       },
       {
-        "name": "plate-falloff",
-        "value": "0 6px 14px rgb(10 18 38 / 0.35)",
-        "purpose": "The tagline plate over the sky."
+        "name": "frame-rings",
+        "value": "0 0 0 0.4rem var(--box-deep), 0 0 0 calc(0.4rem + 1px) var(--foil-lo), 0 24px 60px color-mix(in srgb, var(--box-deep) 70%, transparent)",
+        "purpose": "The gold frames (How to Play paintings, battle loop)."
       },
       {
-        "name": "die-cut-ring",
-        "value": "0 0 0 3px var(--board-hi), 0 0 0 4px rgb(5 10 24 / 0.7)",
-        "purpose": "Every counter disc."
+        "name": "card-fall-off",
+        "value": "0 18px 40px color-mix(in srgb, var(--box-deep) 60%, transparent)",
+        "purpose": "How to Play cards."
       },
       {
-        "name": "panel-lit-edge",
-        "value": "inset 0 1px 0 var(--groove-light)",
-        "purpose": "Top edge of every fold panel."
+        "name": "gold-glow",
+        "value": "0 0 18px color-mix(in srgb, var(--logo-gold) 55%, transparent)",
+        "purpose": "The How to Play timeline, crown and closing line only."
       },
       {
-        "name": "lid-frame-edge",
-        "value": "0 0 0 1px rgb(10 18 38 / 0.6)",
-        "purpose": "Outer edge of the gold lid frame."
+        "name": "paper",
+        "value": "0 24px 50px color-mix(in srgb, black 40%, transparent)",
+        "purpose": "The parchment sheet."
       }
     ],
     "motion": [
       {
         "name": "ease-out-expo",
         "value": "cubic-bezier(0.16, 1, 0.3, 1)",
-        "purpose": "All motion: seal hover and the unfold."
+        "purpose": "Hovers, cards, FAQ and marks."
       },
       {
-        "name": "seal-hover",
-        "value": "180ms",
-        "purpose": "Seal background and 2px lift."
+        "name": "button-lift",
+        "value": "160ms",
+        "purpose": "Play Now and round buttons: 2px lift on hover, press down on click."
       },
       {
-        "name": "unfold",
-        "value": "760ms; rotateX(-82deg) and brightness(0.45) to open; 120ms stagger in rule order",
-        "purpose": "Fold panels hinge down from their top crease on entering view; disabled under reduced motion."
+        "name": "howto-scroll",
+        "value": "scroll-driven (--grow, --shift, --s, --e); squash 170ms, open 260ms, card rise 320ms",
+        "purpose": "How to Play: transform and opacity only, reversible with scrolling; autoplay glides through the steps."
+      },
+      {
+        "name": "scroll-unroll",
+        "value": "1.9-3s scaled by height (1.6ms/px), cubic-bezier(0.45, 0.05, 0.3, 1); close 900ms cubic-bezier(0.65, 0, 0.35, 1)",
+        "purpose": "The Fair Game Rules scroll opens on arrival and rolls shut on leaving."
+      },
+      {
+        "name": "faq-slide",
+        "value": "280ms",
+        "purpose": "FAQ answers slide open where interpolate-size is supported."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "No pinning, autoplay, unrolling or slides; everything shown at once."
       }
     ],
     "breakpoints": [
       {
-        "name": "tablet",
-        "value": "64rem"
+        "name": "phone-hero",
+        "value": "47.5rem"
+      },
+      {
+        "name": "howto-stack",
+        "value": "43.6875rem"
+      },
+      {
+        "name": "rules-one-column",
+        "value": "900px"
       },
       {
         "name": "phone",
-        "value": "47.5rem"
+        "value": "700px"
       }
     ]
   },
   "components": [
     {
-      "name": "Seal Button",
+      "name": "Play Now",
       "kind": "button",
-      "refersTo": "button-seal",
-      "description": "The one action: gold foil face, display type, ringed in navy and foil rim.",
-      "html": "<div class=\"ds-band\"><a class=\"ds-seal\" href=\"#\">Join live battle <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 12h14\"/><path d=\"M13 6l6 6-6 6\"/></svg></a></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-band{background:var(--box);padding:1.5rem;} .ds-seal{display:inline-flex;align-items:center;gap:0.75rem;min-height:3.75rem;padding:0.85rem 1.6rem 0.85rem 1.8rem;background:var(--foil);color:var(--box);font-family:var(--display);font-weight:700;font-size:1.875rem;line-height:1;text-decoration:none;border-radius:6px;border:2px solid var(--foil-hi);box-shadow:0 0 0 3px var(--box),0 0 0 4px var(--foil-lo),0 10px 22px rgb(10 18 38 / 0.5);transition:background-color 180ms cubic-bezier(0.16,1,0.3,1),transform 180ms cubic-bezier(0.16,1,0.3,1);} .ds-seal:hover{background:var(--foil-hi);transform:translateY(-2px);} .ds-seal:active{transform:translateY(0);} .ds-seal:focus-visible{outline:3px solid var(--foil-hi);outline-offset:3px;} .ds-seal svg{width:1.4rem;height:1.4rem;flex:none;}"
+      "refersTo": "button-primary",
+      "description": "The one action: logo gold pill, navy text and arrow, a hard navy edge; lifts on hover, presses on click.",
+      "html": "<div class=\"ds-ground\" style=\"background:var(--sky)\"><a class=\"ds-play\" href=\"#\">Play Now <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 12h14\"/><path d=\"M13 6l6 6-6 6\"/></svg></a></div>",
+      "css": ":host{--sky:#125bce;--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--logo-cream:#f8eeca;--logo-navy:#0f243d;--logo-gold:#fbbc28;--display:\"Grenze Gotisch\",Georgia,serif;--caps:\"Cinzel\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;} .ds-ground{background:var(--box-deep);color:var(--cream);font-family:var(--text);padding:1.5rem;} .ds-play{display:inline-flex;align-items:center;gap:0.6rem;min-height:3.5rem;padding:0 1.8rem;border-radius:999px;background:var(--logo-gold);color:var(--logo-navy);font-family:var(--text);font-weight:700;font-size:1.1875rem;line-height:1;text-decoration:none;box-shadow:0 5px 0 var(--logo-navy),0 14px 28px color-mix(in srgb,var(--logo-navy) 35%,transparent);transition:background-color 160ms cubic-bezier(0.16,1,0.3,1),transform 160ms cubic-bezier(0.16,1,0.3,1),box-shadow 160ms cubic-bezier(0.16,1,0.3,1);} .ds-play:hover{background:color-mix(in srgb,var(--logo-gold) 82%,var(--logo-cream));transform:translateY(-2px);box-shadow:0 7px 0 var(--logo-navy),0 18px 32px color-mix(in srgb,var(--logo-navy) 38%,transparent);} .ds-play:active{transform:translateY(3px);box-shadow:0 2px 0 var(--logo-navy),0 8px 16px color-mix(in srgb,var(--logo-navy) 30%,transparent);} .ds-play:focus-visible{outline:3px solid var(--foil-hi);outline-offset:3px;} .ds-play svg{width:1.2rem;height:1.2rem;}"
     },
     {
-      "name": "Fold Panels",
+      "name": "Round Button",
+      "kind": "button",
+      "refersTo": "corner-button",
+      "description": "A logo navy disc with a gold ring and icon; its name shows in a navy tooltip on hover or focus. Touch area at least 2.75rem.",
+      "html": "<div class=\"ds-ground\" style=\"padding-bottom:4rem\"><a class=\"ds-round\" href=\"#\" aria-label=\"How to Play\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8.6 9.2a3.4 3.4 0 1 1 4.9 3.05c-.95.47-1.5 1.25-1.5 2.25v.5\"/><path d=\"M12 18.4v.1\"/></svg><span class=\"ds-tip\" aria-hidden=\"true\">How to Play</span></a></div>",
+      "css": ":host{--sky:#125bce;--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--logo-cream:#f8eeca;--logo-navy:#0f243d;--logo-gold:#fbbc28;--display:\"Grenze Gotisch\",Georgia,serif;--caps:\"Cinzel\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;} .ds-ground{background:var(--box-deep);color:var(--cream);font-family:var(--text);padding:1.5rem;} .ds-round{position:relative;display:grid;place-items:center;width:2.6rem;height:2.6rem;border-radius:50%;background:var(--logo-navy);border:2px solid var(--logo-gold);color:var(--logo-gold);box-shadow:0 3px 0 color-mix(in srgb,var(--logo-navy) 80%,black);transition:transform 160ms cubic-bezier(0.16,1,0.3,1);} .ds-round::after{content:\"\";position:absolute;inset:-0.075rem;border-radius:50%;} .ds-round svg{width:56%;height:56%;} .ds-round:hover{transform:translateY(-2px);} .ds-round:focus-visible{outline:3px solid var(--foil-hi);outline-offset:3px;} .ds-tip{position:absolute;top:calc(100% + 0.75rem);left:0;padding:0.45rem 0.85rem;border-radius:0.4rem;background:var(--logo-navy);border:1px solid color-mix(in srgb,var(--logo-gold) 60%,transparent);color:var(--logo-cream);font-family:var(--text);font-weight:700;font-size:0.95rem;line-height:1;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 140ms ease;} .ds-round:hover .ds-tip,.ds-round:focus-visible .ds-tip{opacity:1;}"
+    },
+    {
+      "name": "Gold Frame",
+      "kind": "container",
+      "refersTo": "gold-frame",
+      "description": "Board navy inside a 2px foil border, ringed in box-deep and foil-lo; holds the How to Play paintings and the battle loop.",
+      "html": "<div class=\"ds-ground\"><div class=\"ds-frame\"><div class=\"ds-art\"></div></div></div>",
+      "css": ":host{--sky:#125bce;--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--logo-cream:#f8eeca;--logo-navy:#0f243d;--logo-gold:#fbbc28;--display:\"Grenze Gotisch\",Georgia,serif;--caps:\"Cinzel\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;} .ds-ground{background:var(--box-deep);color:var(--cream);font-family:var(--text);padding:1.5rem;} .ds-frame{padding:0.35rem;border:2px solid var(--foil);border-radius:0.5rem;background:var(--board);max-width:20rem;box-shadow:0 0 0 0.4rem var(--box-deep),0 0 0 calc(0.4rem + 1px) var(--foil-lo),0 24px 60px color-mix(in srgb,var(--box-deep) 70%,transparent);} .ds-art{aspect-ratio:16/9;border-radius:0.3rem;background:linear-gradient(to bottom,#3a5a9a,#1b2b55 60%,#2a3b1f);}"
+    },
+    {
+      "name": "How to Play Card",
       "kind": "card",
-      "refersTo": "fold-panel",
-      "description": "Rule panels cut from one board, separated by 3px groove gaps inside a gold hairline.",
-      "html": "<div class=\"ds-folds\"><article class=\"ds-fold\"><div class=\"ds-fold__head\"><span class=\"ds-rule-no\">1</span><h3>Open the kingdom</h3></div><p>The first king pays 10.00 PUSD. All of it goes into the pool.</p></article><article class=\"ds-fold\"><div class=\"ds-fold__head\"><span class=\"ds-rule-no\">2</span><h3>Conquer the throne</h3></div><p>Pay the throne's value plus 2%.</p></article></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-folds{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;background:var(--groove-dark);border:1px solid rgb(224 169 58 / 0.55);border-radius:4px;font-family:var(--text);color:var(--cream);font-size:1.1875rem;line-height:1.55;} .ds-fold{padding:1.75rem;background:var(--board-hi);box-shadow:inset 0 1px 0 var(--groove-light);} .ds-fold__head{display:flex;align-items:center;gap:0.85rem;} .ds-rule-no{flex:none;display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:50%;border:2px solid var(--foil);color:var(--foil-hi);font-family:var(--display);font-weight:700;font-size:1.5rem;line-height:1;} .ds-fold h3{margin:0;font-family:var(--display);font-weight:700;font-size:2rem;line-height:1.05;color:var(--cream);} .ds-fold p{margin:0.8rem 0 0;max-width:34rem;}"
+      "refersTo": "card",
+      "description": "Box navy at 92% with a 1px foil trim; a Cinzel step number in foil, a Grenze title in logo cream, cream body text.",
+      "html": "<div class=\"ds-ground\"><article class=\"ds-card\"><span class=\"ds-no\">Step 3</span><h3>Protect</h3><p>Raise your walls to make the throne cost more to take.</p></article></div>",
+      "css": ":host{--sky:#125bce;--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--logo-cream:#f8eeca;--logo-navy:#0f243d;--logo-gold:#fbbc28;--display:\"Grenze Gotisch\",Georgia,serif;--caps:\"Cinzel\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;} .ds-ground{background:var(--box-deep);color:var(--cream);font-family:var(--text);padding:1.5rem;} .ds-card{max-width:26rem;padding:1.1rem 1.4rem 1.2rem;background:color-mix(in srgb,var(--box) 92%,transparent);border:1px solid color-mix(in srgb,var(--foil) 55%,transparent);border-radius:0.4rem;box-shadow:0 18px 40px color-mix(in srgb,var(--box-deep) 60%,transparent);} .ds-no{display:block;font-family:var(--caps);font-weight:700;font-size:1.125rem;letter-spacing:0.08em;line-height:1;color:var(--foil);} .ds-card h3{margin:0.4rem 0;font-family:var(--display);font-weight:700;font-size:1.875rem;line-height:1.05;color:var(--logo-cream);} .ds-card p{margin:0;font-size:1.0625rem;line-height:1.45;color:var(--cream);}"
     },
     {
-      "name": "Counter Split",
-      "kind": "custom",
-      "refersTo": "counter-token",
-      "description": "A worked payment: counters sized by value, coloured by holder, with foil operators.",
-      "html": "<figure class=\"ds-split\"><figcaption class=\"ds-split__caption\">A conquest of a throne worth 10.00</figcaption><div class=\"ds-split__row\"><div class=\"ds-counter ds-counter--sapphire\" style=\"--v:10.2;--c:var(--sapphire)\"><span class=\"ds-counter__token\">10.20</span><span class=\"ds-counter__label\">You pay</span></div><span class=\"ds-split__op\">=</span><div class=\"ds-counter ds-counter--crimson\" style=\"--v:9.2;--c:var(--crimson)\"><span class=\"ds-counter__token\">9.20</span><span class=\"ds-counter__label\">Back to the old king</span></div><span class=\"ds-split__op\">+</span><div class=\"ds-counter ds-counter--pool\" style=\"--v:1;\"><span class=\"ds-counter__token\">1.00</span><span class=\"ds-counter__label\">Into the pool</span></div></div></figure>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-split{margin:0;padding:1.5rem;background:var(--board-hi);} .ds-split__caption{margin:0 0 1rem;font-family:var(--text);font-weight:700;color:var(--cream-dim);font-size:1rem;} .ds-split__row{display:flex;align-items:center;flex-wrap:wrap;gap:1.25rem;} .ds-split__op{font-family:var(--display);font-weight:700;font-size:2.5rem;color:var(--foil);line-height:1;} .ds-counter{--size:calc(var(--counter-base) + var(--v) * var(--counter-step));max-width:max(var(--size),5.5rem);display:grid;justify-items:center;gap:0.5rem;text-align:center;font-family:var(--text);} .ds-counter__token{display:grid;place-items:center;width:var(--size);height:var(--size);border-radius:50%;background:var(--c,var(--foil));color:#fff;font-weight:700;font-variant-numeric:tabular-nums lining-nums;font-size:calc(0.95rem + var(--v) * var(--counter-text));box-shadow:0 0 0 3px var(--board-hi),0 0 0 4px rgb(5 10 24 / 0.7);} .ds-counter--pool .ds-counter__token{background:var(--foil);color:var(--box);} .ds-counter--obsidian .ds-counter__token{box-shadow:inset 0 0 0 2px var(--silver),0 0 0 3px var(--board-hi),0 0 0 4px rgb(5 10 24 / 0.7);} .ds-counter__label{font-size:0.95rem;font-weight:700;color:var(--cream-dim);line-height:1.2;}"
+      "name": "Parchment Rule",
+      "kind": "content",
+      "refersTo": "parchment",
+      "description": "The one light surface: logo cream parchment with navy ink, a Cinzel rule title led by a deep-gold Roman numeral.",
+      "html": "<div class=\"ds-ground\"><div class=\"ds-sheet\"><h3><span>I</span>The clock</h3><p>A round starts with ten minutes on the clock.</p></div></div>",
+      "css": ":host{--sky:#125bce;--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--logo-cream:#f8eeca;--logo-navy:#0f243d;--logo-gold:#fbbc28;--display:\"Grenze Gotisch\",Georgia,serif;--caps:\"Cinzel\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;} .ds-ground{background:var(--box-deep);color:var(--cream);font-family:var(--text);padding:1.5rem;} .ds-sheet{max-width:26rem;padding:1.5rem 1.75rem;color:var(--logo-navy);background:linear-gradient(to right,color-mix(in srgb,var(--foil-lo) 22%,transparent),transparent 9%,transparent 91%,color-mix(in srgb,var(--foil-lo) 22%,transparent)),radial-gradient(ellipse at 50% 45%,var(--logo-cream),var(--cream) 70%);box-shadow:0 24px 50px color-mix(in srgb,black 40%,transparent);} .ds-sheet h3{margin:0;font-family:var(--caps);font-weight:700;font-size:1.2rem;line-height:1.35;letter-spacing:0.02em;color:color-mix(in srgb,var(--foil-lo) 70%,var(--logo-navy));} .ds-sheet h3 span{margin-right:0.55rem;color:color-mix(in srgb,var(--foil-lo) 80%,var(--logo-navy));} .ds-sheet p{margin:0.3rem 0 0;font-family:var(--text);font-size:1.0625rem;line-height:1.5;color:color-mix(in srgb,var(--logo-navy) 88%,var(--foil-lo));}"
     },
     {
-      "name": "House Counters",
-      "kind": "chip",
-      "refersTo": "counter-token",
-      "description": "The four house colours and the pool, each a flat disc with a die-cut ring.",
-      "html": "<div class=\"ds-row\"><div class=\"ds-counter ds-counter--violet\" style=\"--v:1;--c:var(--violet)\"><span class=\"ds-counter__token\">1.00</span><span class=\"ds-counter__label\">Violet</span></div><div class=\"ds-counter ds-counter--crimson\" style=\"--v:1;--c:var(--crimson)\"><span class=\"ds-counter__token\">1.00</span><span class=\"ds-counter__label\">Crimson</span></div><div class=\"ds-counter ds-counter--obsidian\" style=\"--v:1;--c:var(--obsidian)\"><span class=\"ds-counter__token\">1.00</span><span class=\"ds-counter__label\">Obsidian</span></div><div class=\"ds-counter ds-counter--sapphire\" style=\"--v:1;--c:var(--sapphire)\"><span class=\"ds-counter__token\">1.00</span><span class=\"ds-counter__label\">Sapphire</span></div><div class=\"ds-counter ds-counter--pool\" style=\"--v:1;\"><span class=\"ds-counter__token\">1.00</span><span class=\"ds-counter__label\">Pool</span></div></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-row{display:flex;gap:1rem;padding:1.5rem;background:var(--board-hi);} .ds-counter{--size:calc(var(--counter-base) + var(--v) * var(--counter-step));max-width:max(var(--size),5.5rem);display:grid;justify-items:center;gap:0.5rem;text-align:center;font-family:var(--text);} .ds-counter__token{display:grid;place-items:center;width:var(--size);height:var(--size);border-radius:50%;background:var(--c,var(--foil));color:#fff;font-weight:700;font-variant-numeric:tabular-nums lining-nums;font-size:calc(0.95rem + var(--v) * var(--counter-text));box-shadow:0 0 0 3px var(--board-hi),0 0 0 4px rgb(5 10 24 / 0.7);} .ds-counter--pool .ds-counter__token{background:var(--foil);color:var(--box);} .ds-counter--obsidian .ds-counter__token{box-shadow:inset 0 0 0 2px var(--silver),0 0 0 3px var(--board-hi),0 0 0 4px rgb(5 10 24 / 0.7);} .ds-counter__label{font-size:0.95rem;font-weight:700;color:var(--cream-dim);line-height:1.2;}"
-    },
-    {
-      "name": "Tagline Plate",
-      "kind": "custom",
-      "refersTo": "tagline-plate",
-      "description": "The tagline set on a navy plate over the painted sky (desktop only; on phones it prints straight on the board).",
-      "html": "<div class=\"ds-sky\"><p class=\"ds-plate\">Take the throne. The last king standing wins the pool.</p></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-sky{padding:2rem;background:#9fbfd6;} .ds-plate{display:inline-block;margin:0;padding:0.55rem 1rem 0.6rem;background:rgb(15 26 51 / 0.9);border:1px solid rgb(224 169 58 / 0.7);border-radius:4px;color:var(--cream);font-family:var(--text);font-weight:700;font-size:1.3125rem;line-height:1.35;max-width:36rem;box-shadow:0 6px 14px rgb(10 18 38 / 0.35);}"
-    },
-    {
-      "name": "Foil Title",
-      "kind": "custom",
-      "refersTo": "display",
-      "description": "The box title pressed in gold foil; used once, on the lid.",
-      "html": "<div class=\"ds-lidbg\"><h1 class=\"ds-title\">Funge</h1></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-lidbg{padding:1.5rem 2rem;background:var(--box);} .ds-title{margin:0;font-family:var(--display);font-weight:900;font-size:6rem;line-height:0.85;letter-spacing:-0.01em;color:var(--foil-hi);-webkit-text-stroke:2px var(--foil-lo);paint-order:stroke fill;text-shadow:0 -1px 0 #fff3c9,0 2px 0 var(--foil-lo),0 6px 14px rgb(10 18 38 / 0.45);}"
-    },
-    {
-      "name": "Clockface",
-      "kind": "custom",
-      "refersTo": "clockface",
-      "description": "The clock rule's figure, inset in box navy.",
-      "html": "<div class=\"ds-wrap\"><div class=\"ds-clock\"><strong>+1:00</strong><span>Each conquest</span><span>up to 10:00</span></div></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-wrap{padding:1.5rem;background:var(--board-hi);font-family:var(--text);} .ds-clock{display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:0.25rem 0.6rem;padding:0.55rem 0.9rem;border:1px solid rgb(224 169 58 / 0.6);border-radius:6px;background:var(--box);font-variant-numeric:tabular-nums lining-nums;} .ds-clock strong{font-family:var(--display);font-size:2rem;color:var(--foil-hi);line-height:1;} .ds-clock span{color:var(--cream-dim);font-weight:700;}"
-    },
-    {
-      "name": "Crease Groove",
-      "kind": "custom",
-      "refersTo": "groove",
-      "description": "The fold line between parts of the rule sheet.",
-      "html": "<div class=\"ds-board\"><div class=\"ds-groove\"></div></div>",
-      "css": ":host{--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--board-hi:#1c2d5a;--groove-dark:#050a18;--groove-light:#33497f;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--cream-dim:#c9c2b0;--violet:#8a55e0;--crimson:#d63a3c;--obsidian:#4a4a58;--silver:#d0d3de;--sapphire:#2f73e0;--display:\"Grenze Gotisch\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;--counter-base:2.6rem;--counter-step:0.42rem;--counter-text:0.07rem;} .ds-board{padding:2rem 0;background:var(--board);} .ds-groove{height:6px;background:linear-gradient(var(--groove-dark) 0 2px,var(--groove-light) 2px 3px,rgb(5 10 24 / 0.35) 3px 100%);}"
+      "name": "FAQ Item",
+      "kind": "disclosure",
+      "refersTo": "faq-item",
+      "description": "A native details panel, one open at a time: box navy with a foil hairline; open, a board face and the diamond filled gold.",
+      "html": "<div class=\"ds-ground\"><details class=\"ds-faq\" open><summary><span>What is Funge?</span><span class=\"ds-mark\"></span></summary><p>A king-of-the-hill game on Bitcoin Cash.</p></details></div>",
+      "css": ":host{--sky:#125bce;--box:#0f1a33;--box-deep:#0a1226;--board:#15234a;--foil:#e0a93a;--foil-hi:#f3cf74;--foil-lo:#9c6f1c;--cream:#f4ead2;--logo-cream:#f8eeca;--logo-navy:#0f243d;--logo-gold:#fbbc28;--display:\"Grenze Gotisch\",Georgia,serif;--caps:\"Cinzel\",Georgia,serif;--text:\"Alegreya Sans\",\"Segoe UI\",sans-serif;} .ds-ground{background:var(--box-deep);color:var(--cream);font-family:var(--text);padding:1.5rem;} .ds-faq{max-width:30rem;background:color-mix(in srgb,var(--box) 92%,transparent);border:1px solid color-mix(in srgb,var(--foil) 35%,transparent);border-radius:0.4rem;} .ds-faq[open]{background:var(--board);border-color:color-mix(in srgb,var(--foil) 75%,transparent);} .ds-faq summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:2.75rem;padding:1rem 1.25rem;cursor:pointer;list-style:none;font-weight:700;font-size:1.125rem;color:var(--logo-cream);} .ds-faq summary::-webkit-details-marker{display:none;} .ds-mark{flex:none;width:0.7rem;height:0.7rem;border:2px solid var(--foil);transform:rotate(45deg);} .ds-faq[open] .ds-mark{background:var(--logo-gold);border-color:var(--logo-gold);transform:rotate(225deg) scale(1.15);} .ds-faq p{margin:0;padding:0 1.25rem 1.2rem;font-size:1.0625rem;line-height:1.55;color:var(--cream);}"
     }
   ],
   "narrative": {
-    "northStar": "The Box Lid and the Rule Sheet",
-    "overview": "Funge is shown as the board game it is. The painted valley is the box lid, framed in gold with printed corner marks and the title pressed into the sky as foil. Everything below the lid is one rule sheet printed on heavy navy board: ruled in gold hairlines, divided by crease grooves, its six rule panels hinging open along those creases as they scroll into view. Numbers are carried by punch-out counters in the four house colours, and a counter's size is what it is worth.\n\nThe world is dark, warm-on-cool and printed: navy board, gold foil and cream ink. Depth comes from print and fold, not from floating cards; panels are cut from one surface and separated by dark grooves with a lit edge. Density is generous and calm, with a few large blackletter headings over short, plain rule text.\n\nScope boundary: this system covers the landing page only (`landing.html`, `src/landing.ts`, `src/landing.css`). The game pages (`index.html` with `src/kingdomMode.ts`, and the Phaser battlefield in `src/battlefield/`) keep their own older look and are not governed by this file. Do not restyle them from it without a separate decision.",
+    "northStar": "A Painted Kingdom in Navy and Gold",
+    "overview": "The landing page tells Funge as a painted medieval world. It opens in the daylight sky over the valley painting, then falls into night navy, trimmed in gold the way the Funge logo is: cream letters on a hard navy edge, with crown gold. It is a sequence of scenes: the hero, the pinned How to Play on the dusk battlefield, the battle loop in a gold frame, the Fair Game Rules on a parchment scroll between painted rollers, the FAQ, and King Satoshi on his throne. Scope: the landing page only (index.html at /); the game page (play/index.html at /play/) keeps its own look.",
     "keyCharacteristics": [
-      "Navy board surfaces, gold foil for type and trim, cream for reading text.",
-      "One surface, divided by creases: grooves and 3px dark gaps, never separate floating cards.",
-      "Blackletter-hybrid display (Grenze Gotisch) over a humanist sans (Alegreya Sans); tabular figures for every amount.",
-      "Counters sized by value with one formula per breakpoint; colour says who holds the money.",
-      "The rules unfold panel by panel on scroll; static under reduced motion.",
-      "Self-hosted fonts and the game's own art only."
+      "Night-navy ground, gold trim and cream type, all taken from the logo.",
+      "The game's own paintings carry the scenes: the valley, the dusk field, the How to Play paintings, the roller, the throne.",
+      "Grenze Gotisch for headings, Cinzel capitals for labels and numerals, Alegreya Sans for reading.",
+      "One gold button, Play Now, in the hero, at the end of How to Play and in the footer.",
+      "Scroll-driven motion that plays back in reverse; everything shown and open under reduced motion.",
+      "Self-hosted fonts and the game's own art; icons as inline SVG."
     ],
     "rules": [
       {
-        "name": "The Colour Means Holder Rule",
-        "body": "A house colour on a counter says which player holds that money; gold says it is the pool. House colours are never used for decoration, borders or text.",
+        "name": "The Logo Colour Rule",
+        "body": "Headings, buttons and round controls use the logo's own cream, navy and gold. New controls take these three before anything else.",
         "section": "colors"
       },
       {
-        "name": "The Gold Is Printed Rule",
-        "body": "Gold is foil or a ruled line: a type face, a frame, a hairline, the seal. It is never a background wash or a gradient fill on large areas.",
+        "name": "The One Light Surface Rule",
+        "body": "Below the hero, the parchment scroll is the only light surface, and its text is navy ink. Everything else is navy with cream text.",
         "section": "colors"
       },
       {
-        "name": "The Tabular Money Rule",
-        "body": "Every amount, time and count is set with tabular lining figures, at two decimals for PUSD.",
+        "name": "The Gold Is Trim Rule",
+        "body": "Gold is a border, a line, an icon, a numeral or the Play Now face. It is never a large background area.",
+        "section": "colors"
+      },
+      {
+        "name": "The Hard Edge Rule",
+        "body": "Cream headings on navy or sky carry the logo's hard navy edge (text-shadow 0 0.055em 0 logo-navy); on the painting a soft glow is added.",
         "section": "typography"
       },
       {
-        "name": "The Two Faces Rule",
-        "body": "The display face is for the title, headings, rule numbers, the seal, operators and the clock figure; everything a visitor reads in sentences is the sans.",
+        "name": "The Reading Width Rule",
+        "body": "Reading text is held to about 34rem in cards and the rules, and 42rem in FAQ answers.",
         "section": "typography"
       },
       {
-        "name": "The One Board Rule",
-        "body": "Panels are cut from one surface: a shared border, 3px groove-dark gaps, no per-panel radius or drop shadow.",
-        "section": "elevation"
-      },
-      {
-        "name": "The Flat Counter Rule",
-        "body": "Counters are flat printed discs with a die-cut ring; no gradients, bevels or drop shadows on them.",
+        "name": "The Gold Glow Rule",
+        "body": "Glow is reserved for the How to Play timeline and its crown. Nothing else glows.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do print the sheet on navy board (board, board-hi) with cream ink and gold rules.",
-      "Do size every counter with the one formula for its breakpoint, and show every payment as a split whose numbers add up.",
-      "Do set every amount in tabular lining figures at two decimals.",
-      "Do separate sheet parts with the crease groove and panels with 3px groove-dark gaps.",
-      "Do keep the seal the only gold-faced button, with the foil press reserved for the box title.",
-      "Do keep the unfold static under prefers-reduced-motion, with panels open when the script does not run.",
-      "Do use self-hosted fonts and the game's own art; draw icons as SVG."
+      "Do take colours for new headings and controls from the logo: cream, navy, gold.",
+      "Do give cream headings the logo's hard navy edge.",
+      "Do keep Play Now the only gold-faced button; every other control is a navy disc or panel with gold trim.",
+      "Do frame paintings and video in the gold frame with corner flourishes.",
+      "Do keep touch targets at least 2.75rem and a visible focus outline (3px foil-hi, 3px offset).",
+      "Do keep motion on transform and opacity, reversible with scrolling, and static under reduced motion.",
+      "Do take every word from COPY.landing in src/copy.ts and every rule number from the rule constants.",
+      "Do use self-hosted fonts and the game's own art; draw icons as inline SVG."
     ],
     "donts": [
-      "Don't print the rule sheet on cream paper; cream is ink, not a surface.",
-      "Don't use house colours for anything but counters.",
-      "Don't float panels as separate cards with their own radius and drop shadow.",
-      "Don't give counters gradients, bevels or drop shadows.",
-      "Don't round corners beyond 6px except the circles of counters and rule numbers.",
-      "Don't apply this system to the game pages (index.html, src/battlefield/) without a separate decision."
+      "Don't add a second light surface below the hero; the parchment is the only one.",
+      "Don't use gold as a large background, or glow anything outside the How to Play timeline.",
+      "Don't put a hard border or frame around the throne painting; it fades into the page.",
+      "Don't load the game's code (libauth, Phaser, src/lib/kingdom.ts) into the landing page.",
+      "Don't apply this system to the game page (play/index.html, src/battlefield/) without a separate decision."
     ]
   }
 }

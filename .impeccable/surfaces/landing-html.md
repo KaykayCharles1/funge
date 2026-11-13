@@ -1,15 +1,15 @@
 ---
 version: 1
 slug: "landing-html"
-primary_target: "landing.html"
+primary_target: "index.html"
 related_targets: []
 ---
 
 # Landing page
 
-Scope: the Funge landing page (`landing.html`), separate from the game. Visitor mode: Persuade. Built section by section: the hero first, approved by the owner before anything below it changes.
+Scope: the Funge landing page (`index.html`, served at `/`), separate from the game. Visitor mode: Persuade. Built section by section: the hero first, approved by the owner before anything below it changes.
 
-Audience and job: hackathon judges and players, equally. Understand the rules in seconds, trust who pays, and take one action: Join live battle (`/?mode=battlefield`).
+Audience and job: hackathon judges and players, equally. Understand the rules in seconds, trust who pays, and take one action: Join live battle (`/play/?mode=battlefield`).
 
 Sections (confirmed): hero; the rules, plainly; why you can trust it; how to start. No live round data, no network mention, no links besides the battle and the page's own sections. Avoid: crypto hype, a kids' game look, corporate SaaS coldness, long text, emojis, framed and bordered boxes everywhere.
 
