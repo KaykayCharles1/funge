@@ -107,6 +107,8 @@ export const COPY = {
     // The hero (built first, section by section)
     logoAlt: "Funge",
     navLabel: "Page sections",
+    // the scroll button at the top right, next to the help button: its name, shown on hover
+    rulesLink: "Rules",
     heroTitle: "The last king wins it all",
     // read as one line; the gold dots between the words are drawn by the page
     heroLine: ["Conquer", "Protect", "Reclaim the throne"],
@@ -223,7 +225,13 @@ export const COPY = {
       { title: "Bring PUSD", text: "Fund it with PUSD for your moves and a little BCH for network fees." },
       { title: "Join the battle", text: "Watch the live round, pick your king or queen, and take the throne." },
     ],
-    closing: "Take your rightful place as the King of Funge",
+    closing: "Rise and claim dominion as the true King of Funge",
+    // The footer: the king on his throne, the closing line, Play Now and the X link
+    footer: {
+      throneAlt: "King Satoshi sits on his golden throne in the torch-lit hall of his keep.",
+      xLabel: "Follow Funge on X",
+      xUrl: "https://x.com/playFunge",
+    },
     // How to Play: the pinned section (its title is also the help button's label at the top of the page). The numbers come from the rule constants (src/config.ts).
     howto: {
       title: "How to Play",

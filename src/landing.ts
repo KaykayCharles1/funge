@@ -43,10 +43,18 @@ function hero(): HTMLElement {
   const logo = h("a", { class: "top-logo", href: "#top", "aria-label": L.logoAlt },
     h("img", { src: `${ASSETS}landing/funge-logo.webp`, alt: "", width: "708", height: "420" })
   );
-  // top right: a question mark that takes the visitor to How to Play (and plays it); its name shows on hover
-  const help = h("a", { class: "help", href: "#howto", "aria-label": L.howto.title },
-    svg("0 0 24 24", ["M8.6 9.2a3.4 3.4 0 1 1 4.9 3.05c-.95.47-1.5 1.25-1.5 2.25v.5", "M12 18.4v.1"], { fill: "none", stroke: "currentColor", "stroke-width": "2.6", "stroke-linecap": "round", "stroke-linejoin": "round" }),
-    h("span", { class: "help__tip", "aria-hidden": "true" }, L.howto.title),
+  // top right: a scroll that takes the visitor to the Fair Game Rules, and a question mark that takes them to How to
+  // Play (and plays it); each one's name shows on hover
+  const cornerButton = (cls: string, href: string, label: string, icon: SVGSVGElement) =>
+    h("a", { class: `corner-btn ${cls}`, href, "aria-label": label }, icon, h("span", { class: "corner-btn__tip", "aria-hidden": "true" }, label));
+  const stroke = { fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" };
+  const corner = h("nav", { class: "corner", "aria-label": L.navLabel },
+    cornerButton("rules-link", "#rules", L.rulesLink, svg("0 0 24 24", [
+      // a scroll: the sheet with two lines of writing, curled at the top left and rolled at the foot
+      "M15 12h-5", "M15 8h-5", "M19 17V5a2 2 0 0 0-2-2H4",
+      "M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3",
+    ], stroke)),
+    cornerButton("help", "#howto", L.howto.title, svg("0 0 24 24", ["M8.6 9.2a3.4 3.4 0 1 1 4.9 3.05c-.95.47-1.5 1.25-1.5 2.25v.5", "M12 18.4v.1"], { ...stroke, "stroke-width": "2.6" })),
   );
   const sky = h("div", { class: "hero__sky" },
     // h("h1", { class: "hero__logo" }, h("img", { src: `${ASSETS}landing/funge-logo.webp`, alt: L.logoAlt, width: "708", height: "420", fetchpriority: "high" })),
@@ -63,7 +71,7 @@ function hero(): HTMLElement {
       decoding: "async",
     }),
   );
-  return h("header", { class: "hero", id: "top" }, logo, help, sky, painting);
+  return h("header", { class: "hero", id: "top" }, logo, corner, sky, painting);
 }
 
 // After How to Play: a round on the real battlefield, a silent loop in the same gold frame as the paintings.
@@ -249,6 +257,36 @@ function faq(): HTMLElement {
         h("div", { class: "faq__a" }, ...answer(it.a(FAQ))),
       )),
     )),
+  );
+}
+
+// The footer: the king on his throne, the closing line and Play Now, then the X link. The painting is
+// public/assets/landing/throne*.webp (tools/build_footer.py); its edges fade into the page.
+// the X logo (a single path)
+const xLogo = () => svg("0 0 24 24", ["M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"], { fill: "currentColor" });
+function footer(): HTMLElement {
+  const F = L.footer;
+  const art = h("img", {
+    class: "end__throne",
+    src: `${ASSETS}landing/throne.webp`,
+    srcset: `${ASSETS}landing/throne-768.webp 768w, ${ASSETS}landing/throne.webp 1536w`,
+    sizes: "(max-width: 56rem) 100vw, 56rem",
+    width: "1536",
+    height: "1024",
+    alt: F.throneAlt,
+    loading: "lazy",
+    decoding: "async",
+  });
+  return h("footer", { class: "end", "aria-labelledby": "end-title" },
+    art,
+    h("h2", { class: "end__title", id: "end-title" }, L.closing),
+    h("a", { class: "btn btn--primary", href: BATTLE }, L.join, arrow()),
+    h("div", { class: "end__foot" },
+      h("a", { class: "social", href: F.xUrl, target: "_blank", rel: "noopener noreferrer", "aria-label": F.xLabel },
+        xLogo(),
+        h("span", { class: "social__tip", "aria-hidden": "true" }, F.xLabel),
+      ),
+    ),
   );
 }
 
@@ -783,6 +821,7 @@ document.getElementById("landing")!.append(
     rules(),
     faq(),
   ),
+  footer(),
 );
 rise();
 battleLoop();
