@@ -106,11 +106,9 @@ body {
 /* ---------------- The hero: the painting is the sky the page opens in ---------------- */
 
 .hero {
-  --page: #f5f8fc;
   --ink: #0f1a33;
-  --ink-soft: #3a4867;
   position: relative;
-  background: var(--page);
+  background: var(--box-deep);
   color: var(--ink);
   padding-bottom: 0; /* the fade into the how-to section (.hero::after) closes it */
 }
@@ -365,53 +363,15 @@ body {
   right: 0;
   bottom: 0;
   height: 22%;
-  background: linear-gradient(to bottom, rgb(245 248 252 / 0), var(--page) 92%);
+  background: linear-gradient(to bottom, transparent, var(--box-deep) 92%); /* straight into the navy of How to Play */
 }
 
-/* the real battlefield, rising over the line where the painting meets the page */
-.shot {
-  --rise: 0;
-  position: relative;
-  z-index: 3;
-  width: min(64rem, calc(100% - 2.5rem));
-  margin: calc(-1 * clamp(3rem, 7vw, 6.5rem)) auto 0;
-  transform: translateY(calc((1 - var(--rise)) * 2.5rem));
-}
-.shot__frame {
-  padding: 0.5rem;
-  background: #fff;
-  border-radius: 1.25rem;
-  box-shadow: 0 24px 60px rgb(15 26 51 / 0.22), 0 4px 12px rgb(15 26 51 / 0.1);
-}
-.shot__frame img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 0.85rem;
-}
-.shot__caption {
-  margin: 1rem auto 0;
-  max-width: 40rem;
-  text-align: center;
-  color: var(--ink-soft);
-  font-size: 1.0625rem;
-}
 @media (prefers-reduced-motion: reduce) {
   .shot { transform: none; }
   .btn { transition: none; }
 }
 
 /* ---------------- How a round is played: a pinned, scroll-driven section ---------------- */
-
-/* the light hero fades into the navy the section opens on */
-.hero::after {
-  content: "";
-  display: block;
-  height: clamp(5rem, 10vw, 9rem);
-  margin-top: clamp(3rem, 6vw, 5rem);
-  background: linear-gradient(to bottom, var(--page), var(--box-deep));
-  background: linear-gradient(in oklab to bottom, var(--page), var(--box-deep)); /* skips the grey middle */
-}
 
 .howto {
   /* scroll lengths, in screen heights, on top of the one screen the stage fills */
@@ -934,7 +894,39 @@ body {
   .hero__line span:last-child::before { display: none; }
   .hero__actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 22rem; }
   .hero__art { min-height: 0; max-height: none; margin-top: -2px; }
-  .shot { margin-top: -1.75rem; width: calc(100% - 1.5rem); }
-  .shot__frame { padding: 0.3rem; border-radius: 0.9rem; }
-  .shot__frame img { border-radius: 0.65rem; }
+  .shot { width: calc(100% - 1.5rem); }
+}
+
+/* ---------------- After How to Play: a round on the battlefield ---------------- */
+
+/* a silent loop in the same gold frame as the How to Play paintings; it rises a little as it scrolls in */
+.shot {
+  --rise: 0;
+  width: min(64rem, calc(100% - 2.5rem));
+  margin: clamp(3rem, 8vw, 6rem) auto clamp(4rem, 10vw, 8rem);
+  transform: translateY(calc((1 - var(--rise)) * 2.5rem));
+}
+.shot__frame {
+  position: relative;
+  padding: 0.35rem;
+  border: 2px solid var(--foil);
+  border-radius: 0.5rem;
+  background: var(--board);
+  box-shadow: 0 0 0 0.4rem var(--box-deep), 0 0 0 calc(0.4rem + 1px) var(--foil-lo), 0 24px 60px color-mix(in srgb, var(--box-deep) 70%, transparent);
+}
+.shot__frame::after {
+  content: "";
+  position: absolute;
+  inset: calc(-0.4rem - 7px);
+  background: var(--logo-gold);
+  pointer-events: none;
+  mask: var(--corner-tl) top left / 2rem no-repeat, var(--corner-tr) top right / 2rem no-repeat, var(--corner-br) bottom right / 2rem no-repeat, var(--corner-bl) bottom left / 2rem no-repeat;
+}
+.shot__frame video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.3rem;
+  background: var(--board);
 }

@@ -61,25 +61,47 @@ function hero(): HTMLElement {
       decoding: "async",
     }),
   );
-  const shot = h("figure", { class: "shot" },
-    h("div", { class: "shot__frame" },
-      h("img", {
-        src: `${ASSETS}landing/battlefield-1280.webp`,
-        srcset: `${ASSETS}landing/battlefield-1280.webp 1280w, ${ASSETS}landing/battlefield-2048.webp 2048w`,
-        sizes: "(min-width: 72rem) 64rem, 92vw",
-        alt: L.shotAlt,
-        width: "2048",
-        height: "1152",
-        loading: "lazy",
-        decoding: "async",
-      }),
-    ),
-    h("figcaption", { class: "shot__caption" }, L.shotCaption),
-  );
-  return h("header", { class: "hero", id: "top" }, logo, help, sky, painting, shot);
+  return h("header", { class: "hero", id: "top" }, logo, help, sky, painting);
 }
 
-// The battlefield frame rises a little as the page scrolls past the painting (never with reduced motion)
+// After How to Play: a round on the real battlefield, a silent loop in the same gold frame as the paintings.
+// It was recorded from the dev page's mock round with the two kings of How to Play: King Satoshi (violet) holds the
+// throne, King Blaze (crimson) conquers it, King Satoshi takes it back (public/assets/landing/battle-loop.mp4.json).
+function battle(): HTMLElement {
+  return h("figure", { class: "shot" },
+    h("div", { class: "shot__frame" },
+      h("video", {
+        src: `${ASSETS}landing/battle-loop.mp4`,
+        poster: `${ASSETS}landing/battle-loop-poster.webp`,
+        muted: "",
+        loop: "",
+        playsinline: "",
+        preload: "none",
+        width: "1280",
+        height: "720",
+        "aria-label": L.shotAlt,
+      }),
+    ),
+  );
+}
+
+// The loop plays only while it is on screen. With reduced motion it does not play by itself: its first frame shows,
+// with the video's own controls.
+function battleLoop(): void {
+  const video = document.querySelector<HTMLVideoElement>(".shot video");
+  if (!video) return;
+  video.muted = true; // the attribute alone does not let every browser start it
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    video.controls = true;
+    return;
+  }
+  new IntersectionObserver(([en]) => {
+    if (en?.isIntersecting) void video.play().catch(() => {});
+    else video.pause();
+  }, { threshold: 0.25 }).observe(video);
+}
+
+// The battle frame rises a little as it scrolls into view (never with reduced motion)
 function rise(): void {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const frame = document.querySelector<HTMLElement>(".shot");
@@ -613,8 +635,10 @@ document.getElementById("landing")!.append(
   hero(),
   h("main", {},
     howto(),
+    battle(),
     // the "Fair Game Rules" section goes here (later); its rule strings are kept in COPY.landing
   ),
 );
 rise();
+battleLoop();
 howtoScroll();

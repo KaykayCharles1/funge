@@ -87,8 +87,8 @@ export const COPY = {
     // read as one line; the gold dots between the words are drawn by the page
     heroLine: ["Conquer", "Protect", "Reclaim the throne"],
     heroSecondary: "How it works",
-    shotAlt: "The Funge battlefield: a castle with violet flags, Queen Amina's violet army in front of it, the king plate, the Treasury and the clock at the top.",
-    shotCaption: "The live battlefield. Every conquest, protect and payout plays out here.",
+    // the battle loop after How to Play (a silent video; this is its spoken description)
+    shotAlt: "A round on the battlefield: King Satoshi's violet army holds the castle, King Blaze's crimson army takes it, and King Satoshi takes it back.",
     specs: [
       { icon: "shield", label: "Four houses" },
       { icon: "bell", label: "A 10:00 clock" },
