@@ -2,6 +2,19 @@ import type { ApiErrorCode } from "./referee/api.ts";
 
 // The rule numbers the landing page shows, already formatted (for example "10", "2%")
 export type HowtoNumbers = { open: string; fee: string; cut: string };
+// The Fair Game Rules numbers, already formatted from the rule constants (src/config.ts, src/refereeParams.ts)
+export type RulesNumbers = {
+  clock: string; // "10" (minutes)
+  add: string; // "1 minute"
+  amounts: string; // "1, 5 or 10"
+  perReign: string; // "two"
+  lockout: string; // "30 seconds"
+  cap: string; // "50"
+  back: string; // "90%"
+  fee: string; // "2%"
+  claim: string; // "2 minutes"
+  blocks: string; // "12"
+};
 
 // Every sentence the player sees from the referee timer. Change the wording here only.
 export const COPY = {
@@ -97,37 +110,24 @@ export const COPY = {
     specsLabel: "What is in the box",
     join: "Play Now",
     joinNote: "Watch the round, then take the throne",
-    // Kept for the later "Fair Game Rules" section (not on the page now)
-    rulesTitle: "How a round is played",
-    rulesIntro: "Six rules. That is the whole game.",
-    rules: [
-      { title: "Open the kingdom", text: "The first king pays 10.00 PUSD. All of it goes into the Treasury." },
-      { title: "Conquer the throne", text: "Pay the throne's value plus 2%. The king you dethrone gets most of it back; the rest grows the Treasury." },
-      { title: "Protect your walls", text: "The king can add 1, 5 or 10 PUSD to the throne's value, twice per reign. It all goes into the Treasury. Not in the last 30 seconds." },
-      { title: "Mind the clock", text: "The clock starts at 10:00. Every conquest adds a minute, up to 10:00. Protecting does not." },
-      { title: "Win the Treasury", text: "When the clock runs out, the last king takes the whole Treasury and a trophy." },
-      { title: "Change your mind early", text: "Until someone conquers, the king may cancel the round and take every coin back." },
-    ],
-    // The worked example under the conquest rule: a throne worth 10.00
-    splitCaption: "A conquest of a throne worth 10.00",
-    splitPaid: "You pay",
-    splitBack: "Back to the old king",
-    splitPool: "Into the Treasury",
-    openCaption: "Opening the kingdom",
-    openPaid: "The first king pays",
-    openPool: "Into the Treasury",
-    protectCaption: "A protect: one amount, all of it into the Treasury",
-    protectAdd: "The king adds",
-    protectOr: "or",
-    clockCaption: "Each conquest",
-    clockAdd: "+1:00",
-    clockCap: "up to 10:00",
-    trustTitle: "Fair by the contract",
-    trust: [
-      { title: "The contract pays the king", text: "The payout rule lives in the Bitcoin Cash contract. The game server only keeps the clock; it cannot send the Treasury anywhere else." },
-      { title: "No one can hold the Treasury hostage", text: "If the server ever disappears, anyone can settle the round after 12 quiet blocks, and the last king is still paid." },
-      { title: "Every number is on the chain", text: "Each move is a transaction anyone can check: who paid, how much, and where it went." },
-    ],
+    // Fair Game Rules: the scroll after the battle loop. Only what How to Play does not already say.
+    fairRules: {
+      title: "Fair Game Rules",
+      seal: "Sealed by the contract",
+      // each title and text gets the numbers; a rule that shows none simply ignores them
+      rules: [
+        { title: (_r: RulesNumbers) => "The clock", text: (r: RulesNumbers) => `A round starts with ${r.clock} minutes on the clock. Every conquest adds ${r.add}, but never past ${r.clock}.` },
+        { title: (_r: RulesNumbers) => "Protect amounts", text: (r: RulesNumbers) => `A king protects with ${r.amounts} PUSD, never any other amount.` },
+        { title: (r: RulesNumbers) => `${r.perReign[0]!.toUpperCase()}${r.perReign.slice(1)} protects per reign`, text: (r: RulesNumbers) => `Every new reign starts with ${r.perReign} fresh protects, even for a king who reclaimed his throne.` },
+        { title: (r: RulesNumbers) => `No protecting in the last ${r.lockout}`, text: (_r: RulesNumbers) => "The final moments belong to the challengers." },
+        { title: (_r: RulesNumbers) => "The highest walls", text: (r: RulesNumbers) => `A kingdom is worth at most ${r.cap} PUSD. Once there, the walls can rise no higher.` },
+        { title: (_r: RulesNumbers) => "Losing isn't losing everything", text: (r: RulesNumbers) => `A fallen king gets back ${r.back} of the kingdom's value, plus the ${r.fee} fee the conqueror paid.` },
+        { title: (_r: RulesNumbers) => "No conquering yourself", text: (_r: RulesNumbers) => "You can't take a throne you already hold." },
+        { title: (_r: RulesNumbers) => "A change of heart", text: (_r: RulesNumbers) => "The first king can cancel the round and take every coin back, but only before anyone conquers." },
+        { title: (_r: RulesNumbers) => "The Referee keeps time, not money", text: (_r: RulesNumbers) => "Our game server, the Referee, runs the round's clock. It never holds or sends PUSD: the contract alone pays the winner." },
+        { title: (_r: RulesNumbers) => "The winner is always paid", text: (r: RulesNumbers) => `If the winner doesn't claim within ${r.claim}, the prize is paid automatically. Even if the Referee goes down, anyone can settle the round after ${r.blocks} blocks, and the last king is still paid.` },
+      ],
+    },
     startTitle: "Before you play",
     start: [
       { title: "Open a wallet", text: "Create the game wallet in your browser in one tap, or connect your own wallet through WizardConnect." },
@@ -149,7 +149,7 @@ export const COPY = {
         },
         {
           title: "Protect your kingdom",
-          text: (_r: HowtoNumbers) => "A king can add PUSD to raise his walls. Every protection raises the kingdom's value and feeds the Treasury.",
+          text: (_r: HowtoNumbers) => "A king can protect his kingdom by paying PUSD to raise his walls. Every protection raises the kingdom's value and is added to the Treasury.",
           alt: "The king stands with crossed arms as stone walls rise around the keep, soldiers line up and a golden shield glows above.",
         },
         {
@@ -164,7 +164,7 @@ export const COPY = {
         },
         {
           title: "The Treasury",
-          text: (r: HowtoNumbers) => `Each time a throne is taken, ${r.cut} of the kingdom's value goes into the Treasury. Every protection is also added to the Treasury. When the round ends, the last king wins it all.`,
+          text: (r: HowtoNumbers) => `Each time a throne is taken, ${r.cut} of the kingdom's value goes into the Treasury, same with every protection. When the round ends, the last king wins it all.`,
           alt: "An overflowing treasure chest with a golden trophy and crown, between a violet banner and a crimson banner, with the keep in the distance.",
         },
       ],
