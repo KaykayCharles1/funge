@@ -143,8 +143,8 @@ export const COPY = {
       goTo: (n: number, title: string) => `Step ${n}: ${title}`,
       steps: [
         {
-          title: "The first king",
-          text: (r: HowtoNumbers) => `The first king claims the throne with ${r.open} PUSD. His kingdom is worth ${r.open}, and his ${r.open} PUSD starts the Treasury.`,
+          title: "The First King",
+          text: (r: HowtoNumbers) => `The first King begins the round and claims the throne with ${r.open} PUSD. His kingdom is worth ${r.open} PUSD, and his ${r.open} PUSD goes the Treasury.`,
           alt: "The first king stands before his keep at dusk as gold coins drop into an open treasure chest.",
         },
         {
@@ -153,8 +153,8 @@ export const COPY = {
           alt: "The king stands with crossed arms as stone walls rise around the keep, soldiers line up and a golden shield glows above.",
         },
         {
-          title: "The conqueror",
-          text: (r: HowtoNumbers) => `Anyone can send an army to take the throne. The conqueror pays the kingdom's value plus a ${r.fee} fee and becomes the new king.`,
+          title: "The Conqueror",
+          text: (r: HowtoNumbers) => `Anyone can send an army to take the throne. The Conqueror pays the kingdom's value plus a ${r.fee} fee and becomes the new king.`,
           alt: "A crimson conqueror points toward the keep as his army marches in and the violet king waits at the wall.",
         },
         {
@@ -164,7 +164,7 @@ export const COPY = {
         },
         {
           title: "The Treasury",
-          text: (r: HowtoNumbers) => `Each time a throne is taken, ${r.cut} of the kingdom's value goes into the Treasury, and every protection adds to it. When the round ends, the last king wins it all.`,
+          text: (r: HowtoNumbers) => `Each time a throne is taken, ${r.cut} of the kingdom's value goes into the Treasury. Every protection is also added to the Treasury. When the round ends, the last king wins it all.`,
           alt: "An overflowing treasure chest with a golden trophy and crown, between a violet banner and a crimson banner, with the keep in the distance.",
         },
       ],
