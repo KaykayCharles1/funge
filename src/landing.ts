@@ -2,8 +2,10 @@
 // is played": a pinned section where scrolling walks through the five moves. Every word comes from COPY.landing, and
 // every rule number from the rule constants. Its one action is Play Now, which opens the battlefield.
 import "./landing.css";
-import { COPY, type HowtoNumbers } from "./copy.ts";
+import { COPY, type HowtoNumbers, type RulesNumbers } from "./copy.ts";
 import { CONFIG } from "./config.ts"; // plain constants only: no wallet, chain or Phaser code comes with it
+// plain constants too (its one import is a type, so no server code comes with it)
+import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
 
 const L = COPY.landing;
 const BATTLE = "/?mode=battlefield";
@@ -146,6 +148,73 @@ const SHIFT_START = 0.55;
 
 // The timeline's node: a small crown
 const crown = () => svg("0 0 24 24", ["M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2 1.8 8z", "M3.5 20.5h17"], { class: "howto__crown" });
+
+// Fair Game Rules: a parchment scroll between two painted rollers, after the battle loop. Only the rules How to Play
+// does not already give. Each rule's number is a Roman numeral drawn by the page; the wax seal at the foot carries
+// the crown. Every number comes from the rule constants.
+const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const span = (seconds: number, one: string, many: string) => `${seconds} ${seconds === 1 ? one : many}`;
+const RULES: RulesNumbers = {
+  clock: String(CLOCK_CAP_SECONDS / 60),
+  add: CONQUEST_ADD_SECONDS % 60 === 0 ? span(CONQUEST_ADD_SECONDS / 60, "minute", "minutes") : span(CONQUEST_ADD_SECONDS, "second", "seconds"),
+  // the three protect amounts are 1x, 5x and 10x the unit (src/lib/kingdom.ts protectAmounts, not imported: it
+  // brings the chain library)
+  amounts: `${pusd(K.unit)}, ${pusd(K.unit * 5n)} or ${pusd(K.unit * 10n)}`,
+  perReign: COUNT_WORDS[K.protectsPerReign] ?? String(K.protectsPerReign),
+  lockout: span(PROTECT_LOCKOUT_SECONDS, "second", "seconds"),
+  cap: pusd(K.cap),
+  back: `${100n - K.cutPercent}%`,
+  fee: `${K.feePercent}%`,
+  claim: KEEPER_DELAY_SECONDS % 60 === 0 ? span(KEEPER_DELAY_SECONDS / 60, "minute", "minutes") : span(KEEPER_DELAY_SECONDS, "second", "seconds"),
+  blocks: String(CONFIG.fallbackBlocks),
+};
+
+// the wax's outline: a disc whose rim swells and dips in eleven soft lobes, as poured wax does
+function waxRim(): string {
+  const pts = Array.from({ length: 88 }, (_, i) => {
+    const a = (i / 88) * Math.PI * 2;
+    const r = 45 + 2.6 * Math.sin(a * 11) + 1.2 * Math.sin(a * 4 + 1);
+    return `${(50 + r * Math.cos(a)).toFixed(1)} ${(50 + r * Math.sin(a)).toFixed(1)}`;
+  });
+  return `M${pts.join("L")}z`;
+}
+
+// the wax seal: a pressed disc of gold wax with a ring and the crown in it
+function seal(): SVGSVGElement {
+  const s = svg("0 0 100 100", [
+    waxRim(),
+    // the pressed ring
+    "M50 20a30 30 0 1 0 0.01 0z",
+  ], { class: "rules__wax" });
+  // the crown, centred in the ring
+  const c = document.createElementNS(SVG, "path");
+  c.setAttribute("d", "M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2 1.8 8z M3.5 20.5h17");
+  c.setAttribute("transform", "translate(29 28) scale(1.75)");
+  c.setAttribute("class", "rules__seal-crown");
+  s.append(c);
+  return s;
+}
+
+function rules(): HTMLElement {
+  const R = L.fairRules;
+  const rod = (end: "top" | "bottom") => h("div", { class: `rules__rod rules__rod--${end}`, "aria-hidden": "true" });
+  return h("section", { class: "rules", id: "rules", "aria-labelledby": "rules-title" },
+    h("div", { class: "rules__scroll" },
+      rod("top"),
+      h("div", { class: "rules__sheet" },
+        h("h2", { class: "rules__title", id: "rules-title" }, R.title),
+        h("ol", { class: "rules__list" },
+          ...R.rules.map((r) => h("li", { class: "rules__rule" },
+            h("h3", {}, r.title(RULES)),
+            h("p", {}, r.text(RULES)),
+          )),
+        ),
+        h("div", { class: "rules__seal" }, seal(), h("p", {}, R.seal)),
+      ),
+      rod("bottom"),
+    ),
+  );
+}
 
 // How to Play. A tall track holds a sticky stage; while the stage is pinned, the scroll position plays the section
 // like the reference clip: the panel grows in, shifts left as the timeline draws in, the steps pass the crown, and the
@@ -636,7 +705,7 @@ document.getElementById("landing")!.append(
   h("main", {},
     howto(),
     battle(),
-    // the "Fair Game Rules" section goes here (later); its rule strings are kept in COPY.landing
+    rules(),
   ),
 );
 rise();
