@@ -1038,7 +1038,7 @@ body {
   position: absolute;
   right: calc(100% + 0.7rem);
   top: 0;
-  color: var(--foil-lo);
+  color: color-mix(in srgb, var(--foil-lo) 80%, var(--logo-navy)); /* gold, deep enough to read on the paper */
 }
 .rules__rule h3 {
   position: relative;
@@ -1086,11 +1086,14 @@ body {
   color: color-mix(in srgb, var(--foil-lo) 70%, var(--logo-navy));
 }
 
-/* phones: one column, thinner rollers */
+/* tablets: one column, centred at a comfortable reading width */
+@media (max-width: 900px) {
+  .rules__list { grid-template-columns: minmax(0, 1fr); max-width: 34rem; margin-inline: auto; }
+}
+/* phones: thinner rollers, the numerals lead the titles */
 @media (max-width: 700px) {
   .rules { --rod-h: 2.25rem; }
   .rules__sheet { margin-inline: calc(var(--rod-h) * 1.4); padding-inline: 1.1rem; }
-  .rules__list { grid-template-columns: minmax(0, 1fr); }
   .rules__rule { padding-left: 0; }
   .rules__rule h3::before { position: static; margin-right: 0.55rem; }
 }
