@@ -162,10 +162,15 @@ async function main() {
     report(csp ? "ok" : "warn", "page security policy", csp ? "present" : "missing (is this a production build?)");
     report(html.includes(serverWs) ? "ok" : "fail", "page may reach the server", html.includes(serverWs) ? serverWs : `the page's policy does not list ${serverWs}: rebuild with VITE_REFEREE_URL=${serverOrigin}`);
     if (!isLocal(server) && html.includes("127.0.0.1")) report("fail", "page points at this computer", "rebuild with VITE_REFEREE_URL");
-    const src = /<script[^>]+src="([^"]+)"/.exec(html)?.[1];
-    if (src) {
-      const js = await (await fetch(new URL(src, `${page}/`), { signal: timeout() })).text();
-      report(js.includes(serverOrigin) ? "ok" : "fail", "page code uses this server", js.includes(serverOrigin) ? "address is built in" : "the built code has another server address");
+    // the game page (/play/) and every script it loads: the server address may sit in a shared chunk
+    const playUrl = new URL("play/", `${page}/`);
+    const play = await (await fetch(playUrl, { signal: timeout() })).text();
+    const scripts = [...play.matchAll(/<(?:script[^>]+src|link[^>]+rel="modulepreload"[^>]+href)="([^"]+)"/g)].map((m) => m[1]!);
+    if (scripts.length === 0) report("fail", "page code uses this server", `no scripts found on ${playUrl}`);
+    else {
+      const js = await Promise.all(scripts.map(async (s) => (await fetch(new URL(s, playUrl), { signal: timeout() })).text()));
+      const built = js.some((t) => t.includes(serverOrigin));
+      report(built ? "ok" : "fail", "page code uses this server", built ? "address is built in" : "the built code has another server address");
     }
     const pg = (await (await fetch(`${page}/game.${CONFIG.network}.kingdom.json`, { signal: timeout() })).json()) as { gameCategory?: string };
     report(pg.gameCategory === game.gameCategory ? "ok" : "fail", "page game file", pg.gameCategory === game.gameCategory ? "same game as this checkout" : "the page serves a different game: rebuild after deploying");
