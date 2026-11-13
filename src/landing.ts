@@ -2,7 +2,7 @@
 // is played": a pinned section where scrolling walks through the five moves. Every word comes from COPY.landing, and
 // every rule number from the rule constants. Its one action is Play Now, which opens the battlefield.
 import "./landing.css";
-import { COPY, type HowtoNumbers, type RulesNumbers } from "./copy.ts";
+import { COPY, type FaqBlock, type FaqNumbers, type HowtoNumbers, type RulesNumbers } from "./copy.ts";
 import { CONFIG } from "./config.ts"; // plain constants only: no wallet, chain or Phaser code comes with it
 // plain constants too (its one import is a type, so no server code comes with it)
 import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
@@ -222,6 +222,36 @@ function rules(): HTMLElement {
 // It counts as arrived once the closed scroll is in the upper half of the screen (so the visitor sees it unroll) and
 // some of it is still below the top 30%; it counts as left once it is all but off screen (a gap between the two, so it never flutters at an edge).
 // Never with reduced motion: the scroll is simply open.
+// The FAQ after the scroll: three groups of questions, each a native disclosure (keyboard and screen readers work as
+// they do everywhere). They share one name, so opening a question closes the one that was open. Every answer is in
+// the page, opened or not; every number comes from the rule constants.
+const FRACTION_WORDS: Record<string, string> = { "10": "a tenth", "20": "a fifth", "25": "a quarter", "50": "half" };
+const FAQ: FaqNumbers = {
+  ...RULES,
+  clockTime: `${CLOCK_CAP_SECONDS / 60}:${String(CLOCK_CAP_SECONDS % 60).padStart(2, "0")}`,
+  addPhrase: CONQUEST_ADD_SECONDS === 60 ? "a minute" : RULES.add,
+  open: pusd(K.openingPrice),
+  example: pusd((K.openingPrice * (100n + K.feePercent)) / 100n),
+  maxConquest: pusd((K.cap * (100n + K.feePercent)) / 100n),
+  lossShare: FRACTION_WORDS[String(K.cutPercent)] ?? `${K.cutPercent}%`,
+};
+const answer = (blocks: FaqBlock[]) =>
+  blocks.map((b) => (typeof b === "string" ? h("p", {}, b) : h("ol", {}, ...b.steps.map((st) => h("li", {}, st)))));
+
+function faq(): HTMLElement {
+  const F = L.faq;
+  return h("section", { class: "faq", id: "faq", "aria-labelledby": "faq-title" },
+    h("h2", { class: "faq__title", id: "faq-title" }, F.title),
+    ...F.groups.map((g) => h("div", { class: "faq__group" },
+      h("h3", { class: "faq__group-title" }, g.title),
+      ...g.items.map((it) => h("details", { class: "faq__item", name: "faq" },
+        h("summary", {}, h("span", { class: "faq__q" }, it.q), h("span", { class: "faq__mark", "aria-hidden": "true" })),
+        h("div", { class: "faq__a" }, ...answer(it.a(FAQ))),
+      )),
+    )),
+  );
+}
+
 const RULES_OPEN_MS = 1900; // the opening, at least
 const RULES_OPEN_MAX_MS = 3000; // and at most
 const RULES_OPEN_MS_PER_PX = 1.6; // per pixel the roller travels
@@ -751,6 +781,7 @@ document.getElementById("landing")!.append(
     howto(),
     battle(),
     rules(),
+    faq(),
   ),
 );
 rise();

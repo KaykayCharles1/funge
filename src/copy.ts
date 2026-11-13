@@ -15,6 +15,17 @@ export type RulesNumbers = {
   claim: string; // "2 minutes"
   blocks: string; // "12"
 };
+// The FAQ numbers: the rules' numbers and a few more, already formatted from the rule constants
+export type FaqNumbers = RulesNumbers & {
+  clockTime: string; // "10:00"
+  addPhrase: string; // "a minute"
+  open: string; // "10"
+  example: string; // "10.20" (conquering a kingdom worth the opening price)
+  maxConquest: string; // "51" (conquering a kingdom at its highest value)
+  lossShare: string; // "a tenth" (what a fallen king does not get back of the value)
+};
+// An FAQ answer is a list of blocks: a paragraph, or numbered steps
+export type FaqBlock = string | { steps: string[] };
 
 // Every sentence the player sees from the referee timer. Change the wording here only.
 export const COPY = {
@@ -128,13 +139,91 @@ export const COPY = {
         { title: (_r: RulesNumbers) => "The winner is always paid", text: (r: RulesNumbers) => `If the winner doesn't claim within ${r.claim}, the prize is paid automatically. Even if the Referee goes down, anyone can settle the round after ${r.blocks} blocks, and the last king is still paid.` },
       ],
     },
+    // The FAQ after the scroll: three groups of questions; one answer opens at a time
+    faq: {
+      title: "Frequently Asked Questions",
+      groups: [
+        {
+          title: "The game",
+          items: [
+            {
+              q: "What is Funge?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["Funge is a battle for the throne on Bitcoin Cash. One kingdom, one king, one Treasury. Take the throne by paying what the kingdom is worth, defend it, and be king when the clock runs out to win the whole Treasury and a trophy."],
+            },
+            {
+              q: "How long does a round last?",
+              a: (r: FaqNumbers): FaqBlock[] => [`At least ${r.clock} minutes. The clock starts at ${r.clockTime} when the first king opens the round, and every conquest adds ${r.addPhrase}, never past ${r.clockTime}. A round lasts as long as kings keep fighting. When the clock reaches zero, the last king wins.`],
+            },
+            {
+              q: "What happens to my money if I lose the throne?",
+              a: (r: FaqNumbers): FaqBlock[] => [`You get most of it back. A fallen king gets ${r.back} of the kingdom's value, plus the ${r.fee} fee the conqueror paid. Losing the throne costs you about ${r.lossShare} of what it was worth, and you can always take it back.`],
+            },
+            {
+              q: "Can I play on my phone?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["Yes. Funge runs in your phone's browser, with nothing to install, and the game wallet works there too."],
+            },
+          ],
+        },
+        {
+          title: "Money",
+          items: [
+            {
+              q: "What is PUSD?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["PUSD (ParyonUSD) is a dollar stablecoin on Bitcoin Cash: one PUSD aims to be worth one US dollar. Every PUSD is backed by more than its worth in BCH, and anyone can trade PUSD for a dollar's worth of BCH, which keeps its price close to a dollar. Playing in PUSD means prices and prizes are in dollars, even when BCH's price moves."],
+            },
+            {
+              q: "Where can I get PUSD?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["Swap BCH for PUSD on Cauldron DEX, or, coming soon, right inside Funge with the in-game swap."],
+            },
+            {
+              q: "How much do I need to play?",
+              a: (r: FaqNumbers): FaqBlock[] => [`Opening a round costs ${r.open} PUSD. Conquering costs the kingdom's value plus ${r.fee}, so ${r.example} PUSD for a ${r.open} PUSD kingdom and never more than ${r.maxConquest} PUSD. Protecting costs ${r.amounts} PUSD. You also need a little BCH for network fees; a few cents' worth covers many moves.`],
+            },
+            {
+              q: "How do I get my winnings out?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["The prize is paid straight into the wallet you played with. In the game wallet, press Withdraw, paste the address of any Bitcoin Cash wallet that holds tokens, such as Cashonize or Paytaca, and send."],
+            },
+            {
+              q: "Why Bitcoin Cash?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["Funge needs fast, cheap moves and a Treasury no one can run off with. On Bitcoin Cash a move costs a fraction of a cent, and the Treasury is held by a smart contract that can only pay the last king. PUSD and your trophy live on the same chain."],
+            },
+          ],
+        },
+        {
+          title: "Wallet",
+          items: [
+            {
+              q: "How do I get started?",
+              a: (_r: FaqNumbers): FaqBlock[] => [{ steps: [
+                "Press Play Now and create your Funge game wallet: one tap, nothing to install.",
+                "Write down your 12-word recovery phrase and keep it safe.",
+                "Add PUSD for your moves and a little BCH for network fees.",
+                "Pick your king or queen and take the throne.",
+              ] }],
+            },
+            {
+              q: "What wallets can I use?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["Two kinds. The Funge game wallet lives in the page itself. You create it in one tap, and your moves go through instantly with no approval pop-up, which matters when the clock is close to zero. Or you can connect your own Bitcoin Cash wallet, such as Cashonize or Paytaca, through WizardConnect, and approve each move in it. Approving takes a moment, so a move in the last seconds can arrive too late."],
+            },
+            {
+              q: "Is the in-game wallet safe?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["Your wallet is yours alone. It's created in your browser, and its recovery phrase stays on your device, stored encrypted. Funge's servers never see it and can never move your coins. Set a password and the wallet stays locked until you type it. Without a password it opens by itself on your device, which is easier but means anyone using your browser can play with it. Treat it like a pocket wallet: keep what you play with in it, not your savings."],
+            },
+            {
+              q: "What if I lose my phone or clear my browser?",
+              a: (_r: FaqNumbers): FaqBlock[] => ["The game wallet lives in your browser, so clearing site data or losing the device removes it. Your 12-word recovery phrase is the way back. You can see it any time in the wallet with Back up, then restore it in Funge on any device, or in Cashonize or Paytaca. Without the phrase, nobody can recover the wallet, not even us."],
+            },
+          ],
+        },
+      ],
+    },
     startTitle: "Before you play",
     start: [
       { title: "Open a wallet", text: "Create the game wallet in your browser in one tap, or connect your own wallet through WizardConnect." },
       { title: "Bring PUSD", text: "Fund it with PUSD for your moves and a little BCH for network fees." },
       { title: "Join the battle", text: "Watch the live round, pick your king or queen, and take the throne." },
     ],
-    closing: "Take your righful place as the King of Funge",
+    closing: "Take your rightful place as the King of Funge",
     // How to Play: the pinned section (its title is also the help button's label at the top of the page). The numbers come from the rule constants (src/config.ts).
     howto: {
       title: "How to Play",
