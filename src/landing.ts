@@ -43,18 +43,18 @@ function hero(): HTMLElement {
   const logo = h("a", { class: "top-logo", href: "#top", "aria-label": L.logoAlt },
     h("img", { src: `${ASSETS}landing/funge-logo.webp`, alt: "", width: "708", height: "420" })
   );
-  // top right: a scroll that takes the visitor to the Fair Game Rules, and a question mark that takes them to How to
-  // Play (and plays it); each one's name shows on hover
+  // top right: a question mark that takes the visitor to How to Play (and plays it), then a scroll that takes them to
+  // the Fair Game Rules; each one's name shows on hover
   const cornerButton = (cls: string, href: string, label: string, icon: SVGSVGElement) =>
     h("a", { class: `corner-btn ${cls}`, href, "aria-label": label }, icon, h("span", { class: "corner-btn__tip", "aria-hidden": "true" }, label));
   const stroke = { fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" };
   const corner = h("nav", { class: "corner", "aria-label": L.navLabel },
+    cornerButton("help", "#howto", L.howto.title, svg("0 0 24 24", ["M8.6 9.2a3.4 3.4 0 1 1 4.9 3.05c-.95.47-1.5 1.25-1.5 2.25v.5", "M12 18.4v.1"], { ...stroke, "stroke-width": "2.6" })),
     cornerButton("rules-link", "#rules", L.rulesLink, svg("0 0 24 24", [
       // a scroll: the sheet with two lines of writing, curled at the top left and rolled at the foot
       "M15 12h-5", "M15 8h-5", "M19 17V5a2 2 0 0 0-2-2H4",
       "M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3",
     ], stroke)),
-    cornerButton("help", "#howto", L.howto.title, svg("0 0 24 24", ["M8.6 9.2a3.4 3.4 0 1 1 4.9 3.05c-.95.47-1.5 1.25-1.5 2.25v.5", "M12 18.4v.1"], { ...stroke, "stroke-width": "2.6" })),
   );
   const sky = h("div", { class: "hero__sky" },
     // h("h1", { class: "hero__logo" }, h("img", { src: `${ASSETS}landing/funge-logo.webp`, alt: L.logoAlt, width: "708", height: "420", fetchpriority: "high" })),
