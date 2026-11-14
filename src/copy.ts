@@ -424,7 +424,7 @@ export const COPY = {
     gameWallet: "Game wallet",
     noWallet: "No wallet yet",
     openWallet: "Open the wallet panel",
-    nextRound: "A new round starts when the next game is deployed.",
+    nextRound: "The next round starts in a few minutes. This page reloads by itself.",
     roundDetails: "Round details",
     walletSection: "Wallet",
     actionsLabel: "Your moves",
