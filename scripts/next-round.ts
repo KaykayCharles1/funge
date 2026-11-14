@@ -36,9 +36,16 @@ console.log(`Round ${game.gameCategory.slice(0, 8)}… on ${server}: ${status ??
 const tellWorkflow = (action: string) => process.env.GITHUB_OUTPUT && appendFileSync(process.env.GITHUB_OUTPUT, `action=${action}\n`);
 
 if (status === null) {
-  // The Referee has not loaded this game yet: a redeploy is still running, or it failed and needs another go.
-  console.log("Nothing to do here: the Referee has not loaded this game yet.");
-  tellWorkflow("redeploy");
+  // The Referee has not loaded this game yet. A redeploy may still be running: only ask for another one when the
+  // game file has been on main for more than 5 minutes.
+  const committed = Number(spawnSync("git", ["log", "-1", "--format=%ct", "--", FILE], { encoding: "utf8" }).stdout.trim());
+  const minutes = committed ? (Date.now() / 1000 - committed) / 60 : Infinity;
+  if (minutes > 5) {
+    console.log("The Referee has not loaded this game, and the file is not new: asking Render to redeploy.");
+    tellWorkflow("redeploy");
+  } else {
+    console.log("Nothing to do: the Referee is probably still loading this new game.");
+  }
 } else if (status !== "settled") {
   console.log("Nothing to do: the round is still going.");
 } else if (checkOnly) {

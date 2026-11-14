@@ -31,8 +31,8 @@ async function nextRound(request: Request, env: Env): Promise<Response> {
   };
   const round = await fetch(`${env.REFEREE_URL}/rounds/${game.gameCategory}`);
   const status = round.ok ? ((await round.json()) as { status?: string }).status : null;
-  // settled: the robot deploys the next round. Unknown to the referee: the robot redeploys it.
-  if (status !== "settled" && round.status !== 404) return reply(409, `the round is ${status ?? "unknown"}`);
+  // Only a settled round starts the robot. A round the referee does not know yet is left to the scheduled run.
+  if (status !== "settled") return reply(409, `the round is ${status ?? "not known to the referee yet"}`);
 
   const gh = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${WORKFLOW}/dispatches`, {
     method: "POST",
