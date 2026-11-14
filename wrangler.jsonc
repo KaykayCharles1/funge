@@ -1,0 +1,16 @@
+// Cloudflare Worker for funge.cash: the built site (dist) plus the /next-round route in worker/index.ts.
+// "name" must match the Worker's name in the Cloudflare dashboard. The secret GITHUB_TOKEN is set there, not here.
+{
+  "name": "funge",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-30",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/next-round"]
+  },
+  "vars": {
+    "REFEREE_URL": "https://referee.funge.cash",
+    "GITHUB_REPO": "KaykayCharles1/funge"
+  }
+}

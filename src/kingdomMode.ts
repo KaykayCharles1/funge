@@ -647,6 +647,31 @@ async function loadEnded() {
   }
 }
 
+// A finished round: ask the site to start the next-round robot (worker/index.ts), then reload the page once
+// the new game file is out and the referee knows the new round.
+let nextRoundWatch = false;
+function waitForNextRound() {
+  if (nextRoundWatch) return;
+  nextRoundWatch = true;
+  const ask = () => void fetch(`${import.meta.env.BASE_URL}next-round`, { method: "POST" }).catch(() => {});
+  ask();
+  let checks = 0;
+  const timer = setInterval(async () => {
+    if (++checks % 15 === 0) ask(); // every 5 minutes, in case the first ask did not start it
+    try {
+      const file = `${import.meta.env.BASE_URL}game.${CONFIG.network}.kingdom.json`;
+      const next = (await (await fetch(file, { cache: "no-store" })).json()) as GameKingdom;
+      if (next.gameCategory === game.gameCategory) return;
+      if ((await getRound(next.gameCategory)).ok) {
+        clearInterval(timer);
+        location.reload();
+      }
+    } catch {
+      // try again on the next check
+    }
+  }, 20_000);
+}
+
 async function loadHistory() {
   const res = await getEvents(game.gameCategory, 0);
   if (!res.ok || res.resync) return;
@@ -661,7 +686,10 @@ function applySnapshot(s: RoundSnapshot) {
   watcher?.setSeq(s.lastSeq); // the snapshot already includes every event up to here
   renderAll();
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-  if (s.status === "settled" && !mockActive) void loadEnded();
+  if (s.status === "settled" && !mockActive) {
+    void loadEnded();
+    waitForNextRound();
+  }
 }
 
 // Instant reaction to a pushed event, then the server's snapshot confirms it
