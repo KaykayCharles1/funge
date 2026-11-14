@@ -24,7 +24,7 @@ import { kingdomActExternal, kingdomCancelExternal, kingdomProtectExternal } fro
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
 import { playMockRound } from "./mockRound.ts";
-import { markNextRoundAlmost, nextRoundLine, startNextRoundWait } from "./nextRound.ts";
+import { markNextRoundAlmost, nextRoundLine, resetNextRoundWait, startNextRoundWait } from "./nextRound.ts";
 import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
@@ -648,8 +648,8 @@ async function loadEnded() {
   }
 }
 
-// A finished round: ask the site to start the next-round robot (worker/index.ts), then reload the page once
-// the new game file is out and the referee knows the new round.
+// A finished round: ask the site to start the next-round robot (worker/index.ts), then switch to the new round
+// once the new game file is out and the referee knows it.
 let nextRoundWatch = false;
 function waitForNextRound() {
   if (nextRoundWatch) return;
@@ -657,11 +657,11 @@ function waitForNextRound() {
   startNextRoundWait();
   const showLine = () => ($("endedNext").textContent = nextRoundLine());
   showLine();
-  setInterval(showLine, 1000);
+  const lineTimer = setInterval(showLine, 1000);
   const ask = () => void fetch(`${import.meta.env.BASE_URL}next-round`, { method: "POST" }).catch(() => {});
   ask();
   let checks = 0;
-  const timer = setInterval(async () => {
+  const poll = setInterval(async () => {
     if (++checks % 60 === 0) ask(); // every 5 minutes, in case the first ask did not start it
     try {
       const file = `${import.meta.env.BASE_URL}game.${CONFIG.network}.kingdom.json`;
@@ -669,13 +669,44 @@ function waitForNextRound() {
       if (next.gameCategory === game.gameCategory) return;
       markNextRoundAlmost();
       if ((await getRound(next.gameCategory)).ok) {
-        clearInterval(timer);
-        location.reload();
+        clearInterval(poll);
+        clearInterval(lineTimer);
+        switchToRound(next);
       }
     } catch {
       // try again on the next check
     }
   }, 5_000);
+}
+
+// Show the new round in place: the wallet stays unlocked and connected. Everything tied to the old round is
+// dropped, then the usual first load runs again for the new one (snapshot, history, live socket).
+function switchToRound(next: GameKingdom) {
+  try {
+    watcher?.close();
+    watcher = null;
+    game = next;
+    round = null;
+    lastLive = null;
+    feed.clear();
+    warned.clear();
+    endedShown = endedBusy = false;
+    chain = null;
+    claiming = false;
+    claimNote = fallbackNote = signPrompt = "";
+    note = null;
+    coolUntil = 0;
+    nextRoundWatch = false;
+    resetNextRoundWait();
+    show("ended", false);
+    show("live", true);
+    show("overModal", false);
+    renderAll();
+    kick();
+  } catch (e) {
+    console.error(e);
+    location.reload(); // the old way, if anything above went wrong
+  }
 }
 
 async function loadHistory() {
@@ -686,6 +717,7 @@ async function loadHistory() {
 }
 
 function applySnapshot(s: RoundSnapshot) {
+  if (!mockActive && s.gameId !== game.gameCategory) return; // a late answer about the round before a switch
   round = s;
   emitSceneSnapshot(s, mockActive ? "mock" : "server");
   if (s.kingdom) lastLive = s;
