@@ -6,9 +6,22 @@ TypeScript front end with Tailwind, and an in-browser game wallet. Owner: Charle
 ## Where things stand
 Funge is live on chipnet. The landing page is at https://funge.cash (index.html) and the game at
 https://funge.cash/play/ (play/index.html). The site is a Cloudflare Worker that rebuilds on every push to
-`main`. The referee runs on Render (free plan) at https://referee.funge.cash and only updates when Charles clicks
-Manual Deploy. Background reading: docs/RUNBOOK.md, docs/KINGDOM.md, docs/REFEREE.md, docs/EVENTS.md,
-docs/KNOWN_ISSUES.md. The landing page's design is in DESIGN.md.
+`main` (wrangler.jsonc; worker/index.ts serves dist and adds one route). The referee runs on Render (free plan) at
+https://referee.funge.cash; UptimeRobot keeps it awake.
+
+New rounds are automatic:
+- When a round is settled, the game page POSTs funge.cash/next-round. The Worker checks the referee and, if the
+  round is settled, starts the GitHub workflow .github/workflows/next-round.yml (Cloudflare secret GITHUB_TOKEN).
+- The workflow runs scripts/next-round.ts, which deploys the next round with deploy-kingdom.ts (paid by a separate
+  deploy wallet, GitHub secret FUNGE_DEPLOY_SEED), commits public/game.chipnet.kingdom.json to `main` as
+  github-actions[bot], and calls Render's deploy hook (GitHub secret RENDER_DEPLOY_HOOK) for that commit.
+- The page reloads itself once the new round is live (about 2 to 4 minutes). A 15-minute schedule is a backup.
+- Because the robot commits to `main`, run `git pull` before starting work.
+- Test scripts/next-round.ts with `--check` only: a plain run on a settled round really deploys one.
+- Manual fallback: GitHub, Actions, Next round, Run workflow.
+
+Background reading: docs/RUNBOOK.md, docs/KINGDOM.md, docs/REFEREE.md, docs/EVENTS.md, docs/KNOWN_ISSUES.md.
+The landing page's design is in DESIGN.md.
 
 ## Commands (confirm against package.json)
 - Install: npm install
