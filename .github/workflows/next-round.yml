@@ -48,6 +48,7 @@ jobs:
 
       - name: Tell Render to load the new game
         if: steps.round.outputs.action == 'deployed' || steps.round.outputs.action == 'redeploy'
-        run: curl -fsS -X POST "$HOOK" > /dev/null && echo "Render deploy started."
+        # ref = this exact commit: without it Render may deploy the commit before the robot's push.
+        run: curl -fsS -X POST "$HOOK&ref=$(git rev-parse HEAD)" > /dev/null && echo "Render deploy of $(git rev-parse --short HEAD) started."
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
