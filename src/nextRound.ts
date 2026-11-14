@@ -14,6 +14,12 @@ export function startNextRoundWait(): void {
   if (startedAt === null) startedAt = Date.now();
 }
 
+// The new round is on screen: the next finished round starts a fresh wait
+export function resetNextRoundWait(): void {
+  startedAt = null;
+  almost = false;
+}
+
 // The new game file is out: only the referee is left
 export function markNextRoundAlmost(): void {
   almost = true;
