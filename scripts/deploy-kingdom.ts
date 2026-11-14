@@ -51,6 +51,7 @@ async function main() {
 
   const env = await loadEnv();
   const { provider, tpl, lock, lockHex } = env;
+  console.log("paying wallet:", env.address);
   const pusd = pusdCategory();
   assert.match(pusd, /^[0-9a-f]{64}$/, "pusdCategory in src/config.ts is not set");
 
