@@ -1,0 +1,53 @@
+# The robot: every 15 minutes it asks the Referee whether the round is over. If it is, it deploys the next
+# round (paid by the deploy wallet), commits the new game file to main (Cloudflare rebuilds the site), and
+# calls Render's deploy hook so the Referee loads the new game. Run it by hand from the Actions tab too.
+# Secrets: FUNGE_DEPLOY_SEED (the deploy wallet's seed phrase), RENDER_DEPLOY_HOOK (Render's deploy hook link).
+name: Next round
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never two runs at once: two robots could each deploy a round.
+concurrency:
+  group: next-round
+  cancel-in-progress: false
+
+jobs:
+  next-round:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Check the round, deploy the next one if it is over
+        id: round
+        run: node scripts/next-round.ts https://referee.funge.cash
+        env:
+          FUNGE_DEPLOY_SEED: ${{ secrets.FUNGE_DEPLOY_SEED }}
+
+      - name: Commit the new game file
+        if: steps.round.outputs.action == 'deployed'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898315+github-actions[bot]@users.noreply.github.com"
+          git add public/game.chipnet.kingdom.json
+          git commit -m "Next round: new game file"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Tell Render to load the new game
+        if: steps.round.outputs.action == 'deployed' || steps.round.outputs.action == 'redeploy'
+        run: curl -fsS -X POST "$HOOK" > /dev/null && echo "Render deploy started."
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}

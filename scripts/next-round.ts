@@ -4,7 +4,7 @@
 //   node scripts/next-round.ts --check                (only say what it would do; never deploys)
 // Read-only unless the round is settled. The workflow commits the new file and redeploys the Referee.
 import { spawnSync } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
+import { appendFileSync, readFileSync, rmSync } from "node:fs";
 import { CONFIG } from "../src/config.ts";
 
 const args = process.argv.slice(2);
@@ -32,9 +32,13 @@ const game = JSON.parse(readFileSync(FILE, "utf8")) as { gameCategory: string; r
 const status = await roundStatus(game.gameCategory);
 console.log(`Round ${game.gameCategory.slice(0, 8)}… on ${server}: ${status ?? "not known to the Referee"}`);
 
+// On GitHub, tell the workflow what to do next: "deployed" (commit and redeploy) or "redeploy" (redeploy only).
+const tellWorkflow = (action: string) => process.env.GITHUB_OUTPUT && appendFileSync(process.env.GITHUB_OUTPUT, `action=${action}\n`);
+
 if (status === null) {
-  // The Referee has not loaded this game yet, for example while a redeploy is still running.
-  console.log("Nothing to do: wait for the Referee to load this game.");
+  // The Referee has not loaded this game yet: a redeploy is still running, or it failed and needs another go.
+  console.log("Nothing to do here: the Referee has not loaded this game yet.");
+  tellWorkflow("redeploy");
 } else if (status !== "settled") {
   console.log("Nothing to do: the round is still going.");
 } else if (checkOnly) {
@@ -43,5 +47,6 @@ if (status === null) {
   console.log("The round is over: deploying the next one.");
   rmSync(FILE);
   const run = spawnSync(process.execPath, ["scripts/deploy-kingdom.ts", game.refereePubkey], { stdio: "inherit" });
+  if (run.status === 0) tellWorkflow("deployed");
   process.exit(run.status ?? 1);
 }
