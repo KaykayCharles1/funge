@@ -24,6 +24,7 @@ import { kingdomActExternal, kingdomCancelExternal, kingdomProtectExternal } fro
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
 import { playMockRound } from "./mockRound.ts";
+import { markNextRoundAlmost, nextRoundLine, startNextRoundWait } from "./nextRound.ts";
 import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
@@ -653,15 +654,20 @@ let nextRoundWatch = false;
 function waitForNextRound() {
   if (nextRoundWatch) return;
   nextRoundWatch = true;
+  startNextRoundWait();
+  const showLine = () => ($("endedNext").textContent = nextRoundLine());
+  showLine();
+  setInterval(showLine, 1000);
   const ask = () => void fetch(`${import.meta.env.BASE_URL}next-round`, { method: "POST" }).catch(() => {});
   ask();
   let checks = 0;
   const timer = setInterval(async () => {
-    if (++checks % 15 === 0) ask(); // every 5 minutes, in case the first ask did not start it
+    if (++checks % 60 === 0) ask(); // every 5 minutes, in case the first ask did not start it
     try {
       const file = `${import.meta.env.BASE_URL}game.${CONFIG.network}.kingdom.json`;
       const next = (await (await fetch(file, { cache: "no-store" })).json()) as GameKingdom;
       if (next.gameCategory === game.gameCategory) return;
+      markNextRoundAlmost();
       if ((await getRound(next.gameCategory)).ok) {
         clearInterval(timer);
         location.reload();
@@ -669,7 +675,7 @@ function waitForNextRound() {
     } catch {
       // try again on the next check
     }
-  }, 20_000);
+  }, 5_000);
 }
 
 async function loadHistory() {

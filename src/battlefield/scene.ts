@@ -8,6 +8,7 @@ import { BAND_TOP, C, css, FONT, H, H_COMPACT, Hud, HUD_DEPTH, money, reducedMot
 import { HOUSES } from "./identity.ts";
 import type { House, Identity, Portrait } from "./identity.ts";
 import { COPY } from "../copy.ts";
+import { nextRoundLine } from "../nextRound.ts";
 import { sfx } from "./sound.ts";
 
 const T = COPY.battlefield;
@@ -214,6 +215,7 @@ export class BattlefieldScene extends Phaser.Scene {
   private building: Phaser.GameObjects.Image | null = null;
   private bannerImg: Phaser.GameObjects.Image | null = null;
   private walls: Phaser.GameObjects.Image[] = [];
+  private nextLine: Phaser.GameObjects.Text | null = null; // the finished notice's countdown line
   private flagSpots: [number, number][] = []; // castle flags and the banner, for the banner change glow
   private flags: WavingFlag[] = []; // the waving flags on the field
   private shadows = new Map<Phaser.GameObjects.Image, Phaser.GameObjects.Image>(); // soldier -> its ground shadow
@@ -261,6 +263,10 @@ export class BattlefieldScene extends Phaser.Scene {
       for (const f of this.flags) f.update(time);
       this.wander(time, delta);
       this.syncShadows();
+      if (this.nextLine?.active) {
+        const line = nextRoundLine();
+        if (this.nextLine.text !== line) this.nextLine.setText(line);
+      }
     });
     this.onReady();
 
@@ -293,7 +299,7 @@ export class BattlefieldScene extends Phaser.Scene {
     this.building = this.bannerImg = null;
     if (state.status === "settled" && !king) {
       // Settled, and the server no longer has the round's details: the round is simply finished
-      this.drawNotice(COPY.kingdom.finished, T.nextRound);
+      this.nextLine = this.drawNotice(COPY.kingdom.finished, nextRoundLine());
       return;
     }
     if (state.status === "waiting" || !king) {
@@ -525,7 +531,7 @@ export class BattlefieldScene extends Phaser.Scene {
   }
 
   // A faint keep and a card with a title and a line under it
-  private drawNotice(title: string, detail: string): void {
+  private drawNotice(title: string, detail: string): Phaser.GameObjects.Text {
     const keep = this.add.image(BASE_X, BASE_Y, "keep").setOrigin(0.5, 1).setAlpha(0.3);
     keep.setScale(KEEP_H / keep.height);
     const cw = 560, ch = 140, cx = W / 2 - cw / 2, cy = 430;
@@ -537,6 +543,7 @@ export class BattlefieldScene extends Phaser.Scene {
     const t2 = this.add.text(W / 2, cy + 72, detail, { fontFamily: FONT, fontSize: "20px", color: css(C.gold), align: "center", wordWrap: { width: cw - 40 } })
       .setOrigin(0.5, 0).setDepth(1001);
     this.world.add([keep, g, t1, t2]);
+    return t2;
   }
 
   // ---- Scenes ----

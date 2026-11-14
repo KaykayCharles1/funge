@@ -4,6 +4,7 @@
 // and the referee request. The field itself never moves on a click: scenes play only from events.
 import { COPY, pauseText } from "../copy.ts";
 import type { battlefieldDo, battlefieldPage } from "../kingdomMode.ts";
+import { nextRoundLine } from "../nextRound.ts";
 import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
 import type { Portrait } from "./identity.ts";
@@ -139,7 +140,7 @@ export function mountActionBar(
       reason = v.external ? v.signPrompt : "";
     } else if (r && (v.ended || r.status === "settled")) {
       label = COPY.kingdom.roundOver;
-      reason = T.nextRound;
+      reason = nextRoundLine();
     } else if (!r || !k) {
       label = "…";
     } else if (r.status === "over") {
