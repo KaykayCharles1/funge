@@ -95,7 +95,7 @@ export class Hud {
   private closedMarks: Phaser.GameObjects.Graphics; // over the shields when protect is closed
   private edge: Phaser.GameObjects.Graphics; // red pulse around the field
   private tollRings: Phaser.GameObjects.Arc[]; // sound rings from the bell
-  private added: Phaser.GameObjects.Text; // "+1:00" floating by the bell after a conquest
+  private added: Phaser.GameObjects.Text; // "+0:30" floating by the bell after a conquest
   private addedTween: Phaser.Tweens.Tween | null = null;
   private shieldsShown = { open: false, left: 0 };
   private plateGlow: Phaser.GameObjects.Image;
@@ -350,7 +350,7 @@ export class Hud {
     this.shields.forEach((sh, i) => sh.setAlpha(open && i < left && this.urgency !== 30 && this.urgency !== 10 ? 1 : 0.3));
   }
 
-  // The bell: time left and the ring, whose full circle is the cap (10:00). remainingMs null: no clock running.
+  // The bell: time left and the ring, whose full circle is the cap (5:00). remainingMs null: no clock running.
   setClock(remainingMs: number | null, capMs: number): void {
     const text = remainingMs === null ? "" : clockText(remainingMs);
     if (this.time.text !== text) this.time.setText(text);

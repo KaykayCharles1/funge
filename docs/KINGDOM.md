@@ -5,23 +5,23 @@ Status: built and running on chipnet. The old steal game was retired in K9d and 
 ## Rules
 - **Actions:** open, conquer, protect, settle, plus the existing no-referee settleFallback. No reclaim in v1.
 - **Waiting:** a new game has no king, no pool and no PUSD in it. Nothing can be settled in this state.
-- **Open:** the first player pays OPENING_PRICE (10 PUSD), 100% into the pool, becomes king, value = 10.
+- **Open:** the first player pays OPENING_PRICE (5 PUSD), 100% into the pool, becomes king, value = 5.
 - **Conquer:** pay value + fee. The dethroned king gets value x (1 - CUT) + the fee. The pool gets the rest of the payment. The value does not change. Conquest stays open until the clock reaches zero plus the 1-second grace.
-- **Protect:** king only. Amounts 1, 5 or 10 PUSD, 100% into the pool, raising the stored value. The value never exceeds CAP (50). At most 2 per reign; the counter resets on every conquest. Protect does not reset the clock and is refused in the last 30 seconds before the deadline (a referee rule).
+- **Protect:** king only. Amounts 1, 2 or 5 PUSD, 100% into the pool, raising the stored value. The value never exceeds CAP (50). At most 2 per reign; the counter resets on every conquest. Protect does not reset the clock and is refused in the last 30 seconds before the deadline (a referee rule).
 - **Settle:** the last king takes the whole pool plus the trophy. If only the opener played, the pool goes back to the opener and the page says "No challengers, pool returned".
 - **Cancel round:** the current king only, while the round is open with zero conquests, not paused, and before the deadline (no grace). It is the contract's settle, signed by the referee: the whole pool and the trophy go to the king, so the king gets back everything paid in. The king proves consent with a coin at the king's address as input 2, as for protect. A conquest and a cancel arriving together are decided by the round lock; the loser gets `round_over` (the conquest) or `not_cancellable` (the cancel). There is no other forfeit: a king who does not want to play lets the clock run out.
 - **Take back your throne:** a normal conquest at the normal price. The page shows it to the player whose key is in the previous-king field.
-- **Clock (referee only):** the open starts the clock at CAP (10:00). Every conquest, a take-back too, sets the time left to min(CAP, max(MIN, left + ADD)), with ADD = 1:00 and MIN = 0 (off), where "left" is the time left when the referee records the move (never below 0: a conquest inside the grace gets 1:00). So 10:00 stays 10:00, 9:30 becomes 10:00, 8:00 becomes 9:00, 2:00 becomes 3:00, 0:10 becomes 1:10. Demo preset: CAP 5:00, the same +1:00. Protect changes nothing. Every clock change publishes an event with a reason code.
+- **Clock (referee only):** the open starts the clock at CAP (5:00). Every conquest, a take-back too, adds ADD = 0:30 to the time left, never above CAP. With less than ENDGAME = 1:00 left it adds ENDGAME_ADD = 0:10 instead, never above 1:00. MIN = 0 (off) is a floor no conquest goes below. "Left" is the time left when the referee records the move (never below 0: a conquest inside the grace gets 0:10). So 5:00 stays 5:00, 4:40 becomes 5:00, 3:20 becomes 3:50, 1:00 becomes 1:30, 0:55 becomes 1:00, 0:45 becomes 0:55, 0:10 becomes 0:20. Protect changes nothing. Every clock change publishes an event with a reason code.
 
 ## Deploy-time settings (in the contract)
 | Setting | Value | Notes |
 |---|---|---|
-| OPENING_PRICE | 1000 | base units (10.00 PUSD) |
+| OPENING_PRICE | 500 | base units (5.00 PUSD) |
 | FEE_PERCENT | 2 | whole percent |
 | CUT_PERCENT | 10 | whole percent |
 | CAP | 5000 | base units (50.00 PUSD) |
 | PROTECTS_PER_REIGN | 2 | |
-| UNIT | 100 | base units in 1 PUSD; protect amounts are UNIT, 5 x UNIT, 10 x UNIT |
+| UNIT | 100 | base units in 1 PUSD; protect amounts are UNIT, 2 x UNIT, 5 x UNIT |
 | FALLBACK_BLOCKS | 12 | |
 | WAITING_FALLBACK_BLOCKS | dropped | the waiting state holds no PUSD; the setting no longer exists anywhere in the project |
 
@@ -57,13 +57,14 @@ All amounts are integers in base units.
 
 | Action | Payer pays | Dethroned king | Pool |
 |---|---|---|---|
-| open | 10.00 | none | +10.00 |
+| open | 5.00 | none | +5.00 |
+| conquer at value 5.00 | 5.10 | 4.60 | +0.50 |
 | conquer at value 10.00 | 10.20 | 9.20 | +1.00 |
 | conquer at value 15.00 | 15.30 | 13.80 | +1.50 |
 | conquer, odd value 10.05 (rounding example) | 10.25 | 9.24 | +1.01 |
 | protect +5 | 5.00 | none | +5.00 |
 
-Worked example: A opens (pool 10.00). B conquers: B pays 10.20, A gets 9.20, pool 11.00. C conquers: C pays 10.20, B gets 9.20, pool 12.00. C wins the 12.00 pool, a net +1.80.
+Worked example: A opens (pool 5.00). B conquers: B pays 5.10, A gets 4.60, pool 5.50. C conquers: C pays 5.10, B gets 4.60, pool 6.00. C wins the 6.00 pool, a net +0.90.
 
 Every conquest conserves tokens: what the payer sends out equals what the king and the pool receive.
 

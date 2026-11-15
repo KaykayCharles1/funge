@@ -373,7 +373,7 @@ export async function kingdomCancel(opts: {
   return fail(res.error, errorText(res.error));
 }
 
-// The king pays 1, 5 or 10 PUSD into the pool and raises the kingdom's value. The wallet's PUSD coin is the first wallet
+// The king pays 1, 2 or 5 PUSD into the pool and raises the kingdom's value. The wallet's PUSD coin is the first wallet
 // input (input 2): the contract takes it as proof that the king agreed, because it sits at the king's address.
 export async function kingdomProtect(opts: {
   game: GameKingdom;

@@ -13,13 +13,15 @@ All of these live in config (shared by the app and the server). Names are fixed 
 
 | Name | Default | Meaning |
 |---|---|---|
-| CLOCK_CAP_SECONDS | 600 (demo preset: 300) | The open sets the clock here, and the clock never shows more. |
-| CONQUEST_ADD_SECONDS | 60 | Each conquest sets the time left to min(CAP, max(MIN, left + ADD)). |
+| CLOCK_CAP_SECONDS | 300 | The open sets the clock here, and the clock never shows more. |
+| CONQUEST_ADD_SECONDS | 30 | What a conquest adds to the time left, never above the cap. |
+| CONQUEST_ENDGAME_SECONDS | 60 | With less than this left, a conquest adds CONQUEST_ENDGAME_ADD_SECONDS instead, never above this. 0 = off. |
+| CONQUEST_ENDGAME_ADD_SECONDS | 10 | What a conquest adds in the endgame. |
 | CONQUEST_MIN_SECONDS | 0 (off) | A conquest never leaves less than this on the clock. |
-| Clock preset (`CLOCK_PRESETS`) | standard | `standard` (cap 10:00) or `demo` (cap 5:00), both +1:00 per conquest and minimum off. Chosen at server start with `FUNGE_BELL_PRESET` (the old name is kept so existing setups keep working). |
+| `CLOCK_SETTINGS` | | The one clock setting the server uses. There are no presets; the old `FUNGE_BELL_PRESET` is ignored if still set. |
 | PROTECT_LOCKOUT_SECONDS | 30 | Protect is refused in the last 30 seconds before the deadline. Conquest is never affected. |
 | GRACE_SECONDS | 1 | Lateness tolerated for a move that arrives just after the deadline. |
-| KEEPER_DELAY_SECONDS | 120 | After a round is over, how long the king has to press Claim before the server settles automatically. |
+| KEEPER_DELAY_SECONDS | 30 | After a round is over, how long the king has to press Claim before the server settles automatically. |
 | FALLBACK_BLOCKS | 12 | Deploy-time contract setting (default in config). After this many blocks with no action, anyone can settle without the referee. Sized so it cannot realistically fire while a live round's clock is still running. |
 | UNCONFIRMED_CAP | 40 | How many unconfirmed moves can be chained before the server pauses the round (the node's limit is higher; this keeps a margin). |
 | REFEREE_PUBKEY | per game | Stored in the game file and baked into the state contract. |
@@ -46,14 +48,14 @@ Funge referee. An optional public audit trail is described under "Later, optiona
 - **waiting:** the game is deployed and nobody has opened it. There is **no deadline and no countdown**, and no PUSD in the game.
   The app shows "Waiting for the first player". The referee signs `open` only.
 - **open:** counting down. The open moves a round from waiting to open and sets the clock to the cap.
-  Each conquest sets the time left to min(CAP, max(MIN, left + ADD)) (10:00 → 10:00, 9:30 → 10:00, 8:00 → 9:00, 2:00 → 3:00, 0:10 → 1:10). Protect changes nothing.
+  Each conquest adds 0:30, never above the cap; under 1:00 left it adds 0:10, never above 1:00 (5:00 → 5:00, 4:40 → 5:00, 3:20 → 3:50, 1:00 → 1:30, 0:55 → 1:00, 0:10 → 0:20). Protect changes nothing.
 - **over:** the deadline plus the grace has passed. The app shows "Round is over" to everyone and only the king
   sees Claim.
 - **settled:** the pool has been paid out.
 - **paused:** a flag on an open round (see below), not a separate state.
 
 ### If only the opener plays
-The opener is the king, so when the clock runs out the pool (their own 10.00) goes back to them and the page says
+The opener is the king, so when the clock runs out the pool (their own 5.00) goes back to them and the page says
 "No challengers, pool returned". Nobody else can ever receive it. The server settles it by itself after the keeper delay.
 
 ### If nobody ever opens
@@ -71,8 +73,8 @@ dust in the two contracts.
    transaction itself and replies with the transaction id, or a typed error: `too_late`, `state_changed`,
    `round_over`, `invalid`, and for Kingdom rules `not_open`, `protect_locked`, `already_king`, `walls_at_maximum`, `no_protects_left`, `not_king`, `not_cancellable`, and for player profiles `bad_name`, `name_taken`, `avatar_taken`.
 5. Only on success, still under the lock: for an open the deadline becomes now + the cap. For a conquest the server measures the time left at this
-   instant and the deadline becomes now + min(CAP, max(MIN, left + ADD)): in effect the old deadline + 1:00, at most the cap from now, and 1:00 from now if the
-   move landed inside the grace. Slow checks or a slow wallet neither add nor take time. A protect leaves the deadline alone. An event is pushed to every
+   instant and the deadline becomes now + the clock rule's result (src/lib/kingdomClock.ts): in effect the old deadline + 0:30 (+0:10 under 1:00 left),
+   at most the cap (1:00 in the endgame) from now, and 0:10 from now if the move landed inside the grace. Slow checks or a slow wallet neither add nor take time. A protect leaves the deadline alone. An event is pushed to every
    connected player.
 
 ## Which action is it?

@@ -17,7 +17,7 @@ A note on words: the project says "pool" in the interface and in the other docs.
 
 ## The scene fields (in `data` of every event)
 
-These are the kingdom as it stands **after** the event. Money is always a string of integer base units (2 decimals: `"1000"` is 10.00 PUSD). Keys are 40-character hex key hashes.
+These are the kingdom as it stands **after** the event. Money is always a string of integer base units (2 decimals: `"500"` is 5.00 PUSD). Keys are 40-character hex key hashes.
 
 | Field | Meaning |
 |---|---|
@@ -30,12 +30,12 @@ These are the kingdom as it stands **after** the event. Money is always a string
 | `protectsLeft` | Protects the king may still use this reign. |
 | `deadline` | When the clock runs out, server time in ms (`null` before the open). |
 | `clockSeconds` | Seconds on the clock right after the latest open or conquest (the open: the cap; a conquest: what the rule below gave). `null` before the open. |
-| `clockCapSeconds` | The most time the clock can show. The open starts here. Standard 600, demo 300. |
-| `conquestAddSeconds` | What a conquest adds to the time left (60). |
+| `clockCapSeconds` | The most time the clock can show. The open starts here (300). |
+| `conquestAddSeconds` | What a conquest adds to the time left (30). Under 1:00 left the referee adds 0:10 instead, up to 1:00 (src/refereeParams.ts; not an event field). |
 | `conquestMinSeconds` | A conquest never leaves less than this on the clock. `0` means off (the setting today). |
 | `nextClockSeconds` | **Deprecated**, kept for older pages: what a conquest made at the moment of this event would set the clock to. It goes stale as the clock runs; compute from `deadline` and the three settings above instead. |
 
-**The clock rule.** The open sets the clock to `clockCapSeconds`. Every conquest (a take-back too) sets the time left to `min(cap, max(min, left + add))`, where `left` is the time left at the instant the referee records the move (never below 0, so a conquest inside the one-second grace gets `add` from that moment). Protect never changes the clock. Examples with the standard settings: 10:00 left stays 10:00, 9:30 becomes 10:00, 8:00 becomes 9:00, 2:00 becomes 3:00, 0:10 becomes 1:10.
+**The clock rule.** The open sets the clock to `clockCapSeconds`. Every conquest (a take-back too) adds `conquestAddSeconds` to the time left, never above the cap; with less than 1:00 left it adds 0:10 instead, never above 1:00; and never less than `conquestMinSeconds`. `left` is the time left at the instant the referee records the move (never below 0, so a conquest inside the one-second grace gets 0:10 from that moment). Protect never changes the clock. Examples: 5:00 left stays 5:00, 4:40 becomes 5:00, 3:20 becomes 3:50, 1:00 becomes 1:30, 0:55 becomes 1:00, 0:10 becomes 0:20.
 
 ## The move fields (added to `deadline_changed` open/conquer and `protect_applied`)
 
@@ -61,26 +61,26 @@ The first player opened the round. Status goes `waiting` → `open`; the clock s
   "seq": 1, "roundId": "00…00", "at": 1780000002000, "type": "deadline_changed", "reason": "open",
   "data": {
     "king": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1", "previousKing": null, "passCount": 1, "conquests": 0,
-    "value": "1000", "treasury": "1000", "protectsLeft": 2, "deadline": 1780000602000,
-    "clockSeconds": 600, "nextClockSeconds": 600,
-    "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0, "action": "open",
+    "value": "500", "treasury": "500", "protectsLeft": 2, "deadline": 1780000302000,
+    "clockSeconds": 300, "nextClockSeconds": 300,
+    "clockCapSeconds": 300, "conquestAddSeconds": 30, "conquestMinSeconds": 0, "action": "open",
     "txid": "00…01", "actor": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-    "paid": "1000", "refunded": "0", "toTreasury": "1000"
+    "paid": "500", "refunded": "0", "toTreasury": "500"
   }
 }
 ```
 
 ### `deadline_changed`, reason `conquer`
-Someone took the throne. The clock gets `conquestAddSeconds` on top of the time left, at most the cap (the rule above). In this example Bob conquered 5 s after the open, with 9:55 left: 9:55 + 1:00 would be 10:55, so the cap cuts it to 10:00 and `addedSeconds` is 5. The dethroned king is `previousKing`; `refunded` is what they received.
+Someone took the throne. The clock gets `conquestAddSeconds` on top of the time left, at most the cap (the rule above). In this example Bob conquered 5 s after the open, with 4:55 left: 4:55 + 0:30 would be 5:25, so the cap cuts it to 5:00 and `addedSeconds` is 5. The dethroned king is `previousKing`; `refunded` is what they received.
 
 ```json
 {
   "seq": 3, "roundId": "00…00", "at": 1780000007000, "type": "deadline_changed", "reason": "conquer",
   "data": {
     "king": "b2b2…b2b2", "previousKing": "a1a1…a1a1", "passCount": 2, "conquests": 1,
-    "value": "1500", "treasury": "1650", "protectsLeft": 2, "deadline": 1780000607000,
-    "clockSeconds": 600, "nextClockSeconds": 600, "clockCapSeconds": 600, "conquestAddSeconds": 60, "conquestMinSeconds": 0,
-    "action": "conquer", "txid": "00…03", "actor": "b2b2…b2b2", "paid": "1530", "refunded": "1380", "toTreasury": "150",
+    "value": "1000", "treasury": "1100", "protectsLeft": 2, "deadline": 1780000307000,
+    "clockSeconds": 300, "nextClockSeconds": 300, "clockCapSeconds": 300, "conquestAddSeconds": 30, "conquestMinSeconds": 0,
+    "action": "conquer", "txid": "00…03", "actor": "b2b2…b2b2", "paid": "1020", "refunded": "920", "toTreasury": "100",
     "addedSeconds": 5
   }
 }

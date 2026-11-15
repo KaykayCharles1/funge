@@ -7,7 +7,7 @@ import potJson from "../contracts/FungePot.json";
 import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { CONFIG } from "./config.ts";
-import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS } from "./refereeParams.ts";
+import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS, CONQUEST_ENDGAME_SECONDS } from "./refereeParams.ts";
 import { COPY, errorText, pauseText } from "./copy.ts";
 import { findEndedKingdom } from "./endedKingdom.ts";
 import type { EndedKingdom } from "./endedKingdom.ts";
@@ -208,7 +208,10 @@ function renderClock() {
     } else {
       title = COPY.kingdom.running;
       const ks = r.kingdom ?? null;
-      detail = COPY.kingdom.runningDetail(mmss(ks?.conquestAddSeconds ?? CONQUEST_ADD_SECONDS), mmss(ks?.clockCapSeconds ?? CLOCK_CAP_SECONDS));
+      detail = COPY.kingdom.runningDetail(
+        mmss(ks?.conquestAddSeconds ?? CONQUEST_ADD_SECONDS), mmss(ks?.clockCapSeconds ?? CLOCK_CAP_SECONDS),
+        mmss(CONQUEST_ENDGAME_ADD_SECONDS), mmss(CONQUEST_ENDGAME_SECONDS),
+      );
       text = fmtClock(rem);
       urgent = rem < 30_000;
     }

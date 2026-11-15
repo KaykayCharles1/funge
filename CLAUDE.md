@@ -15,7 +15,7 @@ New rounds are automatic:
 - The workflow runs scripts/next-round.ts, which deploys the next round with deploy-kingdom.ts (paid by a separate
   deploy wallet, GitHub secret FUNGE_DEPLOY_SEED), commits public/game.chipnet.kingdom.json to `main` as
   github-actions[bot], and calls Render's deploy hook (GitHub secret RENDER_DEPLOY_HOOK) for that commit.
-- The page reloads itself once the new round is live (about 2 to 4 minutes). A 15-minute schedule is a backup.
+- The page switches to the new round by itself, without a reload, once it is live (about 1:30). A 15-minute schedule is a backup.
 - Because the robot commits to `main`, run `git pull` before starting work.
 - Test scripts/next-round.ts with `--check` only: a plain run on a settled round really deploys one.
 - Manual fallback: GitHub, Actions, Next round, Run workflow.

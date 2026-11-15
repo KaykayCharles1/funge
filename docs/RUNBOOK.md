@@ -16,7 +16,7 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 
 ## Before going live (once)
 1. Finish every test with a throwaway game. The chaos scripts and tests act on whatever game is in `public/`, so never run them against the real game.
-2. Rehearse on the real hosts: deploy a throwaway game, start the server with `FUNGE_KEEPER_DELAY_SECONDS=60 FUNGE_BELL_PRESET=demo`, build the page for the real server address, and play a full round from two devices (game wallet and WizardConnect): open, conquer, protect, take back the throne, claim.
+2. Rehearse on the real hosts: deploy a throwaway game, start the server with `FUNGE_KEEPER_DELAY_SECONDS=20`, build the page for the real server address, and play a full round from two devices (game wallet and WizardConnect): open, conquer, protect, take back the throne, claim.
 3. Deploy the real game, last:
    - stop the server;
    - `rm public/game.<network>.kingdom.json`, then `node scripts/deploy-kingdom.ts <referee public key>` (default fallback 12 blocks; never set `FUNGE_FALLBACK_BLOCKS` for it). It needs no PUSD: the round starts waiting and the first player's open puts the first PUSD in;
@@ -29,7 +29,7 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 ## Server host settings
 - Start: `npm ci` then `npm run server`. Node 24.
 - `FUNGE_HOST=0.0.0.0`, `FUNGE_ALLOWED_ORIGINS=https://<page>`, `FUNGE_TRUST_PROXY=1`, `REFEREE_KEY_<NETWORK>=<key>`, `FUNGE_DATA_DIR=<persistent disk folder>`.
-- Do not set `FUNGE_KEEPER_DELAY_SECONDS` or `FUNGE_UNCONFIRMED_CAP` for the real round. `FUNGE_BELL_PRESET` is `standard` (10:00 cap) unless you mean to run the 5:00 demo clock.
+- Do not set `FUNGE_KEEPER_DELAY_SECONDS` or `FUNGE_UNCONFIRMED_CAP` for the real round. The clock has one setting (5:00, src/refereeParams.ts); `FUNGE_BELL_PRESET` is no longer read.
 - Health check path: `/health`. Restart automatically if it crashes (restart is safe: downtime counts as a pause).
 - The data folder must survive restarts. If it is lost, a round that already has moves gets a fresh clock from the chain's state (a full clock: the cap), and no one loses a payout.
 
@@ -37,7 +37,7 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 - **A day before:** preflight; check the host's clock is synced; fund the demo wallets with PUSD and a little BCH; read the server log for errors.
 - **An hour before:** preflight again; one round on the throwaway stack if you changed anything; open the page on the device you will present from; have the backup server's details ready.
 - **During:** keep the server log and the page open side by side. A move that is refused as "too late", or a protect refused in the last 30 seconds, is the rule working, not a fault.
-- **After:** let the round end. The winner presses Claim, or the server settles about two minutes after the deadline. Save the settlement transaction id and a screenshot.
+- **After:** let the round end. The winner presses Claim, or the server settles about 30 seconds after the deadline. Save the settlement transaction id and a screenshot.
 
 ## When something breaks
 | What you see | Likely cause | Do this |
@@ -68,4 +68,4 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 - Generate the mainnet referee key on the production host only, never on a development machine.
 - Set `network` to mainnet in `src/config.ts`, fill in the real PUSD category (and check its decimals), choose a mainnet Electrum server list, and rebuild.
 - The server refuses test timers and chipnet keys on mainnet; do not look for ways around that.
-- Start with a rehearsal at small stakes (the opening price is 10.00 PUSD). The game wallet shows a small-stakes banner on mainnet.
+- Start with a rehearsal at small stakes (the opening price is 5.00 PUSD). The game wallet shows a small-stakes banner on mainnet.

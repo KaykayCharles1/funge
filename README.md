@@ -1,6 +1,6 @@
 # Funge
 
-Funge is a king-of-the-hill game on Bitcoin Cash. One throne, one shared pool of PUSD. Pay to conquer the throne: the king you dethrone is paid back most of what their throne was worth, and a small share goes into the pool. When the clock runs out, the last king takes the whole pool and a trophy NFT. Every conquest adds a minute to the clock, up to 10:00.
+Funge is a king-of-the-hill game on Bitcoin Cash. One throne, one shared pool of PUSD. Pay to conquer the throne: the king you dethrone is paid back most of what their throne was worth, and a small share goes into the pool. When the clock runs out, the last king takes the whole pool and a trophy NFT. Every conquest adds 30 seconds to the clock, up to 5:00 (10 seconds, up to 1:00, when under a minute is left).
 
 Built for the BCH BLAZE 2026 hackathon. It currently runs on chipnet (test coins); a mainnet round comes later.
 
@@ -8,9 +8,9 @@ Built for the BCH BLAZE 2026 hackathon. It currently runs on chipnet (test coins
 - **State contract** (`contracts/FungeKingdom.cash`) holds the throne as an NFT. Its 40-byte commitment stores the pass count, the king, the throne's value, the protects used this reign and a short mark of the previous king. It enforces every payment: open, conquer, protect and settle.
 - **Pot contract** (`contracts/FungePot.cash`) holds the PUSD pool. It can only be spent in a transaction that also spends the throne.
 - **The referee** is the Funge game server. It runs the round clock and signs moves that arrive before the deadline (plus one second of grace). The contract requires its signature to open, conquer, protect and settle early. The referee decides *when*, never *who gets paid*: the contract always pays the last king. See `docs/REFEREE.md`.
-- **Money:** the full rules and worked examples are in `docs/KINGDOM.md`. In short: open pays 10.00 PUSD into the pool; a conquest costs the throne's value plus 2%; the dethroned king gets 90% of the value plus the 2%; the pool gets the rest; the king can protect (add 1, 5 or 10 PUSD to the value, at most twice per reign, up to a cap of 50.00) but not in the last 30 seconds.
-- **Clock:** 10:00 at the open. Every conquest adds 1:00 to the time left, never above 10:00 (so 8:00 becomes 9:00, 0:10 becomes 1:10, 9:30 becomes 10:00). Protect does not touch the clock. The demo setting caps it at 5:00.
-- **Settling:** when time is up, the winner presses Claim. If nobody does, the server settles by itself after two minutes. If the server is gone, anyone can settle after 12 blocks and the last king is paid. A round where only the opener played pays the opener back.
+- **Money:** the full rules and worked examples are in `docs/KINGDOM.md`. In short: open pays 5.00 PUSD into the pool; a conquest costs the throne's value plus 2%; the dethroned king gets 90% of the value plus the 2%; the pool gets the rest; the king can protect (add 1, 2 or 5 PUSD to the value, at most twice per reign, up to a cap of 50.00) but not in the last 30 seconds.
+- **Clock:** 5:00 at the open. Every conquest adds 0:30 to the time left, never above 5:00 (so 3:20 becomes 3:50, 4:40 becomes 5:00). With under 1:00 left it adds 0:10 instead, never above 1:00 (so 0:45 becomes 0:55, 0:55 becomes 1:00). Protect does not touch the clock.
+- **Settling:** when time is up, the winner presses Claim. If nobody does, the server settles by itself after 30 seconds. If the server is gone, anyone can settle after 12 blocks and the last king is paid. A round where only the opener played pays the opener back.
 - **Cancel round:** while nobody has conquered yet, the king may cancel the round and take the whole pool back (the opening price plus any protects). Not after the first conquest, not while the clock is paused, and not once the deadline has passed.
 
 ## Two ways to play
@@ -28,9 +28,9 @@ Needs Node 24 (it runs the TypeScript scripts directly).
     npm run server                                  the referee server, on 127.0.0.1:8787
     npm run dev                                     the landing page on http://localhost:5173, the game on http://localhost:5173/play/
 
-For quick tests, shorten the keeper wait when starting the server, and use the 5:00 demo clock (both refused on mainnet, the keeper wait only):
+For quick tests, shorten the keeper wait when starting the server (refused on mainnet):
 
-    FUNGE_KEEPER_DELAY_SECONDS=60 FUNGE_BELL_PRESET=demo npm run server
+    FUNGE_KEEPER_DELAY_SECONDS=10 npm run server
 
 Config lives in `src/config.ts` (network, prices, servers). `public/game.chipnet.kingdom.json` points the page and the server at the deployed game. The server reads it only at start, so restart the server after every deploy.
 

@@ -5,7 +5,9 @@ import "./landing.css";
 import { COPY, type FaqBlock, type FaqNumbers, type HowtoNumbers, type RulesNumbers } from "./copy.ts";
 import { CONFIG } from "./config.ts"; // plain constants only: no wallet, chain or Phaser code comes with it
 // plain constants too (its one import is a type, so no server code comes with it)
-import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
+import {
+  CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS, CONQUEST_ENDGAME_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS,
+} from "./refereeParams.ts";
 
 const L = COPY.landing;
 const BATTLE = "/play/?mode=battlefield"; // the game page (play/index.html)
@@ -162,9 +164,15 @@ const crown = () => svg("0 0 24 24", ["M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2
 // the crown. Every number comes from the rule constants.
 const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const span = (seconds: number, one: string, many: string) => `${seconds} ${seconds === 1 ? one : many}`;
+// "30 seconds", "2 minutes"
+const duration = (seconds: number) => (seconds % 60 === 0 ? span(seconds / 60, "minute", "minutes") : span(seconds, "second", "seconds"));
+const clockText = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 const RULES: RulesNumbers = {
   clock: String(CLOCK_CAP_SECONDS / 60),
-  add: CONQUEST_ADD_SECONDS % 60 === 0 ? span(CONQUEST_ADD_SECONDS / 60, "minute", "minutes") : span(CONQUEST_ADD_SECONDS, "second", "seconds"),
+  add: duration(CONQUEST_ADD_SECONDS),
+  endgame: CONQUEST_ENDGAME_SECONDS === 60 ? "a minute" : duration(CONQUEST_ENDGAME_SECONDS),
+  endgameTime: clockText(CONQUEST_ENDGAME_SECONDS),
+  endgameAdd: duration(CONQUEST_ENDGAME_ADD_SECONDS),
   // the three protect amounts are 1x, 2x and 5x the unit (src/lib/kingdom.ts protectAmounts, not imported: it
   // brings the chain library)
   amounts: `${pusd(K.unit)}, ${pusd(K.unit * 2n)} or ${pusd(K.unit * 5n)}`,
@@ -173,7 +181,7 @@ const RULES: RulesNumbers = {
   cap: pusd(K.cap),
   back: `${100n - K.cutPercent}%`,
   fee: `${K.feePercent}%`,
-  claim: KEEPER_DELAY_SECONDS % 60 === 0 ? span(KEEPER_DELAY_SECONDS / 60, "minute", "minutes") : span(KEEPER_DELAY_SECONDS, "second", "seconds"),
+  claim: duration(KEEPER_DELAY_SECONDS),
   blocks: String(CONFIG.fallbackBlocks),
 };
 
@@ -236,7 +244,7 @@ function rules(): HTMLElement {
 const FRACTION_WORDS: Record<string, string> = { "10": "a tenth", "20": "a fifth", "25": "a quarter", "50": "half" };
 const FAQ: FaqNumbers = {
   ...RULES,
-  clockTime: `${CLOCK_CAP_SECONDS / 60}:${String(CLOCK_CAP_SECONDS % 60).padStart(2, "0")}`,
+  clockTime: clockText(CLOCK_CAP_SECONDS),
   addPhrase: (CONQUEST_ADD_SECONDS as number) === 60 ? "a minute" : RULES.add,
   open: pusd(K.openingPrice),
   example: pusd((K.openingPrice * (100n + K.feePercent)) / 100n),

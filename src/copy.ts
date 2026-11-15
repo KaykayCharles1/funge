@@ -4,23 +4,26 @@ import type { ApiErrorCode } from "./referee/api.ts";
 export type HowtoNumbers = { open: string; fee: string; cut: string };
 // The Fair Game Rules numbers, already formatted from the rule constants (src/config.ts, src/refereeParams.ts)
 export type RulesNumbers = {
-  clock: string; // "10" (minutes)
-  add: string; // "1 minute"
-  amounts: string; // "1, 5 or 10"
+  clock: string; // "5" (minutes)
+  add: string; // "30 seconds"
+  endgame: string; // "a minute": below this much time left, a conquest adds less
+  endgameTime: string; // "1:00": the most the clock shows after such a conquest
+  endgameAdd: string; // "10 seconds"
+  amounts: string; // "1, 2 or 5"
   perReign: string; // "two"
   lockout: string; // "30 seconds"
   cap: string; // "50"
   back: string; // "90%"
   fee: string; // "2%"
-  claim: string; // "2 minutes"
+  claim: string; // "30 seconds"
   blocks: string; // "12"
 };
 // The FAQ numbers: the rules' numbers and a few more, already formatted from the rule constants
 export type FaqNumbers = RulesNumbers & {
-  clockTime: string; // "10:00"
-  addPhrase: string; // "a minute"
-  open: string; // "10"
-  example: string; // "10.20" (conquering a kingdom worth the opening price)
+  clockTime: string; // "5:00"
+  addPhrase: string; // "30 seconds" ("a minute" when it is exactly one)
+  open: string; // "5"
+  example: string; // "5.10" (conquering a kingdom worth the opening price)
   maxConquest: string; // "51" (conquering a kingdom at its highest value)
   lossShare: string; // "a tenth" (what a fallen king does not get back of the value)
 };
@@ -54,7 +57,7 @@ export const COPY = {
   },
   over: {
     title: "Round is over",
-    auto: "The pool is paid out automatically in a few minutes at the latest.",
+    auto: "The pool is paid out automatically within a minute or so.",
     unlockHint: "If you are the winner, unlock your game wallet to claim right away.",
   },
   claim: {
@@ -117,7 +120,7 @@ export const COPY = {
     shotAlt: "A round on the battlefield: King Satoshi's violet army holds the castle, King Blaze's crimson army takes it, and King Satoshi takes it back.",
     specs: [
       { icon: "shield", label: "Four houses" },
-      { icon: "bell", label: "A 10:00 clock" },
+      { icon: "bell", label: "A 5:00 clock" },
       { icon: "coin", label: "One PUSD Treasury" },
     ],
     specsLabel: "What is in the box",
@@ -129,7 +132,7 @@ export const COPY = {
       seal: "Sealed by the contract",
       // each title and text gets the numbers; a rule that shows none simply ignores them
       rules: [
-        { title: (_r: RulesNumbers) => "The clock", text: (r: RulesNumbers) => `A round starts with ${r.clock} minutes on the clock. Every conquest adds ${r.add}, but never past ${r.clock}.` },
+        { title: (_r: RulesNumbers) => "The clock", text: (r: RulesNumbers) => `A round starts with ${r.clock} minutes on the clock. Every conquest adds ${r.add}, but never past ${r.clock} minutes. With under ${r.endgame} left, a conquest adds only ${r.endgameAdd}, and never past ${r.endgameTime}.` },
         { title: (_r: RulesNumbers) => "Protect amounts", text: (r: RulesNumbers) => `A king protects with ${r.amounts} PUSD, never any other amount.` },
         { title: (r: RulesNumbers) => `${r.perReign[0]!.toUpperCase()}${r.perReign.slice(1)} protects per reign`, text: (r: RulesNumbers) => `Every new reign starts with ${r.perReign} fresh protects, even for a king who reclaimed his throne.` },
         { title: (r: RulesNumbers) => `No protecting in the last ${r.lockout}`, text: (_r: RulesNumbers) => "The final moments belong to the challengers." },
@@ -154,7 +157,7 @@ export const COPY = {
             },
             {
               q: "How long does a round last?",
-              a: (r: FaqNumbers): FaqBlock[] => [`At least ${r.clock} minutes. The clock starts at ${r.clockTime} when the first king opens the round, and every conquest adds ${r.addPhrase}, never past ${r.clockTime}. A round lasts as long as kings keep fighting. When the clock reaches zero, the last king wins.`],
+              a: (r: FaqNumbers): FaqBlock[] => [`At least ${r.clock} minutes. The clock starts at ${r.clockTime} when the first king opens the round, and every conquest adds ${r.addPhrase}, never past ${r.clockTime}. With under ${r.endgame} left, a conquest adds only ${r.endgameAdd}, never past ${r.endgameTime}. A round lasts as long as kings keep fighting. When the clock reaches zero, the last king wins.`],
             },
             {
               q: "What happens to my money if I lose the throne?",
@@ -275,7 +278,8 @@ export const COPY = {
     waiting: "Waiting for the first king",
     waitingDetail: "The clock starts when someone opens the kingdom.",
     running: "Time left",
-    runningDetail: (add: string, cap: string) => `Every conquest adds ${add} to the clock, up to ${cap}. A protect does not change it.`,
+    runningDetail: (add: string, cap: string, endgameAdd: string, endgame: string) =>
+      `Every conquest adds ${add} to the clock, up to ${cap}. Under ${endgame} left, it adds only ${endgameAdd}, up to ${endgame}. A protect does not change it.`,
     over: "Time is up",
     overDetail: "The last king wins the pool.",
     finished: "This round is finished.",
