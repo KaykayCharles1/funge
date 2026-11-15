@@ -2,6 +2,7 @@
 // it deploys the next one with the same referee key, which rewrites that file. Otherwise it does nothing.
 //   node scripts/next-round.ts [<server address>]     (default https://referee.funge.cash)
 //   node scripts/next-round.ts --check                (only say what it would do; never deploys)
+//   node scripts/next-round.ts --replace-unopened     (also replace a round nobody has opened: after a rule change)
 // Read-only unless the round is settled. The workflow commits the new file and redeploys the Referee.
 import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync, rmSync } from "node:fs";
@@ -9,6 +10,7 @@ import { CONFIG } from "../src/config.ts";
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
+const replaceUnopened = args.includes("--replace-unopened");
 const server = (args.find((a) => !a.startsWith("--")) ?? "https://referee.funge.cash").replace(/\/$/, "");
 const FILE = `public/game.${CONFIG.network}.kingdom.json`;
 
@@ -46,12 +48,12 @@ if (status === null) {
   } else {
     console.log("Nothing to do: the Referee is probably still loading this new game.");
   }
-} else if (status !== "settled") {
+} else if (status !== "settled" && !(replaceUnopened && status === "waiting")) {
   console.log("Nothing to do: the round is still going.");
 } else if (checkOnly) {
-  console.log("The round is over: without --check, this would deploy the next one.");
+  console.log(`The round is ${status === "waiting" ? "unopened" : "over"}: without --check, this would deploy the next one.`);
 } else {
-  console.log("The round is over: deploying the next one.");
+  console.log(`The round is ${status === "waiting" ? "unopened" : "over"}: deploying the next one.`);
   rmSync(FILE);
   const run = spawnSync(process.execPath, ["scripts/deploy-kingdom.ts", game.refereePubkey], { stdio: "inherit" });
   if (run.status === 0) tellWorkflow("deployed");

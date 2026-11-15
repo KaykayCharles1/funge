@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      replace_unopened:
+        description: "Also replace a round nobody has opened (after a rule change)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -35,7 +40,7 @@ jobs:
 
       - name: Check the round, deploy the next one if it is over
         id: round
-        run: node scripts/next-round.ts https://referee.funge.cash
+        run: node scripts/next-round.ts https://referee.funge.cash ${{ inputs.replace_unopened && '--replace-unopened' || '' }}
         env:
           FUNGE_DEPLOY_SEED: ${{ secrets.FUNGE_DEPLOY_SEED }}
 
