@@ -2,7 +2,7 @@ import { CONFIG } from "./config.ts";
 import { clockAfterConquestMs, clockAfterOpenMs, wholeSeconds } from "./lib/kingdomClock.ts";
 import { conquestMoney, protectAmounts } from "./lib/kingdom.ts";
 import type { KingdomSnapshot, RefereeEvent, RoundSnapshot } from "./referee/api.ts";
-import { CLOCK_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
+import { CLOCK_SETTINGS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refereeParams.ts";
 
 // A scripted round for testing the page (and the animation) without a server or chain transactions:
 // open, protect, conquer, the clock warnings, round over. Every step goes through the same two doors a real
@@ -27,7 +27,7 @@ export type MockHooks = {
 };
 
 const P = CONFIG.kingdom;
-const clockSettings = CLOCK_PRESETS.standard;
+const clockSettings = CLOCK_SETTINGS;
 const str = (n: bigint | number) => n.toString();
 const fakeTx = (n: number) => n.toString(16).padStart(64, "0");
 
@@ -107,7 +107,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
   try {
     h.label("Waiting for the first player");
     h.onSnapshot(snapshot());
-    if (!(await step("Alice opens: 10.00 into the treasury", 2000))) return;
+    if (!(await step("Alice opens: 5.00 into the treasury", 2000))) return;
 
     status = "open"; passCount = 1; king = MOCK_KINGS.alice; value = P.openingPrice; treasury = P.openingPrice;
     deadline = h.now() + clockAfterOpenMs(clockSettings);
@@ -128,7 +128,7 @@ export async function playMockRound(h: MockHooks): Promise<void> {
 
     const money = conquestMoney(value, P);
     previous = king; king = MOCK_KINGS.bob; passCount = 2; protectsUsed = 0; treasury += money.poolGets;
-    // The new clock: the time left plus a minute, at most the cap (the same rule as the referee)
+    // The new clock: the same rule as the referee (src/lib/kingdomClock.ts)
     const left = Math.max(0, remaining() ?? 0);
     const ms = clockAfterConquestMs(left, clockSettings);
     deadline = h.now() + ms;

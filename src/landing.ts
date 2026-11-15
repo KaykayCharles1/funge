@@ -237,7 +237,7 @@ const FRACTION_WORDS: Record<string, string> = { "10": "a tenth", "20": "a fifth
 const FAQ: FaqNumbers = {
   ...RULES,
   clockTime: `${CLOCK_CAP_SECONDS / 60}:${String(CLOCK_CAP_SECONDS % 60).padStart(2, "0")}`,
-  addPhrase: CONQUEST_ADD_SECONDS === 60 ? "a minute" : RULES.add,
+  addPhrase: (CONQUEST_ADD_SECONDS as number) === 60 ? "a minute" : RULES.add,
   open: pusd(K.openingPrice),
   example: pusd((K.openingPrice * (100n + K.feePercent)) / 100n),
   maxConquest: pusd((K.cap * (100n + K.feePercent)) / 100n),

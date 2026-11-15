@@ -7,15 +7,15 @@
 import { CONFIG } from "../src/config.ts";
 import { conquestMoney } from "../src/lib/kingdom.ts";
 import { clockAfterConquestMs, clockAfterOpenMs, wholeSeconds } from "../src/lib/kingdomClock.ts";
-import { CLOCK_PRESETS } from "../src/refereeParams.ts";
+import { CLOCK_SETTINGS } from "../src/refereeParams.ts";
 import { SCENARIOS as EXTRA } from "../src/battlefield/mockScenarios.ts";
 import { playMockRound } from "../src/mockRound.ts";
 import type { RefereeEvent, RoundSnapshot } from "../src/referee/api.ts";
 
 const SCENARIOS = [...EXTRA, { id: "mockRound.ts", label: "", play: playMockRound }];
-const CLOCK = CLOCK_PRESETS.standard;
-// The "Clock rule" scenario: conquests at 9:30, 8:00, 2:00 and 0:10 left
-const CLOCK_RULE = { added: [30, 60, 60, 60], clock: [600, 540, 180, 70] };
+const CLOCK = CLOCK_SETTINGS;
+// The "Clock rule" scenario: conquests at 4:40, 3:20, 1:30, 0:55 and 0:10 left
+const CLOCK_RULE = { added: [20, 30, 30, 5, 10], clock: [300, 230, 120, 60, 20] };
 
 const P = CONFIG.kingdom;
 let failures = 0;

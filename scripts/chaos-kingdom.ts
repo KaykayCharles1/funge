@@ -60,7 +60,6 @@ const describe = (r: { ok: boolean; error?: string }) => (r.ok ? "accepted" : `r
 // ---------- the server this script runs ----------
 const childEnv: Record<string, string | undefined> = {
   ...process.env,
-  FUNGE_BELL_PRESET: "demo", // clock capped at 5:00, +1:00 per conquest
   FUNGE_KEEPER_DELAY_SECONDS: "20", // the keeper settles 20 s after time is up
 };
 delete childEnv.SPIKE_MNEMONIC; // the server never needs a seed

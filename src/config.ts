@@ -30,7 +30,7 @@ export const CONFIG = {
 
   // Kingdom (FungeKingdom contract). Deploy-time contract settings, in base units of PUSD (2 decimals).
   kingdom: {
-    openingPrice: 1_000n, // 10.00 PUSD: what the first player pays; it becomes the kingdom's value
+    openingPrice: 500n, // 5.00 PUSD: what the first player pays; it becomes the kingdom's value
     feePercent: 2n, // whole percent of the value, paid on top by the conqueror, goes to the dethroned king
     cutPercent: 10n, // whole percent of the value taken from the dethroned king's share into the pool
     cap: 5_000n, // 50.00 PUSD: the value can never be raised above this

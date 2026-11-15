@@ -26,19 +26,19 @@ for (const e of events) {
   }
 }
 const [open, protect, conquer, over] = events.map((e) => e.data!);
-assert.deepEqual([open!.actor, open!.paid, open!.toTreasury, open!.treasury, open!.clockSeconds], [MOCK_KINGS.alice, "1000", "1000", "1000", 600]);
-assert.deepEqual([protect!.paid, protect!.value, protect!.treasury, protect!.protectsLeft, protect!.deadline], ["500", "1500", "1500", 1, open!.deadline]);
+assert.deepEqual([open!.actor, open!.paid, open!.toTreasury, open!.treasury, open!.clockSeconds], [MOCK_KINGS.alice, "500", "500", "500", 300]);
+assert.deepEqual([protect!.paid, protect!.value, protect!.treasury, protect!.protectsLeft, protect!.deadline], ["500", "1000", "1000", 1, open!.deadline]);
 assert.deepEqual(
   [conquer!.actor, conquer!.previousKing, conquer!.paid, conquer!.refunded, conquer!.toTreasury, conquer!.treasury, conquer!.conquests, conquer!.clockSeconds, conquer!.addedSeconds, conquer!.nextClockSeconds],
-  [MOCK_KINGS.bob, MOCK_KINGS.alice, "1530", "1380", "150", "1650", 1, 600, 5, 600], // 5 s after the open: 9:55 + 1:00, cut to the 10:00 cap
+  [MOCK_KINGS.bob, MOCK_KINGS.alice, "1020", "920", "100", "1100", 1, 300, 5, 300], // 5 s after the open: 4:55 + 0:30, cut to the 5:00 cap
 );
-assert.deepEqual([over!.king, over!.treasury], [MOCK_KINGS.bob, "1650"]);
+assert.deepEqual([over!.king, over!.treasury], [MOCK_KINGS.bob, "1100"]);
 assert.equal(snapshots.at(0)!.status, "waiting");
 assert.equal(snapshots.at(-1)!.status, "over");
 assert.equal(snapshots.at(-1)!.kingdom?.holder, MOCK_KINGS.bob);
 assert.equal(snapshots.at(-1)!.lastSeq, 4);
 // each snapshot after a move is the world that move made, and the clock is realistic (not shortened for the test)
-assert.equal(snapshots.find((s) => s.passCount === 2)!.kingdom?.conquest?.pay, "1530");
+assert.equal(snapshots.find((s) => s.passCount === 2)!.kingdom?.conquest?.pay, "1020");
 assert.ok(labels.length >= 6);
 console.log("ok: the mock round plays open, protect, conquer, clock jumps and round over; each event is complete");
 

@@ -7,7 +7,6 @@ assert.equal(dev.host, "127.0.0.1");
 assert.equal(dev.port, 8787);
 assert.ok(dev.allowedOrigins.includes("http://localhost:5173"));
 assert.equal(dev.trustProxy, false);
-assert.equal(dev.bellPreset, "standard");
 
 // a cloud setup
 const cloud = readServerEnv({
@@ -15,10 +14,8 @@ const cloud = readServerEnv({
 });
 assert.deepEqual([cloud.host, cloud.port, cloud.allowedOrigins, cloud.trustProxy], ["0.0.0.0", 8080, ["https://funge.example.com"], true]);
 
-// the Kingdom clock preset
-assert.equal(readServerEnv({ FUNGE_BELL_PRESET: "demo" }).bellPreset, "demo");
-assert.equal(readServerEnv({ FUNGE_BELL_PRESET: " standard " }).bellPreset, "standard");
-assert.throws(() => readServerEnv({ FUNGE_BELL_PRESET: "fast" }), /FUNGE_BELL_PRESET/);
+// the old clock preset variable is ignored, so a host that still sets it keeps starting
+assert.doesNotThrow(() => readServerEnv({ FUNGE_BELL_PRESET: "demo" }));
 
 // unsafe or wrong settings refuse to start
 assert.throws(() => readServerEnv({ FUNGE_HOST: "0.0.0.0" }), /FUNGE_ALLOWED_ORIGINS/);

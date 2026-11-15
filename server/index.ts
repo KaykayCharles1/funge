@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { CONFIG } from "../src/config.ts";
 import { makeProvider } from "../src/lib/provider.ts";
-import { CLOCK_PRESETS, GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS, UNCONFIRMED_CAP } from "../src/refereeParams.ts";
+import { CLOCK_SETTINGS, GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS, UNCONFIRMED_CAP } from "../src/refereeParams.ts";
 import { buildApp } from "./app.ts";
 import { makeChainReader } from "./chain.ts";
 import { systemClock } from "./clock.ts";
@@ -23,7 +23,7 @@ const dataDir = process.env.FUNGE_DATA_DIR ?? fileURLToPath(new URL("./data", im
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 try {
-  const { host, port, allowedOrigins, trustProxy, bellPreset } = readServerEnv(process.env);
+  const { host, port, allowedOrigins, trustProxy } = readServerEnv(process.env);
   const { games, chipnetPubkeys } = loadGames(network);
   const keyring = loadKeyring({ network, games, chipnetPubkeys }); // throws if the key is missing or wrong
   if (network === "mainnet" && (process.env.FUNGE_KEEPER_DELAY_SECONDS || process.env.FUNGE_UNCONFIRMED_CAP)) {
@@ -38,9 +38,9 @@ try {
   if (source === "bak") console.warn("state file was damaged; recovered from backup");
   const manager = new RoundManager(store, systemClock);
   manager.onEvent((id, e) => console.log(`[${id.slice(0, 8)}] event #${e.seq} ${e.type} (${e.reason})`));
-  for (const g of games) manager.setClock(g.gameId, CLOCK_PRESETS[bellPreset]); // before any restart handling or observing
-  const b = CLOCK_PRESETS[bellPreset];
-  console.log(`clock (${bellPreset}): ${b.capSeconds}s at the open and at most, +${b.addSeconds}s per conquest, minimum after a conquest ${b.minSeconds}s`);
+  for (const g of games) manager.setClock(g.gameId, CLOCK_SETTINGS); // before any restart handling or observing
+  const b = CLOCK_SETTINGS;
+  console.log(`clock: ${b.capSeconds}s at the open and at most, +${b.addSeconds}s per conquest; under ${b.endgameSeconds}s left +${b.endgameAddSeconds}s, up to ${b.endgameSeconds}s; minimum after a conquest ${b.minSeconds}s`);
   const loaded = games.map((g) => g.gameId);
   const pruned = manager.pruneSettled(loaded);
   if (pruned > 0) console.log(`removed ${pruned} settled round(s) of games that are no longer loaded`);

@@ -8,10 +8,10 @@ import { conquestMoney, protectAmounts } from "../lib/kingdom.ts";
 import { MOCK_ROUND_ID } from "../mockRound.ts";
 import type { MockHooks } from "../mockRound.ts";
 import type { KingdomSnapshot, RefereeEvent, RoundSnapshot } from "../referee/api.ts";
-import { CLOCK_PRESETS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../refereeParams.ts";
+import { CLOCK_SETTINGS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../refereeParams.ts";
 
 const P = CONFIG.kingdom;
-const clockSettings = CLOCK_PRESETS.standard;
+const clockSettings = CLOCK_SETTINGS;
 const str = (n: bigint | number) => n.toString();
 const fakeTx = (n: number) => n.toString(16).padStart(64, "0");
 const KEYS = ["a1", "b2", "c3", "d4", "e5", "f6"].map((k) => k.repeat(20));
@@ -276,18 +276,18 @@ export const SCENARIOS: Scenario[] = [
     ]),
   },
   {
-    // The clock rule: each conquest adds 1:00 to the time left, at most the 10:00 cap. Each jump and its conquest
-    // happen in the same step, so the time left is exact.
+    // The clock rule: each conquest adds 0:30 to the time left, at most the 5:00 cap; under 1:00 left it adds 0:10,
+    // at most 1:00. Each jump and its conquest happen in the same step, so the time left is exact.
     id: "clock", label: "Clock rule",
     play: (h) => script(h, [
-      ["Open (A): the clock starts at 10:00", 1000, (k) => k.open(A)],
-      ["9:30 left, B conquers: +0:30 (the cap), 10:00", 3000, (k) => { k.jumpTo(570_000); k.conquer(B); }],
-      ["8:00 left, C conquers: +1:00, 9:00", 7000, (k) => { k.jumpTo(480_000); k.conquer(C); }],
-      ["2:00 left, D conquers: +1:00, 3:00", 7000, (k) => { k.jumpTo(120_000); k.conquer(D); }],
+      ["Open (A): the clock starts at 5:00", 1000, (k) => k.open(A)],
+      ["4:40 left, B conquers: +0:20 (the cap), 5:00", 3000, (k) => { k.jumpTo(280_000); k.conquer(B); }],
+      ["3:20 left, C conquers: +0:30, 3:50", 7000, (k) => { k.jumpTo(200_000); k.conquer(C); }],
+      ["1:30 left, D conquers: +0:30, 2:00", 7000, (k) => { k.jumpTo(90_000); k.conquer(D); }],
+      ["0:55 left, E conquers: +0:05 (at most 1:00), 1:00", 7000, (k) => { k.jumpTo(55_000); k.conquer(E); }],
       ["30 seconds: dusk, protect closed", 7000, (k) => k.jumpTo(31_000)],
-      ["0:10 left, E conquers: +1:00, 1:10, day again, protect open", 4500, (k) => { k.jumpTo(10_000); k.conquer(E); }],
-      ["One minute left again: the warnings re-arm", 7000, (k) => k.jumpTo(61_000)],
-      ["30 seconds again: dusk", 4000, (k) => k.jumpTo(31_000)],
+      ["0:10 left, A conquers: +0:10, 0:20, protect still closed", 4500, (k) => { k.jumpTo(10_000); k.conquer(A); }],
+      ["10 seconds: the heartbeat", 4500, (k) => k.jumpTo(11_000)],
     ]),
   },
   {

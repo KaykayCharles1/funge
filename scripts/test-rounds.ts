@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { fakeClock } from "../server/clock.ts";
 import { RoundManager } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
-import { CLOCK_PRESETS, EVENT_HISTORY, GRACE_SECONDS } from "../src/refereeParams.ts";
+import { CLOCK_SETTINGS, EVENT_HISTORY, GRACE_SECONDS } from "../src/refereeParams.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "funge-rounds-"));
-const clockSettings = CLOCK_PRESETS.standard;
+const clockSettings = CLOCK_SETTINGS;
 const RESET = clockSettings.capSeconds * 1000; // the clock the open sets (pass 1): the cap
 const GRACE = GRACE_SECONDS * 1000;
 
@@ -50,16 +50,16 @@ function move(mgr: RoundManager, id: string, passCount = 1) {
   console.log("ok: open until deadline + grace, then over");
 }
 
-// a conquest adds a minute to the time left (8:20 left -> 9:20), and events are numbered
+// a conquest adds 0:30 to the time left (3:20 left -> 3:50), and events are numbered
 {
   const { mgr, clock } = await setup("reset");
   move(mgr, "g", 1);
   clock.advance(100_000);
   move(mgr, "g", 2);
   const r = mgr.get("g");
-  assert.equal(r.deadline, clock.now() + 560_000);
+  assert.equal(r.deadline, clock.now() + 230_000);
   assert.deepEqual(r.events.map((e) => e.seq), [1, 2]);
-  console.log("ok: a conquest adds 1:00 to the time left, events numbered");
+  console.log("ok: a conquest adds 0:30 to the time left, events numbered");
 }
 
 // pause freezes the clock; resume pushes the deadline out by the pause length
@@ -139,7 +139,7 @@ function move(mgr: RoundManager, id: string, passCount = 1) {
   mgr.observe("g", { live: true, passCount: 1 });
   assert.equal(mgr.get("g").events.length, 1); // nothing new
   mgr.observe("g", { live: true, passCount: 2 });
-  assert.equal(mgr.get("g").deadline, clock.now() + 560_000);
+  assert.equal(mgr.get("g").deadline, clock.now() + 230_000);
   assert.equal(mgr.get("g").events.at(-1)?.reason, "observed_on_chain");
   console.log("ok: moves made outside /act follow the clock rule");
 }

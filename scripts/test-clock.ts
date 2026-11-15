@@ -1,4 +1,5 @@
-// The Kingdom clock: the open starts at the cap; each conquest sets the time left to min(CAP, max(MIN, left + ADD)).
+// The Kingdom clock: the open starts at the cap; each conquest adds ADD up to the cap, or under ENDGAME left adds
+// ENDGAME_ADD up to ENDGAME.
 // Also the protect lockout, pauses, restarts and the clock fields on events. Run: node scripts/test-clock.ts
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
@@ -9,12 +10,12 @@ import { RoundManager, classifyKingdomAction } from "../server/rounds.ts";
 import { Store } from "../server/store.ts";
 import { clockAfterConquestMs, clockAfterOpenMs, validateClock, wholeSeconds, type ClockSettings } from "../src/lib/kingdomClock.ts";
 import {
-  CLOCK_CAP_SECONDS, CLOCK_PRESETS, CONQUEST_ADD_SECONDS, CONQUEST_MIN_SECONDS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS,
+  CLOCK_CAP_SECONDS, CLOCK_SETTINGS, CONQUEST_ADD_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS, CONQUEST_ENDGAME_SECONDS, CONQUEST_MIN_SECONDS,
+  GRACE_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS,
 } from "../src/refereeParams.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "funge-clock-"));
-const std = CLOCK_PRESETS.standard;
-const demo = CLOCK_PRESETS.demo;
+const std = CLOCK_SETTINGS;
 const GRACE = GRACE_SECONDS * 1000;
 const LOCK = PROTECT_LOCKOUT_SECONDS * 1000;
 const S = 1000;
@@ -31,47 +32,63 @@ const reasons = (mgr: RoundManager) => mgr.get("k").events.map((e) => e.reason);
 const left = (mgr: RoundManager, now: number) => mgr.get("k").deadline! - now;
 
 // --- the settings are what was decided ---
-assert.deepEqual([CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_MIN_SECONDS], [600, 60, 0]);
-assert.deepEqual(std, { capSeconds: 600, addSeconds: 60, minSeconds: 0 });
-assert.deepEqual(demo, { capSeconds: 300, addSeconds: 60, minSeconds: 0 });
+assert.deepEqual([CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_MIN_SECONDS, CONQUEST_ENDGAME_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS], [300, 30, 0, 60, 10]);
+assert.deepEqual(std, { capSeconds: 300, addSeconds: 30, minSeconds: 0, endgameSeconds: 60, endgameAddSeconds: 10 });
 assert.equal(PROTECT_LOCKOUT_SECONDS, 30);
-console.log("ok: settings (cap 10:00, +1:00 per conquest, minimum off; demo cap 5:00) and the 30 s protect lockout");
+assert.equal(KEEPER_DELAY_SECONDS, 30);
+console.log("ok: settings (cap 5:00, +0:30 per conquest, under 1:00 +0:10 up to 1:00, minimum off), the 30 s protect lockout, the 30 s keeper");
 
 // --- the rule, with every example from the decision (standard) ---
 {
   const after = (leftSeconds: number, s = std) => clockAfterConquestMs(leftSeconds * S, s);
-  const examples: [number, number][] = [[600, 600], [570, 600], [480, 540], [120, 180], [10, 70]];
+  const examples: [number, number][] = [
+    [300, 300], [280, 300], [270, 300], [200, 230], [120, 150], [60, 90], // 1:00 or more: +0:30, at most 5:00
+    [59, 60], [55, 60], [50, 60], [45, 55], [10, 20], // under 1:00: +0:10, at most 1:00
+  ];
   for (const [before, expected] of examples) {
     assert.equal(after(before), expected * S, `${mmss(before * S)} left should become ${mmss(expected * S)}`);
   }
-  assert.equal(after(0), 60 * S); // a conquest inside the grace: nothing left, +1:00
-  assert.equal(after(-0.5), 60 * S); // never below 0
-  assert.equal(clockAfterOpenMs(std), 600 * S);
-  console.log("ok: 10:00 -> 10:00, 9:30 -> 10:00, 8:00 -> 9:00, 2:00 -> 3:00, 0:10 -> 1:10, 0:00 -> 1:00; the open starts at 10:00");
+  assert.equal(after(0), 10 * S); // a conquest inside the grace: nothing left, +0:10
+  assert.equal(after(-0.5), 10 * S); // never below 0
+  assert.equal(clockAfterConquestMs(59_999, std), 60 * S); // a hair under 1:00 is the endgame
+  assert.equal(clockAfterConquestMs(60_000, std), 90 * S); // exactly 1:00 is not
+  assert.equal(clockAfterOpenMs(std), 300 * S);
+  console.log("ok: 4:40 -> 5:00, 3:20 -> 3:50, 1:00 -> 1:30; 0:59 -> 1:00, 0:45 -> 0:55, 0:10 -> 0:20, 0:00 -> 0:10; the open starts at 5:00");
+}
+
+// --- the endgame switched off behaves like a plain +ADD clock ---
+{
+  const plain: ClockSettings = { ...std, endgameSeconds: 0 };
+  assert.equal(clockAfterConquestMs(10 * S, plain), 40 * S);
+  assert.equal(clockAfterConquestMs(0, plain), 30 * S);
+  console.log("ok: endgame 0 (off): 0:10 -> 0:40");
 }
 
 // --- the MIN dial works (proved at 180 s, then left at 0) ---
 {
   const dial: ClockSettings = { ...std, minSeconds: 180 };
   const after = (leftSeconds: number) => clockAfterConquestMs(leftSeconds * S, dial);
-  assert.equal(after(10), 180 * S); // 0:10 + 1:00 = 1:10, raised to the 3:00 minimum
+  assert.equal(after(10), 180 * S); // 0:10 + 0:10 = 0:20, raised to the 3:00 minimum
   assert.equal(after(0), 180 * S);
-  assert.equal(after(119), 180 * S); // 1:59 + 1:00 = 2:59, raised to 3:00
-  assert.equal(after(120), 180 * S); // 2:00 + 1:00 = exactly 3:00
-  assert.equal(after(150), 210 * S); // 2:30 + 1:00 = 3:30, above the minimum: unchanged
-  assert.equal(after(590), 600 * S); // the cap still wins
+  assert.equal(after(149), 180 * S); // 2:29 + 0:30 = 2:59, raised to 3:00
+  assert.equal(after(150), 180 * S); // 2:30 + 0:30 = exactly 3:00
+  assert.equal(after(160), 190 * S); // 2:40 + 0:30 = 3:10, above the minimum: unchanged
+  assert.equal(after(290), 300 * S); // the cap still wins
   assert.equal(std.minSeconds, 0); // and the real setting stays off
   console.log("ok: MIN = 180 raises short clocks to 3:00 and leaves longer ones alone; the real setting is 0 (off)");
 }
 
 // --- bad settings are refused ---
 {
-  assert.throws(() => validateClock({ capSeconds: 0, addSeconds: 60, minSeconds: 0 }));
-  assert.throws(() => validateClock({ capSeconds: 600, addSeconds: -1, minSeconds: 0 }));
-  assert.throws(() => validateClock({ capSeconds: 600, addSeconds: 0.5, minSeconds: 0 }));
-  assert.throws(() => validateClock({ capSeconds: 600, addSeconds: 60, minSeconds: 601 }));
-  assert.throws(() => validateClock({ capSeconds: 600, addSeconds: 60, minSeconds: -1 }));
-  validateClock({ capSeconds: 600, addSeconds: 0, minSeconds: 600 }); // a flat clock is allowed
+  assert.throws(() => validateClock({ ...std, capSeconds: 0 }));
+  assert.throws(() => validateClock({ ...std, addSeconds: -1 }));
+  assert.throws(() => validateClock({ ...std, addSeconds: 0.5 }));
+  assert.throws(() => validateClock({ ...std, minSeconds: 301 }));
+  assert.throws(() => validateClock({ ...std, minSeconds: -1 }));
+  assert.throws(() => validateClock({ ...std, endgameSeconds: 301 }));
+  assert.throws(() => validateClock({ ...std, endgameSeconds: -1 }));
+  assert.throws(() => validateClock({ ...std, endgameAddSeconds: 1.5 }));
+  validateClock({ ...std, addSeconds: 0, minSeconds: 300, endgameSeconds: 0 }); // a flat clock is allowed
   console.log("ok: invalid clock settings are refused");
 }
 
@@ -82,15 +99,15 @@ assert.equal(classifyKingdomAction("protect"), "protect");
 assert.equal(classifyKingdomAction("settle"), null);
 console.log("ok: action classification (settle never touches the clock)");
 
-// --- the referee applies the rule: the open, then conquests at 9:30, 8:00, 2:00 and 0:10 left ---
+// --- the referee applies the rule: the open, then conquests at 4:40, 3:20, 1:30, 0:45 and 0:55 left ---
 {
   const { clock, mgr } = await setup("flow");
   assert.equal(mgr.observe("k", { live: true, passCount: 0 }).status, "waiting");
   assert.equal(mgr.get("k").deadline, null);
 
   mgr.applyKingdomAction("k", "open", 1);
-  assert.equal(left(mgr, clock.now()), 600 * S);
-  const steps: [number, number, number][] = [[570, 600, 30], [480, 540, 60], [120, 180, 60], [10, 70, 60]]; // [left before, after, added]
+  assert.equal(left(mgr, clock.now()), 300 * S);
+  const steps: [number, number, number][] = [[280, 300, 20], [200, 230, 30], [90, 120, 30], [45, 55, 10], [55, 60, 5]]; // [left before, after, added]
   let pass = 1;
   for (const [before, after, added] of steps) {
     clock.set(mgr.get("k").deadline! - before * S); // let the clock run down to `before`
@@ -102,8 +119,8 @@ console.log("ok: action classification (settle never touches the clock)");
       ["deadline_changed", "conquer", after, added, pass, "conquer"],
     );
   }
-  assert.deepEqual(reasons(mgr), ["open", "conquer", "conquer", "conquer", "conquer"]);
-  console.log("ok: the referee sets 10:00, then 9:30 -> 10:00 (+0:30, the cap cut it), 8:00 -> 9:00, 2:00 -> 3:00, 0:10 -> 1:10 (+1:00)");
+  assert.deepEqual(reasons(mgr), ["open", "conquer", "conquer", "conquer", "conquer", "conquer"]);
+  console.log("ok: the referee sets 5:00, then 4:40 -> 5:00 (+0:20, the cap cut it), 3:20 -> 3:50, 1:30 -> 2:00, 0:45 -> 0:55 (+0:10), 0:55 -> 1:00 (+0:05, the endgame cap cut it)");
 }
 
 // --- every event carries the clock fields; nextClockSeconds (deprecated) is computed at event time ---
@@ -113,63 +130,63 @@ console.log("ok: action classification (settle never touches the clock)");
   const open = mgr.get("k").events.at(-1)!.data!;
   assert.deepEqual(
     [open.clockSeconds, open.clockCapSeconds, open.conquestAddSeconds, open.conquestMinSeconds, open.nextClockSeconds, "addedSeconds" in open],
-    [600, 600, 60, 0, 600, false], // right after the open 10:00 is left; a conquest now would stay at the cap
+    [300, 300, 30, 0, 300, false], // right after the open 5:00 is left; a conquest now would stay at the cap
   );
-  clock.advance(200 * S); // 6:40 left
+  clock.advance(200 * S); // 1:40 left
   mgr.applyProtect("k", { amount: "500", value: "1500", protectsUsed: 1 });
   const prot = mgr.get("k").events.at(-1)!.data!;
-  assert.deepEqual([prot.clockSeconds, prot.nextClockSeconds, prot.clockCapSeconds], [600, 460, 600]); // still the open's 10:00; a conquest now: 6:40 + 1:00
-  assert.deepEqual(mgr.clockInfo("k"), { clockSeconds: 600, nextClockSeconds: 460, clockCapSeconds: 600, conquestAddSeconds: 60, conquestMinSeconds: 0 });
+  assert.deepEqual([prot.clockSeconds, prot.nextClockSeconds, prot.clockCapSeconds], [300, 130, 300]); // still the open's 5:00; a conquest now: 1:40 + 0:30
+  assert.deepEqual(mgr.clockInfo("k"), { clockSeconds: 300, nextClockSeconds: 130, clockCapSeconds: 300, conquestAddSeconds: 30, conquestMinSeconds: 0 });
   // while waiting: no clock yet, the next move (the open) gets the cap
   const w = await setup("fields-waiting");
   w.mgr.observe("k", { live: true, passCount: 0 });
-  assert.deepEqual(w.mgr.clockInfo("k"), { clockSeconds: null, nextClockSeconds: 600, clockCapSeconds: 600, conquestAddSeconds: 60, conquestMinSeconds: 0 });
+  assert.deepEqual(w.mgr.clockInfo("k"), { clockSeconds: null, nextClockSeconds: 300, clockCapSeconds: 300, conquestAddSeconds: 30, conquestMinSeconds: 0 });
   // a game without settings has no clock info
   assert.equal(new RoundManager((await Store.open(join(dir, "nb.json"))).store, fakeClock()).clockInfo("x"), null);
   console.log("ok: events carry clockSeconds (right after the move), clockCapSeconds, conquestAddSeconds, conquestMinSeconds; addedSeconds on conquests only");
 }
 
-// --- a conquest inside the 1 s grace counts as 0 left: +1:00 from now ---
+// --- a conquest inside the 1 s grace counts as 0 left: +0:10 from now ---
 {
   const { clock, mgr } = await setup("grace");
   mgr.applyKingdomAction("k", "open", 1);
   const deadline = mgr.get("k").deadline!;
   clock.set(deadline + GRACE - 1); // inside the grace, after the deadline
   mgr.applyKingdomAction("k", "conquer", 2);
-  assert.equal(left(mgr, clock.now()), 60 * S);
-  assert.equal(mgr.get("k").events.at(-1)!.data?.addedSeconds, 60);
-  console.log("ok: a conquest accepted inside the grace gives 1:00 from that moment");
+  assert.equal(left(mgr, clock.now()), 10 * S);
+  assert.equal(mgr.get("k").events.at(-1)!.data?.addedSeconds, 10);
+  console.log("ok: a conquest accepted inside the grace gives 0:10 from that moment");
 }
 
 // --- a pause: the time left is frozen while paused, the resume pushes the deadline, then the rule applies ---
 {
   const { clock, mgr } = await setup("pause");
   mgr.applyKingdomAction("k", "open", 1);
-  clock.advance(300 * S); // 5:00 left
+  clock.advance(150 * S); // 2:30 left
   mgr.pause("k", "network_busy");
   clock.advance(120 * S); // two minutes paused
-  assert.equal(mgr.clockInfo("k")!.nextClockSeconds, 360); // frozen at 5:00 left: a conquest would give 6:00
+  assert.equal(mgr.clockInfo("k")!.nextClockSeconds, 180); // frozen at 2:30 left: a conquest would give 3:00
   mgr.resume("k", "network_ok");
-  assert.equal(left(mgr, clock.now()), 300 * S); // the pause cost nothing
-  clock.advance(60 * S); // 4:00 left
+  assert.equal(left(mgr, clock.now()), 150 * S); // the pause cost nothing
+  clock.advance(60 * S); // 1:30 left
   mgr.applyKingdomAction("k", "conquer", 2);
-  assert.equal(left(mgr, clock.now()), 300 * S); // 4:00 + 1:00
+  assert.equal(left(mgr, clock.now()), 120 * S); // 1:30 + 0:30
   console.log("ok: a pause freezes the time left (no time lost), and the next conquest adds to what was really left");
 }
 
-// --- the demo preset: cap 5:00 ---
+// --- the endgame through the referee: under 1:00 each conquest adds 0:10, never past 1:00; at 1:00 it is +0:30 again ---
 {
-  const { clock, mgr } = await setup("demo", demo);
+  const { clock, mgr } = await setup("endgame");
   mgr.applyKingdomAction("k", "open", 1);
-  assert.equal(left(mgr, clock.now()), 300 * S);
-  clock.advance(30 * S); // 4:30 left
-  mgr.applyKingdomAction("k", "conquer", 2);
-  assert.equal(left(mgr, clock.now()), 300 * S); // capped at 5:00
-  clock.advance(240 * S); // 1:00 left
-  mgr.applyKingdomAction("k", "conquer", 3);
-  assert.equal(left(mgr, clock.now()), 120 * S); // 1:00 + 1:00
-  assert.equal(mgr.clockInfo("k")!.clockCapSeconds, 300);
-  console.log("ok: demo preset: the open and the cap are 5:00; 4:30 -> 5:00, 1:00 -> 2:00");
+  clock.set(mgr.get("k").deadline! - 30 * S); // 0:30 left
+  const seen: number[] = [];
+  for (let pass = 2; pass <= 6; pass++) {
+    mgr.applyKingdomAction("k", "conquer", pass);
+    seen.push(left(mgr, clock.now()) / S);
+  }
+  assert.deepEqual(seen, [40, 50, 60, 90, 120]); // 0:30 -> 0:40 -> 0:50 -> 1:00, then 1:00 is not the endgame: 1:30 -> 2:00
+  assert.deepEqual(mgr.get("k").events.slice(-5).map((e) => e.data?.addedSeconds), [10, 10, 10, 30, 30]);
+  console.log("ok: endgame: 0:30 -> 0:40 -> 0:50 -> 1:00, then +0:30 again: 1:30 -> 2:00");
 }
 
 // --- protect changes nothing about the clock ---
@@ -215,28 +232,33 @@ console.log("ok: action classification (settle never touches the clock)");
   assert.equal(mgr.observe("k", { live: true, passCount: 1 }).status, "open");
   clock.set(deadline - 5_000);
   assert.equal(mgr.observe("k", { live: true, passCount: 1 }).status, "open"); // conquest still possible at 5 s
-  // a conquest at 5 s left lifts the clock to 1:05, and protect opens again
+  // a conquest at 5 s left lifts the clock to 0:15: protect stays closed
   mgr.applyKingdomAction("k", "conquer", 2);
-  assert.equal(left(mgr, clock.now()), 65 * S);
+  assert.equal(left(mgr, clock.now()), 15 * S);
+  assert.equal(check().ok, false);
+  // two more conquests: 0:25, then 0:35, and protect opens again
+  mgr.applyKingdomAction("k", "conquer", 3);
+  mgr.applyKingdomAction("k", "conquer", 4);
+  assert.equal(left(mgr, clock.now()), 35 * S);
   assert.equal(check().ok, true);
   // a custom lockout is honoured
   const d2 = mgr.get("k").deadline!;
   assert.equal(mgr.protectCheck("k", d2 - 10_000, 5).ok, true);
   assert.equal(mgr.protectCheck("k", d2 - 4_000, 5).ok, false);
   // paused: refused with its own reason, and the remaining time is the frozen one
-  clock.set(d2 - 50_000);
+  clock.set(d2 - 32_000);
   mgr.pause("k", "network_busy");
   clock.advance(1_000_000);
-  assert.deepEqual(mgr.protectCheck("k", clock.now()), { ok: false, why: "paused", remainingMs: 50_000 });
+  assert.deepEqual(mgr.protectCheck("k", clock.now()), { ok: false, why: "paused", remainingMs: 32_000 });
   mgr.resume("k", "network_ok");
   assert.equal(mgr.protectCheck("k", clock.now()).ok, true);
   // over and settled
   clock.set(mgr.get("k").deadline! + GRACE);
-  mgr.observe("k", { live: true, passCount: 2 });
+  mgr.observe("k", { live: true, passCount: 4 });
   assert.equal(mgr.protectCheck("k", clock.now()).ok, false);
   mgr.markSettled("k", "tx", "keeper");
   assert.equal(mgr.protectCheck("k", clock.now()).ok, false);
-  console.log("ok: protect refused in the last 30 s (30.001 s open, 30.000 s closed), when waiting, paused, over or settled; it reopens when a conquest lifts the clock");
+  console.log("ok: protect refused in the last 30 s (30.001 s open, 30.000 s closed), when waiting, paused, over or settled; it reopens when conquests lift the clock past 0:30");
 }
 
 // --- applyProtect and applyKingdomAction refuse nonsense ---
@@ -258,17 +280,17 @@ console.log("ok: action classification (settle never touches the clock)");
 {
   const { clock, mgr } = await setup("observed");
   mgr.applyKingdomAction("k", "open", 1);
-  clock.advance(180 * S); // 7:00 left
+  clock.advance(180 * S); // 2:00 left
   const r = mgr.observe("k", { live: true, passCount: 2 });
-  assert.equal(left(mgr, clock.now()), 480 * S); // 7:00 + 1:00
+  assert.equal(left(mgr, clock.now()), 150 * S); // 2:00 + 0:30
   const ev = r.events.at(-1)!;
-  assert.deepEqual([ev.reason, ev.data?.clockSeconds, ev.data?.passCount], ["observed_on_chain", 480, 2]);
+  assert.deepEqual([ev.reason, ev.data?.clockSeconds, ev.data?.passCount], ["observed_on_chain", 150, 2]);
   // an open seen on chain while we were waiting gets the cap
   const b = await setup("observed2");
   b.mgr.observe("k", { live: true, passCount: 0 });
   b.mgr.observe("k", { live: true, passCount: 1 });
-  assert.equal(b.mgr.get("k").deadline, b.clock.now() + 600 * S);
-  console.log("ok: an open seen only on the chain gets the cap; a conquest seen only on the chain adds 1:00 to what was left");
+  assert.equal(b.mgr.get("k").deadline, b.clock.now() + 300 * S);
+  console.log("ok: an open seen only on the chain gets the cap; a conquest seen only on the chain adds 0:30 to what was left");
 }
 
 // --- restart: downtime still counts as a pause; a round saved before lastClockSeconds existed still works ---
