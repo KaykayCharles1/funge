@@ -70,7 +70,7 @@ for (const sc of SCENARIOS) {
         treasury += conquestMoney(value, P).poolGets; protects = 0; // a conquest the server did not process
       } else if (e.type === "protect_applied") {
         const a = B(d.amount);
-        if (![1n, 5n, 10n].map((x) => x * P.unit).includes(a)) fail(sc.id, `${tag}: amount ${a} is not 1, 5 or 10 units`);
+        if (![1n, 2n, 5n].map((x) => x * P.unit).includes(a)) fail(sc.id, `${tag}: amount ${a} is not 1, 2 or 5 units`);
         if (++protects > P.protectsPerReign) fail(sc.id, `${tag}: more than ${P.protectsPerReign} protects in one reign`);
         if (value + a > P.cap) fail(sc.id, `${tag}: value above the cap`);
         value += a; treasury += a;

@@ -147,7 +147,7 @@ function validateProtect(ctx: ValidateCtx): Validated {
   if (s.protects >= c.params.protectsPerReign) throw new ActError("no_protects_left", "No protects left in this reign.");
   if (n.value > c.params.cap) throw new ActError("walls_at_maximum", "The walls are at their maximum.");
   const amount = n.value - s.value;
-  if (!protectAmounts(c.params.unit).includes(amount)) return invalid("A protect must add exactly 1, 5 or 10 PUSD.");
+  if (!protectAmounts(c.params.unit).includes(amount)) return invalid("A protect must add exactly 1, 2 or 5 PUSD.");
   if (n.protects !== s.protects + 1) return invalid("A protect uses exactly one of the king's protects.");
   if (c.potAfter !== c.potBefore + amount) return invalid("The pool must grow by exactly the protect amount.");
   return {

@@ -165,9 +165,9 @@ const span = (seconds: number, one: string, many: string) => `${seconds} ${secon
 const RULES: RulesNumbers = {
   clock: String(CLOCK_CAP_SECONDS / 60),
   add: CONQUEST_ADD_SECONDS % 60 === 0 ? span(CONQUEST_ADD_SECONDS / 60, "minute", "minutes") : span(CONQUEST_ADD_SECONDS, "second", "seconds"),
-  // the three protect amounts are 1x, 5x and 10x the unit (src/lib/kingdom.ts protectAmounts, not imported: it
+  // the three protect amounts are 1x, 2x and 5x the unit (src/lib/kingdom.ts protectAmounts, not imported: it
   // brings the chain library)
-  amounts: `${pusd(K.unit)}, ${pusd(K.unit * 5n)} or ${pusd(K.unit * 10n)}`,
+  amounts: `${pusd(K.unit)}, ${pusd(K.unit * 2n)} or ${pusd(K.unit * 5n)}`,
   perReign: COUNT_WORDS[K.protectsPerReign] ?? String(K.protectsPerReign),
   lockout: span(PROTECT_LOCKOUT_SECONDS, "second", "seconds"),
   cap: pusd(K.cap),

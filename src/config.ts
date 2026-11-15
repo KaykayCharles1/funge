@@ -35,7 +35,7 @@ export const CONFIG = {
     cutPercent: 10n, // whole percent of the value taken from the dethroned king's share into the pool
     cap: 5_000n, // 50.00 PUSD: the value can never be raised above this
     protectsPerReign: 2, // protects the king may use before the next conquest
-    unit: 100n, // 1.00 PUSD: the smallest protect; the three amounts are 1x, 5x and 10x
+    unit: 100n, // 1.00 PUSD: the smallest protect; the three amounts are 1x, 2x and 5x
   },
   
   // Deploy-time contract setting.

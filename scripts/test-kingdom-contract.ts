@@ -209,7 +209,7 @@ async function main() {
   const sample: KingdomState = { passCount: 3, holderPkh: alice.pkhHex, value: 1500n, protects: 2, previous: previousOf(bob.pkhHex) };
   assert.deepEqual(decodeKingdomCommitment(encodeKingdomCommitment(sample)), sample);
   assert.equal(encodeKingdomCommitment(sample).length / 2, 40);
-  assert.deepEqual(protectAmounts(100n), [100n, 500n, 1000n]);
+  assert.deepEqual(protectAmounts(100n), [100n, 200n, 500n]);
   console.log("ok    layout and money helpers (the odd unit goes to the pool)");
 
   const sizeInfo = setup().kingdom as unknown as { bytesize?: number; opcount?: number };
@@ -335,11 +335,12 @@ async function main() {
   for (const amount of protectAmounts(P.unit)) {
     await protectTx(king(), alice, { amount }).send();
   }
-  console.log("ok    protect: 1, 5 and 10 PUSD are accepted");
+  console.log("ok    protect: 1, 2 and 5 PUSD are accepted");
   await expectFail("protect: not the king (another address at input 2)", "Input 2 must be the king's", async () => protectTx(king(), bob).send());
   await expectFail("protect: the king's coin signed by someone else", null, async () => protectTx(king(), alice, { signer: bob }).send());
-  await expectFail("protect: an amount that is not 1, 5 or 10", "Protect amount must be 1, 5 or 10", async () => protectTx(king(), alice, { amount: 200n }).send());
-  await expectFail("protect: an amount of zero", "Protect amount must be 1, 5 or 10", async () => protectTx(king(), alice, { amount: 0n }).send());
+  await expectFail("protect: an amount that is not 1, 2 or 5", "Protect amount must be 1, 2 or 5", async () => protectTx(king(), alice, { amount: 300n }).send());
+  await expectFail("protect: the old 10.00 is refused", "Protect amount must be 1, 2 or 5", async () => protectTx(king(), alice, { amount: 1000n }).send());
+  await expectFail("protect: an amount of zero", "Protect amount must be 1, 2 or 5", async () => protectTx(king(), alice, { amount: 0n }).send());
   await expectFail("protect: over the cap (46.00 + 5.00)", "Walls at maximum",
     async () => protectTx(setup(kingState(alice, { value: 4600n }), 4600n), alice, { amount: 500n }).send());
   await protectTx(setup(kingState(alice, { value: 4500n }), 4500n), alice, { amount: 500n }).send();

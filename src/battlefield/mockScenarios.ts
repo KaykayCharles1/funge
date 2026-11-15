@@ -127,7 +127,7 @@ class MockKingdom {
     });
   }
 
-  protect(times: 1n | 5n | 10n): void {
+  protect(times: 1n | 2n | 5n): void {
     const amount = P.unit * times;
     this.value += amount; this.treasury += amount; this.protectsUsed++;
     this.send("protect_applied", "protect", {
@@ -231,7 +231,7 @@ export const SCENARIOS: Scenario[] = [
     play: (h) => script(h, [
       ["Open (A)", 1200, (k) => k.open(A)],
       ["Conquer (B)", 3000, (k) => k.conquer(B)],
-      ["Protect +10.00 (B)", 7000, (k) => k.protect(10n)],
+      ["Protect +5.00 (B)", 7000, (k) => k.protect(5n)],
       ["Conquer (C)", 1500, (k) => k.conquer(C)],
       ["Conquer (D)", 7000, (k) => k.conquer(D)],
       ["Conquer (E): fifth king, houses wrap", 7000, (k) => k.conquer(E)],
@@ -257,11 +257,11 @@ export const SCENARIOS: Scenario[] = [
     id: "protects", label: "Protects and walls",
     play: (h) => script(h, [
       ["Open (A)", 1000, (k) => k.open(A)],
-      ["Protect +5.00: a third wall drops in", 2500, (k) => k.protect(5n)],
-      ["Protect +10.00: 25.00, the castle and two more walls", 2500, (k) => k.protect(10n)],
+      ["Protect +5.00: 10.00", 2500, (k) => k.protect(5n)],
+      ["Protect +2.00: 12.00", 2500, (k) => k.protect(2n)],
       ["Conquer (B)", 2500, (k) => k.conquer(B)],
       ["B protects +1.00 during the conquest: it does not wait", 1200, (k) => k.protect(1n)],
-      ["Protect +10.00: 36.00, eight walls", 7000, (k) => k.protect(10n)],
+      ["Protect +5.00: 18.00", 7000, (k) => k.protect(5n)],
     ]),
   },
   {

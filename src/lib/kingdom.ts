@@ -63,5 +63,5 @@ export function conquestMoney(value: bigint, p: { feePercent: bigint; cutPercent
   return { fee, payment, kingGets, poolGets: payment - kingGets };
 }
 
-// The three protect amounts: 1, 5 and 10 PUSD
-export const protectAmounts = (unit: bigint): bigint[] => [unit, unit * 5n, unit * 10n];
+// The three protect amounts: 1, 2 and 5 PUSD (the contract checks the same three)
+export const protectAmounts = (unit: bigint): bigint[] => [unit, unit * 2n, unit * 5n];

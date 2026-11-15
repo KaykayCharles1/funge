@@ -443,8 +443,8 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   // a conquest resets the counter, and the new king can protect again
   await executeAct(s.deps, GAME, body(s.world, "conquer", { payer: CAROL }));
   assert.equal(kingdomOf(s).protects, 0);
-  await executeAct(s.deps, GAME, body(s.world, "protect", { amount: 1000n }));
-  assert.equal(kingdomOf(s).value, 2600n);
+  await executeAct(s.deps, GAME, body(s.world, "protect", { amount: 500n }));
+  assert.equal(kingdomOf(s).value, 2100n);
   console.log("ok: protect: +5 then +1 never move the clock, a third is refused, a conquest resets the counter");
 }
 {
@@ -457,7 +457,8 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   };
   await bad("not the king (another address at input 2)", { walletLock: p2pkh(CAROL) }, "not_king");
   await bad("the previous king tries", { payer: ALICE }, "not_king");
-  await bad("an amount that is not 1, 5 or 10", { amount: 200n }, "invalid");
+  await bad("an amount that is not 1, 2 or 5", { amount: 300n }, "invalid");
+  await bad("the old 10.00", { amount: 1000n }, "invalid");
   await bad("an amount of zero", { amount: 0n }, "invalid");
   await bad("pool underpaid", { potDelta: -1n }, "invalid");
   await bad("pool overpaid", { potDelta: 1n }, "invalid");
@@ -853,7 +854,7 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.deepEqual(d.kingdom?.conquest, { pay: "1020", fee: "20", kingGets: "920", poolGets: "100" });
   assert.deepEqual([d.kingdom?.clockSeconds, d.kingdom?.nextClockSeconds, d.kingdom?.floorSeconds], [300, 300, null]);
   assert.deepEqual([d.kingdom?.clockCapSeconds, d.kingdom?.conquestAddSeconds, d.kingdom?.conquestMinSeconds], [300, 30, 0]);
-  assert.deepEqual(d.kingdom?.protectAmounts, ["100", "500", "1000"]);
+  assert.deepEqual(d.kingdom?.protectAmounts, ["100", "200", "500"]);
   assert.equal(d.kingdom?.protectsLeft, 2);
   assert.equal(d.kingdom?.previousKing, null);
   assert.equal(d.kingdom?.protectClosesInMs, 300_000 - LOCK);
@@ -864,11 +865,11 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   assert.equal(d.kingdom?.previousKing, previousOf(ALICE));
   assert.deepEqual([d.kingdom?.clockSeconds, d.kingdom?.nextClockSeconds], [230, 260]);
 
-  await executeAct(s.deps, GAME, body(s.world, "protect", { amount: 1000n }));
+  await executeAct(s.deps, GAME, body(s.world, "protect", { amount: 500n }));
   d = desc();
-  assert.equal(d.kingdom?.value, "2000");
+  assert.equal(d.kingdom?.value, "1500");
   assert.equal(d.kingdom?.protectsLeft, 1);
-  assert.deepEqual(d.kingdom?.conquest, { pay: "2040", fee: "40", kingGets: "1840", poolGets: "200" });
+  assert.deepEqual(d.kingdom?.conquest, { pay: "1530", fee: "30", kingGets: "1380", poolGets: "150" });
   s.clock.advance(160_000); // 70 s left: protect closes in 40 s
   assert.equal(desc().kingdom?.protectClosesInMs, 40_000);
   s.clock.advance(60_000);
@@ -879,10 +880,10 @@ const conquered: KingdomState = { passCount: 2, holderPkh: BOB, value: 1000n, pr
   const md = describeRound(GAME, maxed.manager.get(GAME.gameId), mc, maxed.clock.now(), maxed.manager.clockInfo(GAME.gameId));
   assert.equal(md.kingdom?.wallsAtMaximum, true);
   assert.deepEqual(md.kingdom?.protectAmounts, []);
-  const near = await setup({ state: { ...conquered, value: 4500n }, pot: 3000n });
+  const near = await setup({ state: { ...conquered, value: 4600n }, pot: 3000n });
   const nc = near.view();
   const nd = describeRound(GAME, near.manager.get(GAME.gameId), nc, near.clock.now(), near.manager.clockInfo(GAME.gameId));
-  assert.deepEqual(nd.kingdom?.protectAmounts, ["100", "500"]);
+  assert.deepEqual(nd.kingdom?.protectAmounts, ["100", "200"]); // 46.00: +5.00 would pass the 50.00 cap
   assert.equal(nd.kingdom?.wallsAtMaximum, false);
   console.log("ok: the round description: prices, shares, protects left, allowed protect amounts, clocks, previous king, walls at maximum");
 }

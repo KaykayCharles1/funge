@@ -91,7 +91,7 @@ contract FungeKingdom(
         bytes previous = commitment.split(29)[1];
         require(passCount >= 1, "Nobody has opened the round");
         require(tx.inputs[2].lockingBytecode == 0x76a914 + holder + 0x88ac, "Input 2 must be the king's");
-        require(amount == unit || amount == unit * 5 || amount == unit * 10, "Protect amount must be 1, 5 or 10");
+        require(amount == unit || amount == unit * 2 || amount == unit * 5, "Protect amount must be 1, 2 or 5");
         require(used < protectsPerReign, "No protects left this reign");
         require(value + amount <= cap, "Walls at maximum");
 

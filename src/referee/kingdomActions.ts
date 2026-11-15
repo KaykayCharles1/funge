@@ -258,7 +258,7 @@ export function planProtect(
     if (s.protects >= game.params.protectsPerReign) return fail("no_protects_left", errorText("no_protects_left")) as KingdomFailure;
     if (s.value + amount > BigInt(game.params.cap)) return fail("walls_at_maximum", errorText("walls_at_maximum")) as KingdomFailure;
     if (!protectAmounts(BigInt(game.params.unit)).includes(amount)) {
-      return fail("invalid", "A protect adds exactly 1, 5 or 10 PUSD.") as KingdomFailure;
+      return fail("invalid", "A protect adds exactly 1, 2 or 5 PUSD.") as KingdomFailure;
     }
   }
   return { ok: true, next: { ...s, value: s.value + amount, protects: s.protects + 1 } };
