@@ -1,5 +1,5 @@
-// Merges the dev wallet's plain BCH coins into one coin at the same address, so deploy-kingdom.ts finds a coin
-// big enough (it wants one BCH coin above 25,000 sats). Chipnet only. Token coins are never touched. Prints no key.
+// Merges the dev wallet's plain BCH coins into one coin at the same address, so deploy-kingdom.ts has fewer coins with a
+// smaller fee to spend (deploy-kingdom.ts now combines coins by itself). Chipnet only. Token coins are never touched. Prints no key.
 //   node scripts/merge-coins-chipnet.ts          shows what it would do, sends nothing
 //   node scripts/merge-coins-chipnet.ts --send   merges for real
 import assert from "node:assert/strict";

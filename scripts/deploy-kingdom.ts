@@ -56,16 +56,21 @@ async function main() {
   assert.match(pusd, /^[0-9a-f]{64}$/, "pusdCategory in src/config.ts is not set");
 
   const utxos = await retry(() => provider.getUtxos(env.address));
+  // Every round sends small coins back to this wallet, so pay with all its BCH coins (the 30 largest) at once:
+  // one coin rarely covers a round by itself, and the change merges them back into one.
   const funding = utxos
     .filter((u) => !u.token)
-    .sort((a, b) => (a.satoshis < b.satoshis ? 1 : -1))[0];
-  assert.ok(funding, "No BCH-only UTXO found");
+    .sort((a, b) => (a.satoshis < b.satoshis ? 1 : -1))
+    .slice(0, 30);
+  assert.ok(funding.length > 0, "No BCH-only UTXO found");
   const prepSats = CONTRACT_SATS * 2n + 10_000n;
-  assert.ok(funding.satoshis > prepSats + 5_000n, `The wallet needs a BCH coin of more than ${prepSats + 5_000n} sats.`);
+  const fundingSats = funding.reduce((sum, u) => sum + u.satoshis, 0n);
+  const needed = prepSats + 5_000n + BigInt(funding.length) * 400n; // 400: the fee for each coin spent
+  assert.ok(fundingSats > needed, `The wallet needs more than ${needed} sats in BCH coins; it has ${fundingSats}.`);
 
   // Tx 1 (prep): a spare output at index 0. Its txid becomes the game's token category.
   const prep = await new TransactionBuilder({ provider })
-    .addInput(funding, tpl.unlockP2PKH())
+    .addInputs(funding, tpl.unlockP2PKH())
     .addOutput({ to: lock, amount: prepSats })
     .addBchChangeOutputIfNeeded({ to: lock, feeRate: FEE_RATE })
     .send();
