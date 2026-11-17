@@ -1,17 +1,17 @@
 {
   "contractVersion": 3,
   "network": "chipnet",
-  "gameCategory": "1a14f3d33993644c368f258ac5c85d06db1391113a6e09f2322e6e344177b380",
-  "pusdCategory": "8af14ba0e3e6db4d2e6f7290ec7421d3a76d387cf00ea35e9fec1218434549eb",
+  "gameCategory": "60007536d14219cc17796c8e362d46dadcfe18aa36f3944f6b122a091c389ee8",
+  "pusdCategory": "735d04cdead10c2eec0b608ab30b0e9c6edc1b07fa2f06c8ebe99b2e0d2a2163",
   "state": {
-    "address": "bchtest:p0h2g56uw5xad4sjug7fvf2ywkfxduzsvsvx55q9wyv8kud2f62z7jnv4dvq9",
-    "tokenAddress": "bchtest:r0h2g56uw5xad4sjug7fvf2ywkfxduzsvsvx55q9wyv8kud2f62z7qqs55dew",
-    "lockingBytecode": "aa20eea4535c750dd6d612e23c962544759266f05064186a500571187b71aa4e942f87"
+    "address": "bchtest:p0caxjtlx6j3r2jrzsgnadkalmgxn6cl62rdyawjdxkgpufunw062wjvewjap",
+    "tokenAddress": "bchtest:r0caxjtlx6j3r2jrzsgnadkalmgxn6cl62rdyawjdxkgpufunw062upschny2",
+    "lockingBytecode": "aa20f1d3497f36a511aa4314113eb6ddfed069eb1fd286d275d269ac80f13c9b9fa587"
   },
   "pot": {
-    "address": "bchtest:p0xyvzmr9tpfglg02we38w0zjt9yn47k5fgr09pkcmyvwlslf59g7ngang3uc",
-    "tokenAddress": "bchtest:r0xyvzmr9tpfglg02we38w0zjt9yn47k5fgr09pkcmyvwlslf59g7pmpj3s9n",
-    "lockingBytecode": "aa20cc460b632ac2947d0f53b313b9e292ca49d7d6a250379436c6c8c77e1f4d0a8f87"
+    "address": "bchtest:pd6mynnunnaejsqg59sn80fjjewcndrw5lqxnzn2zk6lwdguqwl8gu7pq92ja",
+    "tokenAddress": "bchtest:rd6mynnunnaejsqg59sn80fjjewcndrw5lqxnzn2zk6lwdguqwl8gwdaputtk",
+    "lockingBytecode": "aa2075b24e7c9cfb994008a16133bd32965d89b46ea7c0698a6a15b5f7351c03be7487"
   },
   "refereePubkey": "02be51ba8c8ec721baf4aba465a3022065527c6f659285383e24cf83180ceafd7b",
   "params": {
@@ -24,6 +24,6 @@
     "fallbackBlocks": 12
   },
   "creatorPkh": "fb4e5bd4e4104791475eaaa20ad6488d659af4f7",
-  "prepTxid": "1a14f3d33993644c368f258ac5c85d06db1391113a6e09f2322e6e344177b380",
-  "initTxid": "5ef0c7fd68f12fc5c6d1d686b9c9939fd35e937d67b8b6ff23494ee950c3e9b2"
+  "prepTxid": "60007536d14219cc17796c8e362d46dadcfe18aa36f3944f6b122a091c389ee8",
+  "initTxid": "2b4efdc844febcb8e2e7b100c04442e2db65dc1ca6bd60ad9c0e3f12e1a4bd49"
 }
