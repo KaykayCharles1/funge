@@ -3,7 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { conquestMoney, protectAmounts } from "../src/lib/kingdom.ts";
-import { ACT_BODY_LIMIT, ACT_RATE, GLOBAL_RATE, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
+import { ACT_BODY_LIMIT, ACT_RATE, FAUCET_RATE, GLOBAL_RATE, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "../src/refereeParams.ts";
 import { ActError, executeAct, type Referee } from "./act.ts";
 import { settleRound } from "./keeper.ts";
 import { playersView } from "./players.ts";
@@ -15,6 +15,7 @@ import type { ClockInfo, RoundManager } from "./rounds.ts";
 import type { RoundRecord } from "./store.ts";
 import type { Unconfirmed } from "./unconfirmed.ts";
 import { sceneOf } from "./scene.ts";
+import { FaucetError, type Faucet, type FaucetStatus } from "./faucet.ts";
 
 export type AppDeps = {
   games: ServerGame[];
@@ -28,7 +29,27 @@ export type AppDeps = {
   sleep: (ms: number) => Promise<void>;
   logger?: boolean;
   trustProxy?: boolean; // true only behind a host proxy, so rate limits see the visitor and not the proxy
+  faucet?: Faucet | null; // the chipnet test faucet, when FUNGE_FAUCET_SEED is set
 };
+
+// The faucet's status page, for whoever tops it up: public facts only (the same as on a block explorer)
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+const group = (n: bigint) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const pusdText = (units: string) => `${group(BigInt(units) / 100n)}.${(BigInt(units) % 100n).toString().padStart(2, "0")}`;
+function faucetPage(s: FaucetStatus): string {
+  const row = (k: string, v: string) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Funge test faucet</title><style>body{font:15px system-ui,sans-serif;margin:2rem;background:#0f172a;color:#e2e8f0}
+table{border-collapse:collapse}th,td{text-align:left;padding:.4rem 1rem .4rem 0;vertical-align:top}th{color:#94a3b8;font-weight:500}
+code{word-break:break-all;color:#fbbf24}</style></head><body><h1>Funge test faucet (chipnet)</h1><table>
+${row("Address", `<code>${esc(s.address)}</code><br><small>Send test BCH and test PUSD here to top it up.</small>`)}
+${row("BCH", `${group(BigInt(s.sats))} sats`)}
+${row("PUSD", pusdText(s.pusd))}
+${row("Each claim", `${group(BigInt(s.perClaim.sats))} sats and ${pusdText(s.perClaim.pusd)} PUSD`)}
+${row("Claims today", `${s.claimsToday} of ${s.perDay}`)}
+${row("Claims left", `${s.claimsLeft} (today's limit and the balance)`)}
+</table><p><small>Read from the chain just now. Refresh to update.</small></p></body></html>`;
+}
 
 // Everything a Kingdom page needs to show, computed on the server so the page and the contract cannot disagree
 function describeKingdom(game: ServerGame, round: RoundRecord, chain: ChainState, now: number, clock: ClockInfo | null) {
@@ -186,6 +207,34 @@ export async function buildApp(deps: AppDeps) {
     },
   );
   
+  // The chipnet test faucet: a status page, and the page's "Get test coins" button
+  app.get("/faucet", async (request, reply) => {
+    if (!deps.faucet) return reply.code(404).send({ error: "faucet_off" });
+    try {
+      const s = await deps.faucet.status();
+      if ((request.headers.accept ?? "").includes("text/html")) return reply.type("text/html; charset=utf-8").send(faucetPage(s));
+      return s;
+    } catch {
+      return reply.code(503).send({ error: "chain_unavailable" });
+    }
+  });
+
+  app.post(
+    "/faucet/claim",
+    { bodyLimit: 1_024, config: { rateLimit: { max: FAUCET_RATE.max, timeWindow: FAUCET_RATE.windowMs } } },
+    async (request, reply) => {
+      if (!deps.faucet) return reply.code(404).send({ ok: false, error: "faucet_off", message: "The faucet is off." });
+      try {
+        const result = await deps.faucet.claim((request.body as { pkh?: unknown } | null)?.pkh, request.ip);
+        return { ok: true, ...result };
+      } catch (e) {
+        if (e instanceof FaucetError) return reply.code(e.status).send({ ok: false, error: e.code, message: e.message });
+        console.error("faucet claim failed:", e instanceof Error ? e.message : String(e));
+        return reply.code(500).send({ ok: false, error: "internal", message: "Something went wrong." });
+      }
+    },
+  );
+
   app.get("/rounds/:id/ws", { websocket: true }, (socket, request) => {
     // Browsers do not apply CORS to WebSockets, so the origin is checked here
     const origin = request.headers.origin;

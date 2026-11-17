@@ -29,3 +29,12 @@ export const PROTECT_LOCKOUT_SECONDS = 30; // protect is refused in the last 30 
 export const GLOBAL_RATE = { max: 120, windowMs: 60_000 }; // per IP, all routes
 export const ACT_RATE = { max: 12, windowMs: 60_000 }; // per IP, POST /act
 export const ACT_BODY_LIMIT = 32_768; // bytes
+// The chipnet test faucet (server/faucet.ts): free test coins for new players. Off unless FUNGE_FAUCET_SEED is set.
+export const FAUCET = {
+  pusdUnits: 2_000n, // 20.00 PUSD per claim
+  sats: 20_000n, // 20,000 sats per claim: enough BCH for dozens of moves
+  dayBlocks: 144, // "a day" is the last 144 blocks (about 24 hours): the faucet reads its own payouts from the chain
+  perIpPerDay: 3, // claims per visitor address per 24 hours (kept in memory, so a restart clears it)
+  perDay: 100, // claims in total per day
+};
+export const FAUCET_RATE = { max: 5, windowMs: 60_000 }; // per IP, POST /faucet/claim

@@ -28,6 +28,7 @@ import { markNextRoundAlmost, nextRoundLine, resetNextRoundWait, startNextRoundW
 import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
+import { initFaucet, renderFaucet } from "./faucetUI.ts";
 
 const $ = (id: string) => document.getElementById(id)!;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
@@ -602,6 +603,7 @@ function renderFeed() {
 }
 
 function renderAll() {
+  renderFaucet();
   renderStats();
   renderClock();
   renderPreview();
@@ -922,6 +924,10 @@ export async function startKingdomMode() {
   if (externalWanted()) resumeIfStored(); // only reconnect an old pairing if the player opted in
 
   onLocalWalletChange(renderAll);
+  initFaucet(actingPkh, () => {
+    setTimeout(() => void refreshBalances(provider), 2_000);
+    setTimeout(() => void refreshBalances(provider), 8_000);
+  });
   void initLocalWallet(provider);
 
   $("kActBtn").addEventListener("click", () => onAct());

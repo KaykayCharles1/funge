@@ -96,7 +96,24 @@ export const COPY = {
     failed: "Could not prepare the move. Nothing was sent. Please try again.",
     noKingCoin: "Your wallet has no coin at your king address. Send a small amount of BCH to it, then try again.",
     approveCancel: (pool: string, fee: string) => `Approve in your wallet: cancel the round and get ${pool} PUSD back (network fee about ${fee} sats).`,
-    promptCancel: (pool: string) => `Cancel the Funge round and get ${pool} PUSD back`,  
+    promptCancel: (pool: string) => `Cancel the Funge round and get ${pool} PUSD back`,
+  },
+  // The chipnet test faucet, under the wallets on the game page (chipnet only)
+  faucet: {
+    title: "Free test coins",
+    text: (pusd: string, sats: string) => `New here? Get ${pusd} test PUSD and ${sats} sats of test BCH to play. Once a day per wallet.`,
+    button: "Get test coins",
+    sending: "Sending your test coins…",
+    paid: (pusd: string, sats: string) => `Sent ${pusd} PUSD and ${sats} sats. They show in your wallet in a few seconds.`,
+    errors: {
+      already_claimed: "This wallet already got test coins today. Come back tomorrow.",
+      ip_limit: "You already claimed test coins several times today. Come back tomorrow.",
+      daily_limit: "The faucet has given out all of today's test coins. Come back tomorrow.",
+      empty: "The faucet is empty right now. Please try again later.",
+      faucet_off: "The faucet is not available right now.",
+      busy: "Too many tries. Wait a minute, then try again.",
+      failed: "Could not send test coins. Please try again in a minute.",
+    } as Record<string, string>,
   },
   
   // The Kingdom page. Change the wording here only.

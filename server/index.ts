@@ -16,6 +16,10 @@ import { createKeeper } from "./keeper.ts";
 import { installSafeConsole, warnThrottled } from "../src/lib/safeLog.ts";
 import { readServerEnv } from "./env.ts";
 import { sceneOf } from "./scene.ts";
+import { makeFaucet, type Faucet } from "./faucet.ts";
+import { isValidMnemonic, walletFromMnemonic } from "../src/wallet/local.ts";
+import { lockToAddress } from "../src/lib/chain.ts";
+import { pusdCategory } from "../src/config.ts";
 
 const network = CONFIG.network as Network;
 installSafeConsole();
@@ -53,9 +57,35 @@ try {
   const chain = makeChainReader(provider, systemClock);
   const unconfirmed = makeUnconfirmed(UNCONFIRMED_CAP);
   const locks = makeLocks();
+
+  // The test faucet (chipnet only): on when FUNGE_FAUCET_SEED holds the faucet wallet's seed phrase
+  let faucet: Faucet | null = null;
+  const faucetSeed = process.env.FUNGE_FAUCET_SEED?.trim();
+  if (faucetSeed) {
+    if (network !== "chipnet") throw new Error("Refusing to start: the test faucet is for chipnet only.");
+    if (!isValidMnemonic(faucetSeed)) throw new Error("Refusing to start: FUNGE_FAUCET_SEED is not a valid seed phrase.");
+    const wallet = walletFromMnemonic(faucetSeed);
+    const faucetAddress = lockToAddress(wallet.lock, false);
+    faucet = makeFaucet({
+      provider,
+      history: async () => {
+        const rows = (await provider.performRequest("blockchain.address.get_history", faucetAddress)) as { tx_hash: string; height: number }[];
+        return rows.map((r) => ({ txid: r.tx_hash, height: r.height }));
+      },
+      wallet,
+      pusdCategory: pusdCategory(),
+      addressOf: lockToAddress,
+      locks,
+      now: () => systemClock.now(),
+    });
+    console.log(`test faucet on: ${faucet.address}`);
+  } else {
+    console.log("test faucet off (no FUNGE_FAUCET_SEED)");
+  }
+
   const app = await buildApp({
     games, manager, chain, clock: systemClock, allowedOrigins, trustProxy,
-    referee, locks, unconfirmed, sleep,
+    referee, locks, unconfirmed, sleep, faucet,
   });
   const keeper = createKeeper({ manager, chain, clock: systemClock, referee, locks, unconfirmed, sleep }, games);
   const stopKeeper = keeper.start();
