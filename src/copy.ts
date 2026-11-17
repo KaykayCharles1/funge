@@ -98,6 +98,27 @@ export const COPY = {
     approveCancel: (pool: string, fee: string) => `Approve in your wallet: cancel the round and get ${pool} PUSD back (network fee about ${fee} sats).`,
     promptCancel: (pool: string) => `Cancel the Funge round and get ${pool} PUSD back`,
   },
+  // Invite links: the "Invite friends" button on the battlefield, and the banner a friend sees when they open one
+  invite: {
+    button: "Invite friends",
+    // who: "King Charles"; the same words go in the share message and the banner
+    summons: (who: string) => `${who} summons you to battle for the throne.`,
+    message: (who: string) => `${who} summons you to battle for the throne. Do you have what it takes to become the King of Funge?`,
+    someone: "A challenger", // when the player has not chosen a name yet
+    shareTitle: "Funge: battle for the throne",
+    panelTitle: "Invite friends",
+    panelText: "Send this to a friend or a group:",
+    copy: "Copy invite",
+    copied: "Copied. Paste it in any chat.",
+    copyFailed: "Could not copy. Select the text above and copy it.",
+    telegram: "Telegram",
+    whatsapp: "WhatsApp",
+    x: "X",
+    close: "Close",
+    bannerQuestion: "Do you have what it takes to become the King of Funge?",
+    bannerCoins: "Get free test coins",
+    bannerClose: "Dismiss",
+  },
   // The chipnet test faucet, under the wallets on the game page (chipnet only)
   faucet: {
     title: "Free test coins",

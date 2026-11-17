@@ -18,7 +18,7 @@ export type PickerOpen = {
   onConfirm: (profile: { name: string; avatarId: string }) => void;
 };
 
-function lastChoice(): { name: string; avatarId: string } | null {
+export function lastChoice(): { name: string; avatarId: string } | null {
   try {
     const v = JSON.parse(localStorage.getItem(LAST_KEY) ?? "null") as { name?: unknown; avatarId?: unknown } | null;
     return v && typeof v.name === "string" && typeof v.avatarId === "string" ? { name: v.name, avatarId: v.avatarId } : null;

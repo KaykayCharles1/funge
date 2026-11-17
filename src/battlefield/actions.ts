@@ -9,6 +9,7 @@ import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
 import type { Portrait } from "./identity.ts";
 import { openPicker } from "./picker.ts";
+import { inviterName, openInvite } from "./invite.ts";
 import { isOn, onSoundChange, setSound } from "./sound.ts";
 
 const T = COPY.battlefield;
@@ -78,7 +79,14 @@ export function mountActionBar(
   });
   onSoundChange(showSound);
   showSound(isOn());
-  top.append(chip, main, cancel, mute);
+  // Invite friends: anyone with a wallet can share a link with their name in it
+  const invite = el("button", `${SMALL} text-sm`, COPY.invite.button);
+  invite.type = "button";
+  invite.addEventListener("click", () => {
+    const v = page();
+    openInvite(inviterName({ actingPkh: v.actingPkh, players: v.players, portraits: portraits() }));
+  });
+  top.append(chip, main, cancel, invite, mute);
 
   const prot = el("div", "flex flex-wrap items-center gap-2");
   const protTitle = el("span", "text-sm text-[#e0a93a]");
@@ -130,6 +138,7 @@ export function mountActionBar(
     // Wallet chip: which wallet plays, and the game wallet's balances
     const w = v.wallet;
     set(chip, w.externalName ?? (w.game ? [T.gameWallet, w.pusdText, w.bchText].filter(Boolean).join(" · ") : w.vault === "locked" ? T.unlockWallet : T.noWallet));
+    toggle(invite, !(w.game || w.externalName !== null));
 
     // Main button
     let label = "…", enabled = false, reason = "", busy = false;

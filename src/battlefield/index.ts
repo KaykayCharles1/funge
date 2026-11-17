@@ -8,6 +8,7 @@ import { conquestMoney } from "../lib/kingdom.ts";
 import type { GameKingdom } from "../lib/game.ts";
 import type { RoundSnapshot } from "../referee/api.ts";
 import { onSceneEvent, onSceneSnapshot } from "../sceneBus.ts";
+import { mountInviteBanner } from "./invite.ts";
 import { mountActionBar } from "./actions.ts";
 import type { PageDo, PageView } from "./actions.ts";
 import { Director } from "./director.ts";
@@ -157,6 +158,7 @@ export function mountBattlefield(opts: MountOptions): void {
 
   // The action bar and the folded old page, under the field
   const wallet = foldOldPage();
+  mountInviteBanner(host, wallet.open);
   mountActionBar(host, opts.page, opts.run, (text) => {
     if (director) scene.hud.popup(text);
   }, wallet.open, () => scene.portraits);
