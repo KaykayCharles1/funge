@@ -30,6 +30,11 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 - Start: `npm ci` then `npm run server`. Node 24.
 - `FUNGE_HOST=0.0.0.0`, `FUNGE_ALLOWED_ORIGINS=https://<page>`, `FUNGE_TRUST_PROXY=1`, `REFEREE_KEY_<NETWORK>=<key>`, `FUNGE_DATA_DIR=<persistent disk folder>`.
 - Do not set `FUNGE_KEEPER_DELAY_SECONDS` or `FUNGE_UNCONFIRMED_CAP` for the real round. The clock has one setting (5:00, src/refereeParams.ts); `FUNGE_BELL_PRESET` is no longer read.
+- Optional, chipnet only: `FUNGE_FAUCET_SEED=<seed phrase>` turns on the test faucet (server/faucet.ts): each claim
+  pays 20.00 PUSD and 20,000 sats from the seed's first address, once per wallet per day, 3 per visitor, 100 a day
+  (src/refereeParams.ts `FAUCET`). Its status page, https://referee.funge.cash/faucet, shows the address to top up
+  and the balances. Top it up with test BCH from chipnet.bch.ninja and PUSD from the dev wallet
+  (`node scripts/send-test-pusd.ts <faucet address> <units>`). Without the variable the faucet is off.
 - Health check path: `/health`. Restart automatically if it crashes (restart is safe: downtime counts as a pause).
 - The data folder must survive restarts. If it is lost, a round that already has moves gets a fresh clock from the chain's state (a full clock: the cap), and no one loses a payout.
 
