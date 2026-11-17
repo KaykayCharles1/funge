@@ -1,4 +1,5 @@
-// Cloudflare Worker for funge.cash: the built site (dist) plus the /next-round route in worker/index.ts.
+// Cloudflare Worker for funge.cash: the built site (dist) plus the /next-round route in worker/index.ts, and the
+// invite-link card on the game page (/play/).
 // "name" must match the Worker's name in the Cloudflare dashboard. The secret GITHUB_TOKEN is set there, not here.
 {
   "name": "funge",
@@ -7,7 +8,7 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/next-round"]
+    "run_worker_first": ["/next-round", "/play/", "/play/index.html"]
   },
   "vars": {
     "REFEREE_URL": "https://referee.funge.cash",

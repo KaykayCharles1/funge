@@ -3,6 +3,16 @@
 //                      game file is settled, this starts the GitHub "Next round" workflow, which deploys it.
 // Secret GITHUB_TOKEN (Cloudflare): a fine-grained token with "Actions: read and write" on this repository only.
 // Anyone may call the route: the workflow itself only deploys when the round is over, and runs one at a time.
+// It also passes over the game page (/play/): for an invite link (?from=King%20Charles) the link card's title and
+// description become the summons, so a chat shows "King Charles summons you to battle for the throne."
+import { COPY } from "../src/copy.ts";
+import { invitedBy } from "../src/lib/invite.ts";
+
+// The Workers runtime's HTML rewriter (only the part used here)
+declare class HTMLRewriter {
+  on(selector: string, handler: { element(e: { setAttribute(name: string, value: string): void }): void }): HTMLRewriter;
+  transform(response: Response): Response;
+}
 
 interface Env {
   ASSETS: { fetch(request: Request | string): Promise<Response> };
@@ -60,6 +70,17 @@ export default {
         return reply(500, e instanceof Error ? e.message : String(e));
       }
     }
-    return env.ASSETS.fetch(request);
+    const page = await env.ASSETS.fetch(request);
+    const who = url.pathname.startsWith("/play") ? invitedBy(url.search) : null;
+    if (!who || !page.headers.get("content-type")?.includes("text/html")) return page;
+    const set = (value: string) => ({ element: (e: { setAttribute(n: string, v: string): void }) => e.setAttribute("content", value) });
+    const title = COPY.invite.summons(who);
+    const text = COPY.invite.bannerQuestion;
+    return new HTMLRewriter()
+      .on('meta[property="og:title"]', set(title))
+      .on('meta[name="twitter:title"]', set(title))
+      .on('meta[property="og:description"]', set(text))
+      .on('meta[name="twitter:description"]', set(text))
+      .transform(page);
   },
 };

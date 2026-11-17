@@ -119,6 +119,17 @@ export const COPY = {
     bannerCoins: "Get free test coins",
     bannerClose: "Dismiss",
   },
+  // The card a chat app or X shows for a shared funge.cash link (built into both pages; an invite link's title
+  // becomes "King Charles summons you to battle for the throne." in worker/index.ts)
+  preview: {
+    siteName: "Funge",
+    title: "Funge: Battle for the throne",
+    description: "Conquer the throne, protect it, and be the last King standing to win the Treasury. A game on Bitcoin Cash.",
+    imageAlt: "The Funge crown and logo over the castle in its valley, with the words Battle for the throne.",
+    // the words on the picture itself (public/assets/share/preview.jpg; its .json says how it was made)
+    imageTitle: "Battle for the throne",
+    imageLine: "Be the last King standing and win the Treasury",
+  },
   // The chipnet test faucet, under the wallets on the game page (chipnet only)
   faucet: {
     title: "Free test coins",
