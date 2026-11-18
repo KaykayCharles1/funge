@@ -24,9 +24,16 @@ export const CONFIG = {
   // chipnet: our own test token (filled in after Step 3a). mainnet: from the official PUSD docs.
   pusdCategory: {
     chipnet: "735d04cdead10c2eec0b608ab30b0e9c6edc1b07fa2f06c8ebe99b2e0d2a2163", // test PUSD v2 (100,000.00 and a minting NFT, Nov 2026)
-    mainnet: "REPLACE_FROM_PUSD_DOCS",
+    mainnet: "2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544", // ParyonUSD (PUSD), checked by Charles against paryonusd.com, Nov 2026
   } as Record<Net, string>,
-  pusdDecimals: 2, // TODO: confirm from the token's BCMR metadata before mainnet
+  pusdDecimals: 2, // ParyonUSD's on-chain metadata (BCMR) says 2
+
+  // "Get PUSD" swaps BCH for PUSD against Cauldron's pools (src/lib/swap.ts). Mainnet: Cauldron's own pool list.
+  // Chipnet, where Cauldron does not run: our practice pools, owned by the dev wallet (scripts/create-chipnet-pool.ts).
+  swap: {
+    indexerUrl: "https://indexer.riften.net",
+    chipnetPoolOwner: "53478d4c3763bfc04cf433a148c8ac14435233f7", // first pool: 7,500.00 test PUSD and 0.015 test BCH, Nov 2026
+  },
 
   // Kingdom (FungeKingdom contract). Deploy-time contract settings, in base units of PUSD (2 decimals).
   kingdom: {
