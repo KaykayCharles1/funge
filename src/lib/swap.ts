@@ -1,22 +1,25 @@
-// Swap BCH for PUSD against Cauldron's pools, the part with no page in it. Cauldron is a set of small pool
+// Swap BCH and PUSD (either way) against Cauldron's pools, the part with no page in it. Cauldron is a set of small pool
 // contracts that anyone may trade with; CashLab (@cashlab/cauldron) picks the pools, does the pool arithmetic, builds
 // the trade transaction and checks it. The game wallet signs its own coins through its signing capability
 // (unlockP2PKH): the key never leaves src/wallet/. CashLab chooses the pools and the amounts; the transaction is
 // built with CashScript, because CashLab's own builder needs the private key itself.
 //   Pools: on mainnet from Cauldron's public list (indexer.riften.net); on chipnet, where Cauldron does not run,
 //   from our own practice pool (scripts/create-chipnet-pool.ts).
-import { binToHex, hexToBin, lockingBytecodeToCashAddress } from "@bitauth/libauth";
-import { buildPoolV0UnlockingBytecode, ExchangeLab, type PoolV0, type TradeResult } from "@cashlab/cauldron";
-import { TransactionBuilder, type NetworkProvider, type SpendableUtxo, type Unlocker } from "cashscript";
+import {
+  binToHex, encodeDataPush, generateSigningSerializationBch, hash160, hash256, hexToBin, lockingBytecodeToCashAddress,
+} from "@bitauth/libauth";
+import { buildPoolV0RedeemScriptBytecode, buildPoolV0UnlockingBytecode, ExchangeLab, type PoolV0, type TradeResult } from "@cashlab/cauldron";
+import { TransactionBuilder, type NetworkProvider, type SignatureTemplate, type SpendableUtxo, type Unlocker } from "cashscript";
 
 export const MAX_PRICE_MOVE = 0.03; // refuse a swap that pays more than 3% over the best price before it
 const FEE_PER_BYTE = 1n; // for CashLab's choice of pools
 const FEE_RATE = 1.0; // sats per byte, the network's usual minimum
 const PUSD_OUTPUT_SATS = 1_000n; // the BCH that carries the bought PUSD
+export const MIN_SELL_SATS = 1_000n; // a smaller swap would cost more in network fee than it buys
 
-export type SwapWallet = { lock: Uint8Array; unlockP2PKH: () => Unlocker };
+export type SwapWallet = { lock: Uint8Array; tokenAddress: string; unlockP2PKH: () => Unlocker };
 
-export type SwapError = "no_pools" | "too_big" | "price_move" | "no_bch" | "pools_changed";
+export type SwapError = "no_pools" | "too_big" | "too_small" | "price_move" | "no_bch" | "no_pusd" | "pools_changed";
 export class SwapFailure extends Error {
   readonly code: SwapError;
   constructor(code: SwapError) {
@@ -63,84 +66,146 @@ export async function poolsOnChain(provider: NetworkProvider, ownerPkh: Uint8Arr
     .map((u) => pool(ownerPkh, u.txid, u.vout, u.satoshis, u.token!.amount, category));
 }
 
+// Which way: BCH to PUSD (buy PUSD), or PUSD to BCH (sell PUSD). `side` says which amount the player typed:
+// "sell" is the top coin (what they give), "buy" the bottom one (what they get).
+export type Direction = "toPusd" | "toBch";
+export type Side = "sell" | "buy";
+
 export type SwapQuote = {
   trade: TradeResult;
   category: string;
-  pusd: bigint; // what the player gets
-  sats: bigint; // what it costs in BCH, before the network fee
-  priceMove: number; // how much more than the best price before the swap, 0.012 = 1.2%
+  direction: Direction;
+  pusd: bigint; // PUSD the player gets (toPusd) or gives (toBch)
+  sats: bigint; // BCH the player gives (toPusd) or gets (toBch), before the network fee
+  poolFee: bigint; // sats that go to the pools' owners (Cauldron's 0.3%)
+  priceMove: number; // how much worse than the best price before the swap, 0.012 = 1.2%
 };
 
-// "I want this much PUSD": the cheapest way to get it from these pools
-export function quote(pools: PoolV0[], category: string, pusdWanted: bigint): SwapQuote {
+// The market price: sats per PUSD base unit across these pools
+export function marketPrice(pools: PoolV0[]): number | null {
+  const sats = pools.reduce((n, p) => n + Number(p.output.amount), 0);
+  const units = pools.reduce((n, p) => n + Number(p.output.token.amount), 0);
+  return units > 0 ? sats / units : null;
+}
+
+// The best rate these pools give for the amount the player typed
+export function quote(pools: PoolV0[], category: string, amount: bigint, side: Side = "buy", direction: Direction = "toPusd"): SwapQuote {
   if (pools.length === 0) throw new SwapFailure("no_pools");
+  const toPusd = direction === "toPusd";
+  const supplyId = toPusd ? "BCH" : category;
+  const demandId = toPusd ? category : "BCH";
+  const satsSide = toPusd ? "sell" : "buy"; // the side whose amount is in sats
+  if (side === satsSide && amount < MIN_SELL_SATS) throw new SwapFailure("too_small");
   let trade: TradeResult;
   try {
-    trade = lab.constructTradeBestRateForTargetDemand("BCH", category, pusdWanted, pools, FEE_PER_BYTE);
+    trade = side === "buy"
+      ? lab.constructTradeBestRateForTargetDemand(supplyId, demandId, amount, pools, FEE_PER_BYTE)
+      : lab.constructTradeBestRateForTargetSupply(supplyId, demandId, amount, pools, FEE_PER_BYTE);
   } catch {
     throw new SwapFailure("too_big"); // more than the pools can give
   }
-  // The best price before the swap: the cheapest pool's sats per PUSD unit
-  const best = Math.min(...pools.map((p) => Number(p.output.amount) / Number(p.output.token.amount)));
-  const paid = Number(trade.summary.supply) / Number(trade.summary.demand);
-  return { trade, category, pusd: trade.summary.demand, sats: trade.summary.supply, priceMove: paid / best - 1 };
+  const { supply, demand, trade_fee } = trade.summary;
+  if (demand <= 0n) throw new SwapFailure("too_small");
+  const sats = toPusd ? supply : demand;
+  const pusd = toPusd ? demand : supply;
+  if (sats < MIN_SELL_SATS) throw new SwapFailure("too_small");
+  // The best price before the swap: the cheapest pool to buy from, or the dearest to sell to (sats per PUSD unit)
+  const rates = pools.map((p) => Number(p.output.amount) / Number(p.output.token.amount));
+  const rate = Number(sats) / Number(pusd);
+  const priceMove = toPusd ? rate / Math.min(...rates) - 1 : Math.max(...rates) / rate - 1;
+  return { trade, category, direction, pusd, sats, poolFee: trade_fee, priceMove };
 }
 
-export type SwapTx = { hex: string; fee: bigint; pusd: bigint; sats: bigint };
+// The most BCH a swap can spend: the plain BCH coins, less the BCH that carries the PUSD and room for the fee
+export const SWAP_RESERVE = 4_000n;
+
+export type SwapTx = { hex: string; fee: bigint; pusd: bigint; sats: bigint; direction: Direction };
+
+const largestFirst = (a: SpendableUtxo, b: SpendableUtxo) => (a.satoshis < b.satoshis ? 1 : a.satoshis > b.satoshis ? -1 : 0);
+const tokensFirst = (a: SpendableUtxo, b: SpendableUtxo) =>
+  a.token!.amount < b.token!.amount ? 1 : a.token!.amount > b.token!.amount ? -1 : 0;
 
 // Build the trade with CashScript, as every game move is built. Cauldron's rule: each pool coin is spent and
-// re-created at the same position, so the pools come first in both inputs and outputs. Then the game wallet's plain
-// BCH coins (signed by the wallet), the PUSD to the game wallet and the BCH change.
+// re-created at the same position, so the pools come first in both inputs and outputs. Then the game wallet's coins
+// (signed by the wallet), what the player gets, and the change.
 export async function buildSwap(provider: NetworkProvider, wallet: SwapWallet, q: SwapQuote): Promise<SwapTx> {
   if (q.priceMove > MAX_PRICE_MOVE) throw new SwapFailure("price_move");
-  const coins = (await provider.getUtxosForLockingBytecode(wallet.lock))
-    .filter((u) => !u.token)
-    .sort((a, b) => (a.satoshis < b.satoshis ? 1 : a.satoshis > b.satoshis ? -1 : 0));
-  // largest coins first, until the price, the PUSD output's BCH and a generous fee are covered
-  const need = q.sats + PUSD_OUTPUT_SATS + 5_000n;
-  const paying: SpendableUtxo[] = [];
-  let total = 0n;
-  for (const c of coins) {
-    if (total >= need) break;
-    paying.push(c);
-    total += c.satoshis;
-  }
-  if (total < need) throw new SwapFailure("no_bch");
+  const toPusd = q.direction === "toPusd";
+  const coins = await provider.getUtxosForLockingBytecode(wallet.lock);
+  const plainCoins = coins.filter((u) => !u.token).sort(largestFirst);
+  const pick = (list: SpendableUtxo[], enough: (picked: SpendableUtxo[]) => boolean) => {
+    const picked: SpendableUtxo[] = [];
+    for (const c of list) {
+      if (enough(picked)) break;
+      picked.push(c);
+    }
+    return enough(picked) ? picked : null;
+  };
+  const satsOf = (list: SpendableUtxo[]) => list.reduce((n, u) => n + u.satoshis, 0n);
 
-  const builder = new TransactionBuilder({ provider });
-  for (const e of q.trade.entries) {
-    const p = e.pool;
-    const unlockingBytecode = buildPoolV0UnlockingBytecode(p.parameters); // the trade path needs no signature
-    builder.addInput(
-      {
-        txid: binToHex(p.outpoint.txhash),
-        vout: p.outpoint.index,
-        satoshis: p.output.amount,
-        lockingBytecode: binToHex(p.output.locking_bytecode),
-        token: { amount: p.output.token.amount, category: p.output.token.token_id },
-      },
-      { generateUnlockingBytecode: () => unlockingBytecode },
-    );
+  let paying: SpendableUtxo[];
+  if (toPusd) {
+    // largest BCH coins first, until the price, the PUSD output's BCH and the fee are covered
+    const picked = pick(plainCoins, (l) => satsOf(l) >= q.sats + SWAP_RESERVE);
+    if (!picked) throw new SwapFailure("no_bch");
+    paying = picked;
+  } else {
+    // largest PUSD coins first, until the PUSD sold is covered; the BCH the player gets pays the fee
+    const pusdCoins = coins.filter((u) => u.token?.category === q.category && !u.token.nft).sort(tokensFirst);
+    const picked = pick(pusdCoins, (l) => l.reduce((n, u) => n + u.token!.amount, 0n) >= q.pusd);
+    if (!picked) throw new SwapFailure("no_pusd");
+    paying = picked;
   }
-  for (const e of q.trade.entries) {
-    const p = e.pool;
-    builder.addOutput({
-      to: p.output.locking_bytecode,
-      amount: p.output.amount + e.supply,
-      token: { amount: p.output.token.amount - e.demand, category: p.output.token.token_id },
-    });
-  }
-  builder.addInputs(paying, wallet.unlockP2PKH());
-  builder.addOutput({ to: wallet.lock, amount: PUSD_OUTPUT_SATS, token: { amount: q.pusd, category: q.category } });
+
+  const attempt = (extra: SpendableUtxo[]) => {
+    const builder = new TransactionBuilder({ provider });
+    for (const e of q.trade.entries) {
+      const p = e.pool;
+      const unlockingBytecode = buildPoolV0UnlockingBytecode(p.parameters); // the trade path needs no signature
+      builder.addInput(
+        {
+          txid: binToHex(p.outpoint.txhash),
+          vout: p.outpoint.index,
+          satoshis: p.output.amount,
+          lockingBytecode: binToHex(p.output.locking_bytecode),
+          token: { amount: p.output.token.amount, category: p.output.token.token_id },
+        },
+        { generateUnlockingBytecode: () => unlockingBytecode },
+      );
+    }
+    for (const e of q.trade.entries) {
+      const p = e.pool;
+      builder.addOutput({
+        to: p.output.locking_bytecode,
+        amount: toPusd ? p.output.amount + e.supply : p.output.amount - e.demand,
+        token: { amount: toPusd ? p.output.token.amount - e.demand : p.output.token.amount + e.supply, category: p.output.token.token_id },
+      });
+    }
+    builder.addInputs([...paying, ...extra], wallet.unlockP2PKH());
+    if (toPusd) {
+      builder.addOutput({ to: wallet.lock, amount: PUSD_OUTPUT_SATS, token: { amount: q.pusd, category: q.category } });
+    } else {
+      builder.addTokenChangeOutputIfNeeded({ category: q.category, to: wallet.tokenAddress }); // PUSD not sold
+    }
+    builder.addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate: FEE_RATE }); // toBch: this is the BCH they get
+    return { builder, inputs: [...paying, ...extra] };
+  };
+  let built: ReturnType<typeof attempt>;
   try {
-    builder.addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate: FEE_RATE });
+    built = attempt([]);
   } catch {
-    throw new SwapFailure("no_bch");
+    // selling PUSD for very little BCH: add a BCH coin to cover the fee
+    if (toPusd || plainCoins.length === 0) throw new SwapFailure("no_bch");
+    try {
+      built = attempt([plainCoins[0]!]);
+    } catch {
+      throw new SwapFailure("no_bch");
+    }
   }
-  const hex = builder.build(); // CashScript refuses a transaction that would destroy tokens
-  const inSats = total + q.trade.entries.reduce((s, e) => s + e.pool.output.amount, 0n);
-  const fee = inSats - builder.outputs.reduce((s, o) => s + o.amount, 0n);
-  return { hex, fee, pusd: q.pusd, sats: q.sats };
+  const hex = built.builder.build(); // CashScript refuses a transaction that would destroy tokens
+  const inSats = satsOf(built.inputs) + q.trade.entries.reduce((n, e) => n + e.pool.output.amount, 0n);
+  const fee = inSats - built.builder.outputs.reduce((n, o) => n + o.amount, 0n);
+  return { hex, fee, pusd: q.pusd, sats: q.sats, direction: q.direction };
 }
 
 // Send it. If someone traded with one of these pools a moment ago, the network refuses it and nothing is spent.
@@ -153,3 +218,21 @@ export async function sendSwap(provider: NetworkProvider, tx: SwapTx): Promise<s
     throw e;
   }
 }
+
+// For the pool's owner only (scripts/reset-chipnet-pool.ts): take a pool coin back. The withdraw path of the pool
+// contract checks the owner's signature over the pool's own script, so this signs with that script as the covered
+// bytecode rather than as a plain P2PKH coin.
+export function poolWithdrawUnlocker(owner: SignatureTemplate): Unlocker {
+  const redeem = buildPoolV0RedeemScriptBytecode({ withdraw_pubkey_hash: hash160(owner.publicKey) });
+  return {
+    generateUnlockingBytecode: ({ transaction, sourceOutputs, inputIndex }) => {
+      const preimage = generateSigningSerializationBch(
+        { inputIndex, sourceOutputs, transaction },
+        { coveredBytecode: redeem, signingSerializationType: new Uint8Array([owner.sighashType | SIGHASH_FORKID]) },
+      );
+      const signature = owner.generateSignature(hash256(preimage));
+      return Uint8Array.from([...encodeDataPush(signature), ...encodeDataPush(owner.publicKey), ...encodeDataPush(redeem)]);
+    },
+  };
+}
+const SIGHASH_FORKID = 0x40;

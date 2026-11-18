@@ -192,6 +192,56 @@ export const COPY = {
     } as Record<string, string>,
   },
 
+  // Swap: the game wallet's BCH and PUSD, either way, through Cauldron's pools, laid out like any exchange (sell on top, buy below)
+  swap: {
+    button: "Swap",
+    title: "Swap",
+    practice: "Practice pool",
+    sell: "Sell",
+    buy: "Buy",
+    percents: [25, 50, 75],
+    max: "Max",
+    settings: "Swap settings",
+    flip: "Switch the two coins",
+    slippage: "Max slippage",
+    slippageAuto: "Auto",
+    slippageHelp: "If someone trades just before you, your swap still goes through when the new price is within this much of the one you reviewed.",
+    // the main button
+    enter: "Enter an amount",
+    loading: "Getting price…",
+    review: "Review",
+    notEnough: (coin: string) => `Not enough ${coin}`,
+    tooBig: (coin: string) => `Not enough ${coin} on offer`,
+    tooSmall: "Amount too small",
+    tooMuchImpact: "Price impact over 3%",
+    unavailable: "Exchange unavailable",
+    // under the panels
+    rate: (bch: string, usd: string) => `1 PUSD = ${bch} BCH${usd ? ` (${usd})` : ""}`,
+    networkCost: "Network cost",
+    // the review window
+    confirmTitle: "You're swapping",
+    close: "Close",
+    showMore: "Show more",
+    showLess: "Show less",
+    rowRate: "Rate",
+    rowFee: "Pool fee",
+    rowNetwork: "Network cost",
+    rowImpact: "Price impact",
+    rowSlippage: "Max slippage",
+    rowRoute: "Route",
+    route: "Cauldron",
+    rateLine: (bch: string) => `1 BCH = ${bch} PUSD`,
+    send: "Swap",
+    sending: "Swapping…",
+    retrying: "Price moved a little. Trying again…",
+    done: (amount: string, coin: string) => `Swapped. +${amount} ${coin}`,
+    errors: {
+      pools_changed: "The price moved more than your slippage. Nothing was spent. Review again.",
+      busy: "Wait until your move is confirmed, then try again.",
+      failed: "Could not swap. Check your balances in a minute before trying again.",
+    } as Record<string, string>,
+  },
+
   // The Kingdom page. Change the wording here only.
   // The landing page (index.html, at /): the game presented as a board game, the valley as the box lid and the rules as the
   // rule sheet. Plain, short sentences; real numbers only.

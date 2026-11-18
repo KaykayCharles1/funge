@@ -29,6 +29,7 @@ import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 import { initWithdraw, withdrawing } from "./withdrawUI.ts";
+import { initSwap, swapping } from "./swapUI.ts";
 import { initFaucet, renderFaucet } from "./faucetUI.ts";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -448,7 +449,7 @@ function renderActions() {
 // Open, conquer or protect with whichever wallet is playing. `amount` is the price the player agreed to (open, conquer)
 // or the protect amount. Nothing is spent beyond it: the helpers re-check the chain and refuse a changed price.
 async function run(kind: Kind, amount: bigint, profile?: { name: string; avatarId: string }) {
-  if (acting || mockActive || withdrawing()) return; // never spend anything while the mock round shows or a withdrawal is sending
+  if (acting || mockActive || withdrawing() || swapping()) return; // never spend anything while the mock round shows or a withdrawal or swap is sending
   const external = externalPkh();
   const local = getLocalWallet();
   if (external === null && !local) return;
@@ -929,7 +930,11 @@ export async function startKingdomMode() {
     setTimeout(() => void refreshBalances(provider), 2_000);
     setTimeout(() => void refreshBalances(provider), 8_000);
   });
-  initWithdraw(provider, getLocalWallet, () => acting, () => {
+  initSwap(provider, getLocalWallet, () => acting || withdrawing(), () => {
+    setTimeout(() => void refreshBalances(provider), 2_000);
+    setTimeout(() => void refreshBalances(provider), 8_000);
+  });
+  initWithdraw(provider, getLocalWallet, () => acting || swapping(), () => {
     setTimeout(() => void refreshBalances(provider), 2_000);
     setTimeout(() => void refreshBalances(provider), 8_000);
   });
