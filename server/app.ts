@@ -30,6 +30,7 @@ export type AppDeps = {
   logger?: boolean;
   trustProxy?: boolean; // true only behind a host proxy, so rate limits see the visitor and not the proxy
   faucet?: Faucet | null; // the chipnet test faucet, when FUNGE_FAUCET_SEED is set
+  mayOpen?: (gameId: string) => boolean; // the opening rule (server/gameRegistry.ts); without it any round may open
 };
 
 // The faucet's status page, for whoever tops it up: public facts only (the same as on a block explorer)
@@ -126,7 +127,11 @@ export async function buildApp(deps: AppDeps) {
   await app.register(rateLimit, { global: true, max: GLOBAL_RATE.max, timeWindow: GLOBAL_RATE.windowMs });
   await app.register(websocket);
 
-  const byId = new Map(games.map((g) => [g.gameId, g]));
+  // The list grows and shrinks while the server runs (server/gameRegistry.ts): look it up on every request
+  const byId = {
+    get: (id: string) => games.find((g) => g.gameId === id),
+    has: (id: string) => games.some((g) => g.gameId === id),
+  };
   const clients = new Map<string, Set<Client>>();
 
   const stopListening = manager.onEvent((gameId, event) => {
@@ -164,6 +169,13 @@ export async function buildApp(deps: AppDeps) {
       const { id } = request.params as { id: string };
       const game = byId.get(id);
       if (!game) return reply.code(404).send({ ok: false, error: "unknown_round", serverNow: clock.now() });
+      // The prepared next round opens only once the current one is settled
+      const action = (request.body as { action?: unknown } | null)?.action;
+      if (action === "open" && deps.mayOpen && !deps.mayOpen(id)) {
+        return reply.code(409).send({
+          ok: false, error: "not_started", message: "This round starts when the current one ends.", serverNow: clock.now(),
+        });
+      }
       try {
         const result = await executeAct(
           { manager, chain, clock, referee: deps.referee, locks: deps.locks, unconfirmed: deps.unconfirmed, sleep: deps.sleep },

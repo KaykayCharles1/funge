@@ -610,6 +610,7 @@ export const COPY = {
     bad_name: "That name cannot be used. Use 2 to 16 letters, digits, spaces, apostrophes or hyphens.",
     name_taken: "Another player in this round already uses that name. Choose another.",
     avatar_taken: "Another player in this round already uses that portrait. Choose another.",
+    not_started: "This round starts when the current one ends.",
   } satisfies Record<ApiErrorCode, string>,
 } as const;
 

@@ -70,11 +70,45 @@ export function parseKingdomGameFile(j: any, network: Network): ServerGame {
   };
 }
 
-// Loads the Kingdom game file. The chipnet referee key is checked against the public key in that file.
-export function loadGames(network: Network): { games: ServerGame[]; chipnetPubkeys: string[] } {
-  const file = publicFile(`game.${network}.kingdom.json`);
-  if (!existsSync(file)) throw new Error(`Missing public/game.${network}.kingdom.json (run scripts/deploy-kingdom.ts)`);
-  const j = JSON.parse(readFileSync(file, "utf8"));
-  const game = parseKingdomGameFile(j, network);
-  return { games: [game], chipnetPubkeys: network === "chipnet" ? [game.refereePubkey] : [] };
+// ---- The current round and the prepared next one (server/gameRegistry.ts) ----
+// public/game.<network>.kingdom.json is the current round; public/game.<network>.next.json, when there is one, is the
+// next round: already deployed, waiting, and not to be opened until the current one is settled.
+// They are read from the published site (FUNGE_GAMES_URL, e.g. https://funge.cash) or, without it, from public/.
+export type GameSource = { kind: "local" } | { kind: "url"; base: string };
+export type GameFiles = { current: ServerGame; next: ServerGame | null; problems: string[] };
+export const gameFileNames = (network: Network) => ({ current: `game.${network}.kingdom.json`, next: `game.${network}.next.json` });
+
+async function readOne(source: GameSource, name: string, fetchImpl: typeof fetch): Promise<unknown | null> {
+  if (source.kind === "local") {
+    const file = publicFile(name);
+    return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
+  }
+  const res = await fetchImpl(`${source.base}/${name}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null; // a page instead of a file (the site answers unknown paths with a page): no such file
+  }
+}
+
+// The current round must be there and valid. A next round that is missing is normal; one that is broken is reported
+// in `problems` and ignored.
+export async function readGameFiles(network: Network, source: GameSource, fetchImpl: typeof fetch = fetch): Promise<GameFiles> {
+  const names = gameFileNames(network);
+  const rawCurrent = await readOne(source, names.current, fetchImpl);
+  if (rawCurrent === null) throw new Error(`Missing ${names.current} (${source.kind === "url" ? source.base : "public/"})`);
+  const current = parseKingdomGameFile(rawCurrent, network);
+  const problems: string[] = [];
+  let next: ServerGame | null = null;
+  try {
+    const rawNext = await readOne(source, names.next, fetchImpl);
+    if (rawNext !== null) next = parseKingdomGameFile(rawNext, network);
+  } catch (e) {
+    problems.push(`${names.next}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (next && next.gameId === current.gameId) next = null; // the robot promoted it: the same round
+  return { current, next, problems };
 }

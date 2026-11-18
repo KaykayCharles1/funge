@@ -39,15 +39,20 @@ export function loadKeyring(opts: { network: Network; games: GameKeyInfo[]; chip
   const pool = candidates(network);
   if (games.length === 0) throw new Error("No games configured.");
   const byGame = new Map<string, Uint8Array>();
-  for (const g of games) {
+  const addGame = (g: GameKeyInfo, when: string) => {
     const key = pool.find((k) => pubOf(k) === g.refereePubkey);
-    if (!key) throw new Error(`Refusing to start: no ${network} referee key matches game ${g.gameId}.`);
+    if (!key) throw new Error(`${when}: no ${network} referee key matches game ${g.gameId}.`);
     if (network === "mainnet" && chipnetPubkeys.includes(g.refereePubkey)) {
-      throw new Error("Refusing to start: a mainnet game uses a chipnet referee key.");
+      throw new Error(`${when}: a mainnet game uses a chipnet referee key.`);
     }
     byGame.set(g.gameId, key);
-  }
+  };
+  for (const g of games) addGame(g, "Refusing to start");
   return {
+    // A round that appears while the server runs (server/gameRegistry.ts): the same checks as at start
+    add(g: GameKeyInfo): void {
+      if (!byGame.has(g.gameId)) addGame(g, "Refusing this game");
+    },
     keyFor(gameId: string): Uint8Array {
       const k = byGame.get(gameId);
       if (!k) throw new Error(`Unknown game ${gameId}`);

@@ -5,7 +5,8 @@ import { CLOCK_SETTINGS, GRACE_SECONDS, HEARTBEAT_SECONDS, KEEPER_DELAY_SECONDS,
 import { buildApp } from "./app.ts";
 import { makeChainReader } from "./chain.ts";
 import { systemClock } from "./clock.ts";
-import { loadGames } from "./games.ts";
+import { readGameFiles, type GameSource, type ServerGame } from "./games.ts";
+import { makeGameRegistry } from "./gameRegistry.ts";
 import { loadKeyring, type Network } from "./keys.ts";
 import { makeLocks } from "./lock.ts";
 import { makeReferee } from "./referee.ts";
@@ -25,10 +26,28 @@ const network = CONFIG.network as Network;
 installSafeConsole();
 const dataDir = process.env.FUNGE_DATA_DIR ?? fileURLToPath(new URL("./data", import.meta.url));
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const GAMES_REFRESH_SECONDS = 10;
 
 try {
   const { host, port, allowedOrigins, trustProxy } = readServerEnv(process.env);
-  const { games, chipnetPubkeys } = loadGames(network);
+  // Where the round files come from: the published site (FUNGE_GAMES_URL, e.g. https://funge.cash), so new rounds
+  // arrive without a restart; without it, this server's own public/ folder
+  const gamesUrl = process.env.FUNGE_GAMES_URL?.trim().replace(/\/$/, "");
+  if (gamesUrl && !/^https:\/\/[^/]+$/.test(gamesUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(gamesUrl)) {
+    throw new Error(`FUNGE_GAMES_URL must be an https address with no path, like https://funge.cash (got ${gamesUrl}).`);
+  }
+  const gameSource: GameSource = gamesUrl ? { kind: "url", base: gamesUrl } : { kind: "local" };
+  let files;
+  try {
+    files = await readGameFiles(network, gameSource);
+  } catch (e) {
+    if (gameSource.kind === "local") throw e;
+    console.warn(`could not read the round files from ${gamesUrl} (${e instanceof Error ? e.message : String(e)}); starting from this server's copy`);
+    files = await readGameFiles(network, { kind: "local" });
+  }
+  const games: ServerGame[] = [files.current]; // grows and shrinks while running (server/gameRegistry.ts)
+  const chipnetPubkeys = network === "chipnet" ? [files.current.refereePubkey] : [];
+  console.log(`round files: ${gameSource.kind === "url" ? `${gamesUrl} (checked every ${GAMES_REFRESH_SECONDS} s)` : "public/ on this server"}`);
   const keyring = loadKeyring({ network, games, chipnetPubkeys }); // throws if the key is missing or wrong
   if (network === "mainnet" && (process.env.FUNGE_KEEPER_DELAY_SECONDS || process.env.FUNGE_UNCONFIRMED_CAP)) {
     throw new Error("Refusing to start: timer overrides are for testing only.");
@@ -83,9 +102,16 @@ try {
     console.log("test faucet off (no FUNGE_FAUCET_SEED)");
   }
 
+  // New rounds (the prepared next one, then each promotion) are picked up from the round files while running
+  const registry = makeGameRegistry({ network, source: gameSource, games, keyring, referee, manager });
+  await registry.refresh().catch((e) => console.warn(`round files: ${e instanceof Error ? e.message : String(e)}`));
+  setInterval(() => {
+    registry.refresh().catch((e) => warnThrottled("round-files", `round files: ${e instanceof Error ? e.message : String(e)}`));
+  }, GAMES_REFRESH_SECONDS * 1000);
+
   const app = await buildApp({
     games, manager, chain, clock: systemClock, allowedOrigins, trustProxy,
-    referee, locks, unconfirmed, sleep, faucet,
+    referee, locks, unconfirmed, sleep, faucet, mayOpen: registry.mayOpen,
   });
   const keeper = createKeeper({ manager, chain, clock: systemClock, referee, locks, unconfirmed, sleep }, games);
   const stopKeeper = keeper.start();

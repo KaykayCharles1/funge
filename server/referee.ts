@@ -16,9 +16,9 @@ export function makeReferee(
   provider: ElectrumNetworkProvider,
   keyring: ReturnType<typeof loadKeyring>,
   games: ServerGame[],
-): Referee {
+): Referee & { add: (g: ServerGame) => void } {
   const contracts = new Map<string, { state: Contract; pot: Contract }>();
-  for (const g of games) {
+  const addGame = (g: ServerGame, when: string) => {
     const pot = new Contract(artifact("FungePot"), [swapEndianness(g.gameId)], { provider });
     const k = g.kingdom;
     const state = new Contract(
@@ -30,16 +30,21 @@ export function makeReferee(
       { provider },
     );
     if (pot.lockingBytecode !== g.potLockingBytecode || state.lockingBytecode !== g.stateLockingBytecode) {
-      throw new Error(`Refusing to start: the compiled contracts do not match the deployed game ${g.gameId}.`);
+      throw new Error(`${when}: the compiled contracts do not match the deployed game ${g.gameId}.`);
     }
     contracts.set(g.gameId, { state, pot });
-  }
+  };
+  for (const g of games) addGame(g, "Refusing to start");
   const need = (id: string) => {
     const c = contracts.get(id);
     if (!c) throw new Error("unknown game");
     return c;
   };
   return {
+    // A round that appears while the server runs (server/gameRegistry.ts): the same contract check as at start
+    add(g) {
+      if (!contracts.has(g.gameId)) addGame(g, "Refusing this game");
+    },
     sign(game, tx, sourceOutputs, call) {
       const { state } = need(game.gameId);
       const template = keyring.templateFor(game.gameId); // ALL | UTXOS (Step 3)
