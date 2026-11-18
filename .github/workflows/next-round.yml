@@ -1,6 +1,8 @@
-# The robot: every 15 minutes it asks the Referee whether the round is over. If it is, it deploys the next
-# round (paid by the deploy wallet), commits the new game file to main (Cloudflare rebuilds the site), and
-# calls Render's deploy hook so the Referee loads the new game. Run it by hand from the Actions tab too.
+# The robot: keeps a next round ready. Every 15 minutes (and when a page sees a round end) it asks the Referee about
+# the current round and the prepared one. A settled current round is replaced by the prepared one; a missing prepared
+# round is deployed (paid by the deploy wallet). The new files are committed to main; Cloudflare publishes them and
+# the Referee picks them up by itself (FUNGE_GAMES_URL). Render is only restarted when the Referee has not picked a
+# file up for 5 minutes. Run it by hand from the Actions tab too.
 # Secrets: FUNGE_DEPLOY_SEED (the deploy wallet's seed phrase), RENDER_DEPLOY_HOOK (Render's deploy hook link).
 name: Next round
 
@@ -10,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       replace_unopened:
-        description: "Also replace a round nobody has opened (after a rule change)"
+        description: "Rule change: replace the prepared round, and the current one if nobody has opened it"
         type: boolean
         default: false
 
@@ -38,24 +40,24 @@ jobs:
 
       - run: npm ci
 
-      - name: Check the round, deploy the next one if it is over
+      - name: Check the rounds; promote the prepared one, prepare the next
         id: round
         run: node scripts/next-round.ts https://referee.funge.cash ${{ inputs.replace_unopened && '--replace-unopened' || '' }}
         env:
           FUNGE_DEPLOY_SEED: ${{ secrets.FUNGE_DEPLOY_SEED }}
 
-      - name: Commit the new game file
+      - name: Commit the round files
         if: steps.round.outputs.action == 'deployed'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898315+github-actions[bot]@users.noreply.github.com"
-          git add public/game.chipnet.kingdom.json
-          git commit -m "Next round: new game file"
+          git add -A -- public/game.chipnet.kingdom.json public/game.chipnet.next.json
+          git commit -m "Next round: round files"
           git pull --rebase origin main
           git push origin HEAD:main
 
-      - name: Tell Render to load the new game
-        if: steps.round.outputs.action == 'deployed' || steps.round.outputs.action == 'redeploy'
+      - name: Restart the Referee (only when it has not picked up a round file)
+        if: steps.round.outputs.redeploy == 'yes'
         # ref = this exact commit: without it Render may deploy the commit before the robot's push.
         run: curl -fsS -X POST "$HOOK&ref=$(git rev-parse HEAD)" > /dev/null && echo "Render deploy of $(git rev-parse --short HEAD) started."
         env:

@@ -1,5 +1,7 @@
 // Deploys a Kingdom game and writes public/game.<network>.kingdom.json. One command, run by the owner.
-//   node scripts/deploy-kingdom.ts [<33-byte referee public key in hex>]
+//   node scripts/deploy-kingdom.ts [<33-byte referee public key in hex>] [--next]
+// --next writes public/game.<network>.next.json: the prepared next round, which the referee keeps closed until the
+// current round is settled.
 // Without a key, on chipnet, it uses the test key in .referee.chipnet.json (made by scripts/gen-referee-key.ts). No PUSD is needed: the round starts
 // "waiting", with a BCH-only pot coin and an empty state. The first player's open puts the first PUSD in.
 // Chipnet test games can use a short fallback: FUNGE_FALLBACK_BLOCKS=3 node scripts/deploy-kingdom.ts
@@ -14,7 +16,10 @@ import { loadEnv } from "./env.ts";
 import { loadArtifact, retry, toVmCategory } from "./helpers.ts";
 
 const FEE_RATE = 2;
-const OUT = `public/game.${CONFIG.network}.kingdom.json`;
+// --next writes the prepared next round (game.<network>.next.json) instead of the current one (scripts/next-round.ts)
+const OUT = process.argv.includes("--next")
+  ? `public/game.${CONFIG.network}.next.json`
+  : `public/game.${CONFIG.network}.kingdom.json`;
 // The state and the pot each keep this much BCH for good. A settlement pays its own fee from them, and the
 // Kingdom contract is large, so this is more than the steal game needed.
 const CONTRACT_SATS = 5_000n;
@@ -30,7 +35,7 @@ function fallbackBlocks(): number {
 }
 
 function refereeKey(): string {
-  const given = (process.argv[2] ?? process.env.REFEREE_PUBKEY ?? "").toLowerCase();
+  const given = (process.argv.slice(2).find((a) => !a.startsWith("--")) ?? process.env.REFEREE_PUBKEY ?? "").toLowerCase();
   if (given) return given;
   // Chipnet: the test key made by gen-referee-key.ts (git-ignored) is the one the server signs with.
   const keyFile = new URL("../.referee.chipnet.json", import.meta.url);
