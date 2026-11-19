@@ -24,7 +24,7 @@ import { kingdomActExternal, kingdomCancelExternal, kingdomProtectExternal } fro
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
 import { playMockRound } from "./mockRound.ts";
-import { markNextRoundAlmost, nextRoundLine, resetNextRoundWait, startNextRoundWait } from "./nextRound.ts";
+import { markNextRoundAlmost, nextRoundLine, nextRoundReady, resetNextRoundWait, startNextRoundWait } from "./nextRound.ts";
 import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
@@ -655,8 +655,10 @@ async function loadEnded() {
   }
 }
 
-// A finished round: ask the site to start the next-round robot (worker/index.ts), then switch to the new round
-// once the new game file is out and the referee knows it.
+// A finished round: show the winner, then switch to the next round. Normally it is already prepared
+// (game.<network>.next.json, see scripts/next-round.ts): the switch comes WINNER_SECONDS after the end. If none is
+// prepared, the robot deploys one (asked through worker/index.ts) and the page switches once the new current file is
+// out and the referee knows it. The robot is asked either way: it also turns the prepared round into the current one.
 let nextRoundWatch = false;
 function waitForNextRound() {
   if (nextRoundWatch) return;
@@ -668,22 +670,63 @@ function waitForNextRound() {
   const ask = () => void fetch(`${import.meta.env.BASE_URL}next-round`, { method: "POST" }).catch(() => {});
   ask();
   let checks = 0;
+  let checking = false;
+  const done = (next: GameKingdom) => {
+    clearInterval(poll);
+    clearInterval(lineTimer);
+    switchToRound(next);
+  };
   const poll = setInterval(async () => {
-    if (++checks % 60 === 0) ask(); // every 5 minutes, in case the first ask did not start it
+    if (checking) return;
+    checking = true;
     try {
-      const file = `${import.meta.env.BASE_URL}game.${CONFIG.network}.kingdom.json`;
-      const next = (await (await fetch(file, { cache: "no-store" })).json()) as GameKingdom;
-      if (next.gameCategory === game.gameCategory) return;
-      markNextRoundAlmost();
-      if ((await getRound(next.gameCategory)).ok) {
+      if (++checks % 100 === 0) ask(); // every 5 minutes, in case the first ask did not start it
+      const prepared = await readRoundFile("next");
+      if (prepared && prepared.gameCategory !== game.gameCategory && (await getRound(prepared.gameCategory)).ok) {
+        // ready: switch exactly when the winner has been shown long enough
         clearInterval(poll);
-        clearInterval(lineTimer);
-        switchToRound(next);
+        setTimeout(() => done(prepared), Math.max(0, nextRoundReady() - Date.now()));
+        return;
       }
+      const current = await readRoundFile("current");
+      if (!current || current.gameCategory === game.gameCategory) return;
+      markNextRoundAlmost();
+      if ((await getRound(current.gameCategory)).ok) done(current);
     } catch {
       // try again on the next check
+    } finally {
+      checking = false;
     }
-  }, 5_000);
+  }, 3_000);
+}
+
+// The current round's file, or the prepared next round's (null when there is none). Never from the cache.
+async function readRoundFile(which: "current" | "next"): Promise<GameKingdom | null> {
+  const name = which === "current" ? `game.${CONFIG.network}.kingdom.json` : `game.${CONFIG.network}.next.json`;
+  const res = await fetch(`${import.meta.env.BASE_URL}${name}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  try {
+    const j = (await res.json()) as GameKingdom;
+    return typeof j?.gameCategory === "string" ? j : null;
+  } catch {
+    return null; // the site answers a missing file with a page
+  }
+}
+
+// On load: the current round, or the prepared one when the current round is already settled and the robot has not
+// promoted the prepared one yet (someone arriving in that minute starts on the new round, not on the old one)
+async function firstRound(): Promise<GameKingdom> {
+  const current = await readRoundFile("current");
+  if (!current) throw new Error("The round file could not be loaded.");
+  try {
+    const prepared = await readRoundFile("next");
+    if (!prepared || prepared.gameCategory === current.gameCategory) return current;
+    const now = await getRound(current.gameCategory);
+    if (!now.ok || now.round.status !== "settled") return current;
+    return (await getRound(prepared.gameCategory)).ok ? prepared : current;
+  } catch {
+    return current;
+  }
 }
 
 // Show the new round in place: the wallet stays unlocked and connected. Everything tied to the old round is
@@ -904,7 +947,7 @@ export async function startKingdomMode() {
   $("status").textContent = "Connecting to the game server…";
 
   provider = makeProvider();
-  game = (await (await fetch(`${import.meta.env.BASE_URL}game.${CONFIG.network}.kingdom.json`)).json()) as GameKingdom;
+  game = await firstRound();
 
   // The player's own wallet (WizardConnect): a second option next to the game wallet
   $("connectBtn").addEventListener("click", () => startConnection(true));
