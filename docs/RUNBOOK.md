@@ -6,7 +6,7 @@
 | Page | static host | `VITE_REFEREE_URL=https://<server> npm run build`, upload `dist/` |
 | Server (the referee) | cloud host with HTTPS | one running copy at a time, never two |
 | Referee key | the server host's secret settings | never in the repo, chat or logs |
-| Game file | `public/game.<network>.kingdom.json` | must be the same in the page build and the server checkout |
+| Game files | `public/game.<network>.kingdom.json` (current round), `public/game.<network>.next.json` (prepared next round) | written by the robot; the server reads them from the published site (`FUNGE_GAMES_URL`) |
 | Chain data | public Electrum servers | few and slow on chipnet; see `KNOWN_ISSUES.md` |
 
 Fill in the addresses here once they exist: server ______, page ______, backup server ______.
@@ -30,6 +30,9 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 - Start: `npm ci` then `npm run server`. Node 24.
 - `FUNGE_HOST=0.0.0.0`, `FUNGE_ALLOWED_ORIGINS=https://<page>`, `FUNGE_TRUST_PROXY=1`, `REFEREE_KEY_<NETWORK>=<key>`, `FUNGE_DATA_DIR=<persistent disk folder>`.
 - Do not set `FUNGE_KEEPER_DELAY_SECONDS` or `FUNGE_UNCONFIRMED_CAP` for the real round. The clock has one setting (5:00, src/refereeParams.ts); `FUNGE_BELL_PRESET` is no longer read.
+- `FUNGE_GAMES_URL=https://funge.cash`: the server reads the round files from the published site every 10 seconds, so
+  new rounds arrive without a restart (see "Rounds" below). Without it, it reads its own `public/` folder once at
+  start and every 10 seconds after (fine on your computer; on the host that copy only changes with a redeploy).
 - Optional, chipnet only: `FUNGE_FAUCET_SEED=<seed phrase>` turns on the test faucet (server/faucet.ts): each claim
   pays 20.00 PUSD and 20,000 sats from the seed's first address, once per wallet per day, 3 per visitor, 100 a day
   (src/refereeParams.ts `FAUCET`). Its status page, https://referee.funge.cash/faucet, shows the address to top up
@@ -37,6 +40,20 @@ Only one server may run for a game at a time. Two servers would have two clocks 
   (`node scripts/send-test-pusd.ts <faucet address> <units>`). Without the variable the faucet is off.
 - Health check path: `/health`. Restart automatically if it crashes (restart is safe: downtime counts as a pause).
 - The data folder must survive restarts. If it is lost, a round that already has moves gets a fresh clock from the chain's state (a full clock: the cap), and no one loses a payout.
+
+## Rounds: the robot keeps the next one ready
+- `public/game.<network>.kingdom.json` is the current round. `public/game.<network>.next.json` is the next round,
+  already deployed and waiting. The server serves both, but refuses to open the next one until the current one is
+  settled (`not_started`); the contract needs the server's signature to open, so this holds on chain too.
+- When a round is settled, the page shows the winner for 10 seconds, then switches to the prepared round.
+- The robot (`.github/workflows/next-round.yml`, `scripts/next-round.ts`, decisions in `scripts/robot-plan.ts`) runs
+  when a page sees a round end (through funge.cash/next-round) and every 15 minutes. It turns the prepared round into
+  the current one once the current one is settled, deploys a new prepared round when there is none, and commits the
+  files. Cloudflare publishes them and the server picks them up within about a minute. Render is restarted only when
+  the server has not picked a file up for 5 minutes.
+- A rule change in the contract or the PUSD: merge it, then run the workflow by hand with "Rule change" ticked. It
+  replaces the prepared round, and the current one if nobody has opened it. A round being played is never replaced.
+- Check what the robot would do, without changing anything: `node scripts/next-round.ts --check`.
 
 ## Demo day
 - **A day before:** preflight; check the host's clock is synced; fund the demo wallets with PUSD and a little BCH; read the server log for errors.

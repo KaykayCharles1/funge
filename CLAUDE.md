@@ -9,16 +9,21 @@ https://funge.cash/play/ (play/index.html). The site is a Cloudflare Worker that
 `main` (wrangler.jsonc; worker/index.ts serves dist and adds one route). The referee runs on Render (free plan) at
 https://referee.funge.cash; UptimeRobot keeps it awake.
 
-New rounds are automatic:
-- When a round is settled, the game page POSTs funge.cash/next-round. The Worker checks the referee and, if the
-  round is settled, starts the GitHub workflow .github/workflows/next-round.yml (Cloudflare secret GITHUB_TOKEN).
-- The workflow runs scripts/next-round.ts, which deploys the next round with deploy-kingdom.ts (paid by a separate
-  deploy wallet, GitHub secret FUNGE_DEPLOY_SEED), commits public/game.chipnet.kingdom.json to `main` as
-  github-actions[bot], and calls Render's deploy hook (GitHub secret RENDER_DEPLOY_HOOK) for that commit.
-- The page switches to the new round by itself, without a reload, once it is live (about 1:30). A 15-minute schedule is a backup.
+New rounds are automatic, and the next one is always prepared in advance:
+- public/game.chipnet.kingdom.json is the current round; public/game.chipnet.next.json is the next round, already
+  deployed and waiting. The referee reads both from the published site every 10 s (Render setting FUNGE_GAMES_URL)
+  and refuses to open the next one until the current one is settled.
+- When a round is settled, the page shows the winner for 10 seconds, then switches to the prepared round, without a
+  reload. It also POSTs funge.cash/next-round; the Worker checks the referee and, if the round is settled, starts the
+  GitHub workflow .github/workflows/next-round.yml (Cloudflare secret GITHUB_TOKEN). A 15-minute schedule is a backup.
+- The workflow runs scripts/next-round.ts (decisions in scripts/robot-plan.ts): it promotes the prepared round to
+  current once the current one is settled, deploys a new prepared round with deploy-kingdom.ts --next (paid by a
+  separate deploy wallet, GitHub secret FUNGE_DEPLOY_SEED), and commits the files to `main` as github-actions[bot].
+  Render's deploy hook (GitHub secret RENDER_DEPLOY_HOOK) is used only when the referee has not picked a file up
+  for 5 minutes.
 - Because the robot commits to `main`, run `git pull` before starting work.
-- Test scripts/next-round.ts with `--check` only: a plain run on a settled round really deploys one.
-- Manual fallback: GitHub, Actions, Next round, Run workflow.
+- Test scripts/next-round.ts with `--check` only: a plain run really deploys rounds (paid by the deploy wallet).
+- Manual fallback: GitHub, Actions, Next round, Run workflow (tick "Rule change" only after a contract or PUSD change).
 
 Background reading: docs/RUNBOOK.md, docs/KINGDOM.md, docs/REFEREE.md, docs/EVENTS.md, docs/KNOWN_ISSUES.md.
 The landing page's design is in DESIGN.md.
