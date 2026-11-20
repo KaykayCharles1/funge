@@ -132,11 +132,7 @@ export function mountInviteBanner(before: HTMLElement, openWallet: () => void): 
   if (CONFIG.network === "chipnet") {
     const coins = el("button", MAIN, T.bannerCoins);
     coins.type = "button";
-    coins.addEventListener("click", () => {
-      const faucet = document.getElementById("faucet");
-      if (faucet && !faucet.classList.contains("hidden")) faucet.scrollIntoView({ behavior: "smooth", block: "center" });
-      else openWallet(); // no wallet yet: the faucet box appears once there is one
-    });
+    coins.addEventListener("click", () => openWallet()); // the faucet is in the panel's Wallet tab
     banner.append(coins);
   }
   const dismiss = el("button", `${SMALL} text-sm`, T.bannerClose);

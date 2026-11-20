@@ -584,6 +584,12 @@ export const COPY = {
     nextRoundAnyMoment: "The next round starts any moment now…",
     roundDetails: "Round details",
     walletSection: "Wallet",
+    // The side panel (src/battlefield/panel.ts): Wallet and Rules tabs
+    rulesTab: "Rules",
+    panelAria: "Wallet and rules",
+    closeAria: "Close",
+    // Rule 10 in the game's Rules tab: the landing page's version also explains the fallback after a few blocks
+    ruleTenShort: (claim: string) => `If the winner doesn't claim within ${claim}, the prize is paid automatically.`,
     actionsLabel: "Your moves",
     loading: "Loading the battlefield…",
     soundOn: "Sound on",

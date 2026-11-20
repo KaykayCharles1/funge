@@ -1,0 +1,24 @@
+/* The side panel over the field: Wallet and Rules tabs. Laptop: 420px on the right (docs/REDESIGN_CHECKLIST.md, 9). */
+.fg-scrim { position: absolute; inset: 0; z-index: 40; }
+.fg-panel { position: absolute; right: 0; top: 0; z-index: 41; width: 420px; max-width: 100%; height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; background: #0a1226; border-left: 2px solid #e0a93a;
+  box-shadow: -24px 0 50px rgba(0, 0, 0, 0.45); color: #f4ead2; font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-scrim[hidden], .fg-panel[hidden] { display: none; }
+.fg-panel-head { display: flex; align-items: center; gap: 6px; padding: 16px 16px 12px 20px; border-bottom: 1px solid rgba(224, 169, 58, 0.35); }
+.fg-tab { height: 40px; padding: 0 14px; border-radius: 999px; cursor: pointer; font-family: inherit; font-size: 16px; font-weight: 700;
+  background: transparent; color: #f4ead2; border: 1px solid rgba(224, 169, 58, 0.45); }
+.fg-tab[aria-selected="true"] { background: #fbbc28; color: #0f243d; border-color: #fbbc28; }
+.fg-close { margin-left: auto; width: 44px; height: 44px; border-radius: 50%; background: transparent; border: 1.5px solid rgba(224, 169, 58, 0.6);
+  color: #f3cf74; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.fg-tab:focus-visible, .fg-close:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+.fg-panel-body { position: relative; flex: 1; overflow: auto; padding: 22px 24px; }
+.fg-panel-body > [hidden] { display: none; }
+
+.fg-kick { font-family: Cinzel, Georgia, serif; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #f3cf74; }
+.fg-rules { display: flex; flex-direction: column; gap: 12px; font-size: 16px; line-height: 1.45; margin: 12px 0 0; padding: 0; list-style: none; }
+.fg-rules li { margin: 0; }
+.fg-rules .fg-n { font-family: Cinzel, Georgia, serif; font-weight: 700; color: #f3cf74; display: inline-block; width: 28px; }
+.fg-rules strong { color: #f8eeca; }
+
+/* The old wallet sections live in the Wallet tab until each screen is rebuilt (redesign step 6) */
+.fg-wallet-old { display: flex; flex-direction: column; gap: 16px; }

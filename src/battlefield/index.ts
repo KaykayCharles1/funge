@@ -18,6 +18,7 @@ import { displayName, HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
 import { installUnlock, preloadTracks } from "./sound.ts";
+import { mountPanel } from "./panel.ts";
 import { TopBar } from "./topbar.ts";
 
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
@@ -168,7 +169,7 @@ export function mountBattlefield(opts: MountOptions): void {
   });
 
   // The action bar and the folded old page, under the field
-  const wallet = foldOldPage();
+  const wallet = foldOldPage(host);
   mountInviteBanner(host, wallet.open);
   mountActionBar(host, opts.page, opts.run, (text) => {
     if (director) scene.hud.popup(text);
@@ -375,9 +376,11 @@ function devPanel(
   };
 }
 
-// Under the field the old page folds into two sections, so the field and the actions come first. Nothing is removed:
-// the same elements move, with their handlers. The old "Round is over" window gives way to the action bar's Claim.
-function foldOldPage(): { open: () => void } {
+// The old wallet sections move into the side panel's Wallet tab (until each screen is rebuilt); the rest of the old
+// page folds into one section under the field. Nothing is removed: the same elements move, with their handlers.
+// The old "Round is over" window gives way to the action bar's Claim.
+function foldOldPage(host: HTMLElement): { open: () => void } {
+  const panel = mountPanel(host, ["localWallet", "wallet", "faucet"]);
   const app = document.getElementById("app");
   const header = app?.querySelector("header") ?? null;
   const section = (label: string) => {
@@ -391,7 +394,6 @@ function foldOldPage(): { open: () => void } {
     d.append(s, body);
     return { d, body };
   };
-  const wallet = section(COPY.battlefield.walletSection);
   const details = section(COPY.battlefield.roundDetails);
   const move = (to: HTMLElement, ids: string[]) => {
     for (const id of ids) {
@@ -399,19 +401,13 @@ function foldOldPage(): { open: () => void } {
       if (e) to.append(e);
     }
   };
-  move(wallet.body, ["localWallet", "wallet"]);
   move(details.body, ["ended", "live", "refereeNotice", "status"]);
-  if (header) header.after(wallet.d, details.d);
-  else app?.append(wallet.d, details.d);
+  if (header) header.after(details.d);
+  else app?.append(details.d);
   const modal = document.getElementById("overModal");
   if (modal) modal.style.display = "none"; // stays hidden whatever the old page toggles
   return {
-    open: () => {
-      wallet.d.open = true;
-      wallet.d.scrollIntoView({ behavior: "smooth", block: "start" });
-      const first = wallet.body.querySelector<HTMLElement>("button:not([disabled]):not(.hidden), input:not(.hidden)");
-      first?.focus({ preventScroll: true });
-    },
+    open: () => panel.open("wallet"),
   };
 }
 
