@@ -32,8 +32,20 @@ function refereeUrl(): string {
 
 export const CONFIG = {
   network: NETWORK,
-    // Chipnet Electrum WebSocket servers, tried in order. The library's own default (chipnet.bch.ninja) is flaky.
-  chipnetServers: ["chipnet.imaginary.cash", "chipnet.bch.ninja"],
+  // Electrum servers (secure WebSocket, port 50004), tried in order, slow ones hedged by the next (src/lib/provider.ts).
+  // Chipnet: the library's own default (chipnet.bch.ninja) is flaky.
+  // Mainnet: each checked on 2026-11-20 for the block height and for coins carrying PUSD; six different operators.
+  servers: {
+    chipnet: ["chipnet.imaginary.cash", "chipnet.bch.ninja"],
+    mainnet: [
+      "bch.imaginary.cash",
+      "cashnode.bch.ninja",
+      "fulcrum.greyh.at",
+      "electroncash.dk",
+      "fulcrum.criptolayer.net",
+      "blackie.c3-soft.com",
+    ],
+  } as Record<Net, string[]>,
 
   // PUSD token category (standard 64-char hex, as shown by explorers/BCMR).
   // chipnet: our own test token (filled in after Step 3a). mainnet: from the official PUSD docs.
@@ -66,7 +78,7 @@ export const CONFIG = {
   // Where "View on the explorer" opens a transaction (the withdraw screen)
   explorerTx: {
     chipnet: "https://chipnet.imaginary.cash/tx/",
-    mainnet: "https://blockchair.com/bitcoin-cash/transaction/",
+    mainnet: "https://explorer.bch.ninja/tx/",
   },
 
   // The Funge referee server (runs the game clock)

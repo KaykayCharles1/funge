@@ -193,7 +193,7 @@ the mockup wins.
       No NFT checkbox. **new**
 - [x] `Confirm Transaction`: a PUSD line and/or a BCH line (only what was filled), To, Network fee; `Back` and
       `Withdraw`. No warning line. **new**
-- [x] `Transaction Successful` + `View on the testnet explorer ↗` (chipnet.imaginary.cash; mainnet: blockchair.com, to confirm) + `Done`. **new**
+- [x] `Transaction Successful` + `View on the testnet explorer ↗` (chipnet.imaginary.cash; mainnet: explorer.bch.ninja, checked with a real transaction) + `Done`. **new**
 
 ### Back up seed phrase
 - [x] Password dialog `Backup Seed Phrase` / `Enter the password to confirm` / `Cancel` / `Confirm`.
