@@ -22,3 +22,14 @@
 
 /* The old wallet sections live in the Wallet tab until each screen is rebuilt (redesign step 6) */
 .fg-wallet-old { display: flex; flex-direction: column; gap: 16px; }
+
+/* Phone (Phase B): the panel is a sheet that comes up from the bottom, under the top strip, with a grab handle;
+   the field above it dims. A tap on the dimmed part closes it. */
+@media (max-width: 699px) {
+  .fg-scrim { background: rgba(5, 10, 24, 0.6); }
+  .fg-panel { top: auto; bottom: 0; left: 0; right: 0; width: 100%; height: calc(100% - 64px); border-left: 0; border-top: 2px solid #e0a93a;
+    border-radius: 18px 18px 0 0; box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.45); overflow: hidden; }
+  .fg-panel::before { content: ""; display: block; flex-shrink: 0; width: 44px; height: 5px; margin: 10px auto 0; border-radius: 3px; background: rgba(224, 169, 58, 0.6); }
+  .fg-panel-head { padding: 6px 14px 12px 16px; }
+  .fg-panel-body { padding: 18px 18px 28px; }
+}

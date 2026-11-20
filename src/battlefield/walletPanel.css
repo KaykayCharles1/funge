@@ -96,7 +96,7 @@
 .fg-w-tip { position: absolute; top: calc(100% + 8px); right: 0; white-space: nowrap; background: #0f1a33; border: 1.5px solid #e0a93a; color: #f8eeca;
   font-weight: 700; font-size: 15px; padding: 6px 10px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 2; }
 @media (hover: hover) { .fg-w-iconbtn:hover .fg-w-tip { opacity: 1; } }
-.fg-w-iconbtn:focus-visible .fg-w-tip { opacity: 1; }
+.fg-w-iconbtn:focus-visible .fg-w-tip, .fg-w-iconbtn.fg-tip-on .fg-w-tip { opacity: 1; }
 .fg-w-card { padding: 16px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; }
 .fg-w-coins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .fg-w-coin { padding: 14px 16px; }

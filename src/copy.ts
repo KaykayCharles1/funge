@@ -105,7 +105,6 @@ export const COPY = {
     summons: (who: string) => `${who} summons you to battle for the throne.`,
     message: (who: string) => `${who} summons you to battle for the throne. Do you have what it takes to become the King of Funge?`,
     someone: "A challenger", // when the player has not chosen a name yet
-    shareTitle: "Funge: battle for the throne",
     panelTitle: "Invite friends",
     panelText: "Send this to a friend or a group:",
     copy: "Copy invite",

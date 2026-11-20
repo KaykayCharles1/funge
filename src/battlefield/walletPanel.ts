@@ -76,6 +76,31 @@ export const ownWalletBalances = () => {
   return w.status === "connected" && ownBalances && ownBalances.pkhHex === w.pkhHex ? ownBalances : null;
 };
 
+// A long press shows a round button's tip on a touch screen; the tap that ends that press does nothing else
+function holdTip(b: HTMLButtonElement): HTMLButtonElement {
+  let timer = 0, held = false;
+  b.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse") return;
+    held = false;
+    timer = window.setTimeout(() => {
+      held = true;
+      b.classList.add("fg-tip-on");
+    }, 450);
+  });
+  const end = () => {
+    clearTimeout(timer);
+    window.setTimeout(() => b.classList.remove("fg-tip-on"), 1200);
+  };
+  for (const t of ["pointerup", "pointercancel", "pointerleave"] as const) b.addEventListener(t, end);
+  b.addEventListener("contextmenu", (e) => e.preventDefault());
+  b.addEventListener("click", (e) => {
+    if (!held) return;
+    held = false;
+    e.stopImmediatePropagation(); // the press showed the tip; it does not also lock or disconnect
+  }, { capture: true });
+  return b;
+}
+
 export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onOpen: () => void } {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
     const e = document.createElement(tag);
@@ -473,7 +498,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     // Title, then Lock and Disconnect at the right
     const top = el("div", "fg-w-top");
     const iconBtn = (label: string, html: string, onClick: () => void) => {
-      const b = button("fg-w-iconbtn", "", onClick);
+      const b = holdTip(button("fg-w-iconbtn", "", onClick));
       b.setAttribute("aria-label", label);
       b.append(icon(html), el("span", "fg-w-tip", label));
       return b;
@@ -762,13 +787,13 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   function wcConnected(): void {
     const s = getWalletState();
     const top = el("div", "fg-w-top");
-    const off = button("fg-w-iconbtn", "", () => {
+    const off = holdTip(button("fg-w-iconbtn", "", () => {
       void disconnectWallet();
       setExternalFlag(false);
       wantsOwn = false;
       pickFirst = true;
       go(auto());
-    });
+    }));
     off.setAttribute("aria-label", T.disconnectWallet);
     off.append(icon(ICON.disconnect), el("span", "fg-w-tip", T.disconnectWallet));
     top.append(el("div", "fg-w-kick", T.wizardConnect), off);

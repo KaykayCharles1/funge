@@ -59,3 +59,30 @@
 .fg-invited .fg-gold { height: 46px; padding: 0 20px; font-size: 17px; flex-shrink: 0; }
 .fg-x { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: transparent; border: 1.5px solid rgba(224, 169, 58, 0.6); color: #f3cf74;
   display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+
+/* Phone (Phase B) */
+@media (max-width: 699px) {
+  .fg-dlg-back { padding: 10px; }
+  .fg-dlg { padding: 16px 14px; gap: 12px; }
+  .fg-dlg-title { font-size: 28px; }
+  /* Picker: near full screen; the preview card above Cancel and the confirm button */
+  .fg-picker { width: 100%; }
+  .fg-portraits { gap: 6px; }
+  .fg-portrait { border-width: 3px; border-radius: 10px; }
+  .fg-name-input { width: 100%; }
+  .fg-pick-foot { flex-wrap: wrap; gap: 10px; }
+  .fg-preview { flex-basis: 100%; }
+  .fg-pick-foot .fg-outline { flex: 1; width: auto; }
+  .fg-pick-foot .fg-gold { flex: 2; padding: 0 12px; font-size: 17px; }
+  /* Invite friends */
+  .fg-invite { width: 100%; padding: 18px 16px; }
+  .fg-share { gap: 10px; }
+  .fg-logo-btn { width: 46px; height: 46px; }
+  /* The friend's banner: the words, then Get free test coins with the X beside it */
+  .fg-invited { left: 12px; right: 12px; top: 76px; transform: none; width: auto; max-width: none; flex-wrap: wrap; gap: 10px; padding: 12px 14px; border-radius: 14px; }
+  .fg-invited-words { flex-basis: 100%; }
+  .fg-invited-who { font-size: 16px; }
+  .fg-invited-q { font-size: 15px; }
+  .fg-invited .fg-gold { flex: 1; height: 44px; }
+  .fg-x { width: 44px; height: 44px; }
+}

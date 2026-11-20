@@ -45,19 +45,11 @@ export function inviterName(o: {
   return `${title} ${check.name}`;
 }
 
-// Share: the phone's own share sheet when there is one; otherwise a small window with the text and quick links
+// Share: the game's own Invite friends window on every device (the app logos open those apps on a phone too).
+// Not the system share sheet: on a computer that is the operating system's window, which does not fit the game.
 export function openInvite(who: string | null): void {
   const name = who ?? T.someone;
-  const text = T.message(name);
-  const url = inviteUrl(location.origin, import.meta.env.BASE_URL, who);
-  const phone = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
-  if (phone) {
-    navigator.share({ title: T.shareTitle, text, url }).catch((e: unknown) => {
-      if (!(e instanceof DOMException && e.name === "AbortError")) openPanel(text, url); // cancelled: nothing to do
-    });
-    return;
-  }
-  openPanel(text, url);
+  openPanel(T.message(name), inviteUrl(location.origin, import.meta.env.BASE_URL, who));
 }
 
 let closeOpen: (() => void) | null = null;
