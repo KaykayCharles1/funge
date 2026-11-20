@@ -3,7 +3,9 @@
 # round is deployed (paid by the deploy wallet). The new files are committed to main; Cloudflare publishes them and
 # the Referee picks them up by itself (FUNGE_GAMES_URL). Render is only restarted when the Referee has not picked a
 # file up for 5 minutes. Run it by hand from the Actions tab too.
-# Secrets: FUNGE_DEPLOY_SEED (the deploy wallet's seed phrase), RENDER_DEPLOY_HOOK (Render's deploy hook link).
+# One network per run (the "network" choice; the 15-minute schedule runs chipnet). Each network has its own secrets:
+#   chipnet: FUNGE_DEPLOY_SEED, RENDER_DEPLOY_HOOK
+#   mainnet: FUNGE_DEPLOY_SEED_MAINNET, RENDER_DEPLOY_HOOK_MAINNET (deploy wallet seed phrase; Render's deploy hook link)
 name: Next round
 
 on:
@@ -11,6 +13,11 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
+      network:
+        description: "Network"
+        type: choice
+        options: [chipnet, mainnet]
+        default: chipnet
       replace_unopened:
         description: "Rule change: replace the prepared round, and the current one if nobody has opened it"
         type: boolean
@@ -19,15 +26,18 @@ on:
 permissions:
   contents: write
 
-# Never two runs at once: two robots could each deploy a round.
+# Never two runs at once for one network: two robots could each deploy a round.
 concurrency:
-  group: next-round
+  group: next-round-${{ inputs.network || 'chipnet' }}
   cancel-in-progress: false
 
 jobs:
   next-round:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      VITE_FUNGE_NETWORK: ${{ inputs.network || 'chipnet' }}
+      REFEREE: ${{ (inputs.network || 'chipnet') == 'mainnet' && 'https://referee-mainnet.funge.cash' || 'https://referee.funge.cash' }}
     steps:
       # main as it is now, not as it was when this run was queued: an earlier run may have just pushed a new round
       - uses: actions/checkout@v5
@@ -42,23 +52,33 @@ jobs:
 
       - name: Check the rounds; promote the prepared one, prepare the next
         id: round
-        run: node scripts/next-round.ts https://referee.funge.cash ${{ inputs.replace_unopened && '--replace-unopened' || '' }}
+        # The seed is chosen in the shell: a missing mainnet secret must fail, never fall back to the chipnet one
+        run: |
+          if [ "$VITE_FUNGE_NETWORK" = mainnet ]; then FUNGE_DEPLOY_SEED="$SEED_MAINNET"; else FUNGE_DEPLOY_SEED="$SEED_CHIPNET"; fi
+          [ -n "$FUNGE_DEPLOY_SEED" ] || { echo "The deploy wallet secret for $VITE_FUNGE_NETWORK is not set."; exit 1; }
+          export FUNGE_DEPLOY_SEED
+          node scripts/next-round.ts "$REFEREE" ${{ inputs.replace_unopened && '--replace-unopened' || '' }}
         env:
-          FUNGE_DEPLOY_SEED: ${{ secrets.FUNGE_DEPLOY_SEED }}
+          SEED_CHIPNET: ${{ secrets.FUNGE_DEPLOY_SEED }}
+          SEED_MAINNET: ${{ secrets.FUNGE_DEPLOY_SEED_MAINNET }}
 
       - name: Commit the round files
         if: steps.round.outputs.action == 'deployed'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898315+github-actions[bot]@users.noreply.github.com"
-          git add -A -- public/game.chipnet.kingdom.json public/game.chipnet.next.json
-          git commit -m "Next round: round files"
+          git add -A -- "public/game.$VITE_FUNGE_NETWORK.kingdom.json" "public/game.$VITE_FUNGE_NETWORK.next.json"
+          git commit -m "Next round: round files ($VITE_FUNGE_NETWORK)"
           git pull --rebase origin main
           git push origin HEAD:main
 
       - name: Restart the Referee (only when it has not picked up a round file)
         if: steps.round.outputs.redeploy == 'yes'
         # ref = this exact commit: without it Render may deploy the commit before the robot's push.
-        run: curl -fsS -X POST "$HOOK&ref=$(git rev-parse HEAD)" > /dev/null && echo "Render deploy of $(git rev-parse --short HEAD) started."
+        run: |
+          if [ "$VITE_FUNGE_NETWORK" = mainnet ]; then HOOK="$HOOK_MAINNET"; else HOOK="$HOOK_CHIPNET"; fi
+          [ -n "$HOOK" ] || { echo "The Render deploy hook for $VITE_FUNGE_NETWORK is not set."; exit 1; }
+          curl -fsS -X POST "$HOOK&ref=$(git rev-parse HEAD)" > /dev/null && echo "Render deploy of $(git rev-parse --short HEAD) started."
         env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          HOOK_CHIPNET: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          HOOK_MAINNET: ${{ secrets.RENDER_DEPLOY_HOOK_MAINNET }}

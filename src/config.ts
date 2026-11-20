@@ -1,22 +1,37 @@
 export type Net = "chipnet" | "mainnet";
 
+// A build or process setting, read the same way in the browser build (import.meta.env) and in Node (process.env)
+function setting(name: "VITE_REFEREE_URL" | "VITE_FUNGE_NETWORK"): string | undefined {
+  let value: string | undefined;
+  try {
+    // the browser build: Vite writes these in at build time, so each is named in full
+    value = name === "VITE_REFEREE_URL" ? import.meta.env.VITE_REFEREE_URL : import.meta.env.VITE_FUNGE_NETWORK;
+  } catch {
+    // running in Node (server, scripts, vite config): there is no import.meta.env
+  }
+  if (!value && typeof process !== "undefined") value = process.env[name];
+  return value?.trim() || undefined;
+}
+
+// Which network this build or process plays on: VITE_FUNGE_NETWORK=mainnet or chipnet (the default).
+// The page, the referee server, the robot and the scripts all read it from here.
+function network(): Net {
+  const value = setting("VITE_FUNGE_NETWORK") ?? "chipnet";
+  if (value !== "chipnet" && value !== "mainnet") throw new Error(`VITE_FUNGE_NETWORK must be chipnet or mainnet (got ${value}).`);
+  return value;
+}
+const NETWORK = network();
+
 
 // The referee server's address. Set VITE_REFEREE_URL when building the page for a real host, e.g.
 //   VITE_REFEREE_URL=https://referee.example.com npm run build
 function refereeUrl(): string {
-  let url: string | undefined;
-  try {
-    url = import.meta.env.VITE_REFEREE_URL; // the browser build
-  } catch {
-    // running in Node (server, scripts, vite config): there is no import.meta.env
-  }
-  if (!url && typeof process !== "undefined") url = process.env.VITE_REFEREE_URL;
-  return (url ?? "http://127.0.0.1:8787").replace(/\/$/, "");
+  return (setting("VITE_REFEREE_URL") ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 }
 
 
 export const CONFIG = {
-  network: "chipnet" as Net,
+  network: NETWORK,
     // Chipnet Electrum WebSocket servers, tried in order. The library's own default (chipnet.bch.ninja) is flaky.
   chipnetServers: ["chipnet.imaginary.cash", "chipnet.bch.ninja"],
 
@@ -37,7 +52,9 @@ export const CONFIG = {
 
   // Kingdom (FungeKingdom contract). Deploy-time contract settings, in base units of PUSD (2 decimals).
   kingdom: {
-    openingPrice: 500n, // 5.00 PUSD: what the first player pays; it becomes the kingdom's value
+    // What the first player pays; it becomes the kingdom's value. Mainnet 1.00 PUSD (small stakes for the
+    // hackathon demo), chipnet 5.00. A deployed round keeps the price it was deployed with.
+    openingPrice: NETWORK === "mainnet" ? 100n : 500n,
     feePercent: 2n, // whole percent of the value, paid on top by the conqueror, goes to the dethroned king
     cutPercent: 10n, // whole percent of the value taken from the dethroned king's share into the pool
     cap: 5_000n, // 50.00 PUSD: the value can never be raised above this

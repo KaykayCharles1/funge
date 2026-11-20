@@ -19,9 +19,9 @@ interface Env {
   GITHUB_TOKEN?: string;
   REFEREE_URL: string;
   GITHUB_REPO: string;
+  NETWORK: "chipnet" | "mainnet"; // this site's network (wrangler.jsonc): its round files and its robot run
 }
 
-const NETWORK = "chipnet";
 const WORKFLOW = "next-round.yml";
 const QUIET_SECONDS = 120; // after starting the workflow, later asks are answered without calling GitHub
 
@@ -33,10 +33,10 @@ async function nextRound(request: Request, env: Env): Promise<Response> {
 
   // Many pages ask at once when a round ends: start the workflow once, then stay quiet for a while
   const cache = (caches as unknown as { default: Cache }).default;
-  const quietKey = new Request(new URL("/next-round-asked", request.url));
+  const quietKey = new Request(new URL(`/next-round-asked-${env.NETWORK}`, request.url));
   if (await cache.match(quietKey)) return reply(202, "already asked");
 
-  const game = (await (await env.ASSETS.fetch(new URL(`/game.${NETWORK}.kingdom.json`, request.url).toString())).json()) as {
+  const game = (await (await env.ASSETS.fetch(new URL(`/game.${env.NETWORK}.kingdom.json`, request.url).toString())).json()) as {
     gameCategory: string;
   };
   const round = await fetch(`${env.REFEREE_URL}/rounds/${game.gameCategory}`);
@@ -52,7 +52,7 @@ async function nextRound(request: Request, env: Env): Promise<Response> {
       "x-github-api-version": "2022-11-28",
       "user-agent": "funge-worker",
     },
-    body: JSON.stringify({ ref: "main" }),
+    body: JSON.stringify({ ref: "main", inputs: { network: env.NETWORK } }),
   });
   if (!gh.ok) return reply(502, `GitHub said ${gh.status}`);
   await cache.put(quietKey, new Response("asked", { headers: { "cache-control": `max-age=${QUIET_SECONDS}` } }));

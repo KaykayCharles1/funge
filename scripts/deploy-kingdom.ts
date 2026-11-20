@@ -54,7 +54,7 @@ async function main() {
   const blocks = fallbackBlocks();
   const k = CONFIG.kingdom;
 
-  const env = await loadEnv();
+  const env = await loadEnv({ mainnet: true });
   const { provider, tpl, lock, lockHex } = env;
   console.log("paying wallet:", env.address);
   const pusd = pusdCategory();
