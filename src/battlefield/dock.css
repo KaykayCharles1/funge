@@ -1,0 +1,48 @@
+/* The dock at the bottom of the field: wallet chip, main button, protect buttons, Cancel round (redesign step 3).
+   Laptop layout from the approved mockup (docs/REDESIGN_CHECKLIST.md, section 2). */
+.fg-shade-bottom { position: absolute; inset: auto 0 0 0; height: 170px; z-index: 19; pointer-events: none;
+  background: linear-gradient(0deg, rgba(10, 18, 38, 0.7) 0%, rgba(10, 18, 38, 0) 100%); }
+.fg-dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 14px;
+  box-sizing: border-box; padding: 12px; background: rgba(15, 26, 51, 0.92); border: 2px solid #e0a93a; border-radius: 999px;
+  font-family: "Alegreya Sans", "Segoe UI", sans-serif; color: #f4ead2; white-space: nowrap; }
+.fg-dock[hidden], .fg-dock [hidden] { display: none !important; }
+.fg-dock button { font-family: inherit; }
+.fg-dock button:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+
+.fg-chip { height: 56px; box-sizing: border-box; padding: 0 16px 0 10px; display: flex; align-items: center; gap: 10px; background: #15234a;
+  border: 1.5px solid rgba(224, 169, 58, 0.7); border-radius: 999px; color: #f4ead2; font-size: 17px; cursor: pointer; }
+.fg-chip:hover { background: #1c2c5a; }
+.fg-chip img { width: 26px; height: 26px; border-radius: 50%; }
+.fg-chip strong { font-family: Cinzel, Georgia, serif; }
+.fg-chip svg { flex-shrink: 0; }
+
+.fg-main { height: 60px; min-width: 400px; box-sizing: border-box; padding: 0 34px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fbbc28; color: #0f243d; border: 0; border-radius: 999px; box-shadow: 0 5px 0 #0f243d, 0 10px 24px rgba(0, 0, 0, 0.35);
+  font-weight: 700; font-size: 23px; cursor: pointer; }
+.fg-main:hover { background: #fcc94d; }
+.fg-main.fg-off { background: #3a3f55; color: #f4ead2; box-shadow: none; cursor: default; font-family: Cinzel, Georgia, serif; font-size: 21px; }
+.fg-spin { width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(244, 234, 210, 0.3); border-top-color: #f4ead2; animation: fg-spin 0.9s linear infinite; }
+@keyframes fg-spin { to { transform: rotate(360deg); } }
+
+.fg-line { height: 56px; padding: 0 22px; background: #0f243d; border: 2px solid #fbbc28; border-radius: 999px; color: #fbbc28; font-weight: 700; font-size: 18px; cursor: pointer; }
+.fg-line:hover { background: #15234a; }
+
+.fg-kingrow { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+.fg-pb, .fg-cr { position: relative; height: 56px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 999px; cursor: pointer; }
+.fg-pb { min-width: 76px; padding: 0 14px; gap: 6px; background: #fbbc28; color: #0f243d; border: 0; box-shadow: 0 5px 0 #0f243d;
+  font-family: Cinzel, Georgia, serif !important; font-weight: 700; font-size: 20px; }
+.fg-pb img { width: 22px; }
+.fg-cr { padding: 0 20px; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28; font-weight: 700; font-size: 18px; }
+.fg-cr:hover { background: #15234a; }
+/* Unavailable: faded, the not-allowed cursor, no click (aria-disabled keeps the hover tip working) */
+.fg-pb[aria-disabled="true"], .fg-cr[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.fg-cr[aria-disabled="true"]:hover { background: #0f243d; }
+
+/* Tips: on hover with a mouse, on a long press on a phone */
+.fg-tip { position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: #0f1a33;
+  border: 1.5px solid #e0a93a; color: #f8eeca; font-family: "Alegreya Sans", sans-serif; font-weight: 700; font-size: 16px;
+  padding: 8px 12px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+.fg-tip:empty { display: none; }
+@media (hover: hover) { .fg-pb:hover .fg-tip, .fg-cr:hover .fg-tip { opacity: 1; } }
+.fg-pb:focus-visible .fg-tip, .fg-cr:focus-visible .fg-tip, .fg-tip-on .fg-tip { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .fg-spin { animation-duration: 2.5s; } }
