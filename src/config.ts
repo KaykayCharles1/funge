@@ -1,24 +1,51 @@
 export type Net = "chipnet" | "mainnet";
 
+// A build or process setting, read the same way in the browser build (import.meta.env) and in Node (process.env)
+function setting(name: "VITE_REFEREE_URL" | "VITE_FUNGE_NETWORK"): string | undefined {
+  let value: string | undefined;
+  try {
+    // the browser build: Vite writes these in at build time, so each is named in full
+    value = name === "VITE_REFEREE_URL" ? import.meta.env.VITE_REFEREE_URL : import.meta.env.VITE_FUNGE_NETWORK;
+  } catch {
+    // running in Node (server, scripts, vite config): there is no import.meta.env
+  }
+  if (!value && typeof process !== "undefined") value = process.env[name];
+  return value?.trim() || undefined;
+}
+
+// Which network this build or process plays on: VITE_FUNGE_NETWORK=mainnet or chipnet (the default).
+// The page, the referee server, the robot and the scripts all read it from here.
+function network(): Net {
+  const value = setting("VITE_FUNGE_NETWORK") ?? "chipnet";
+  if (value !== "chipnet" && value !== "mainnet") throw new Error(`VITE_FUNGE_NETWORK must be chipnet or mainnet (got ${value}).`);
+  return value;
+}
+const NETWORK = network();
+
 
 // The referee server's address. Set VITE_REFEREE_URL when building the page for a real host, e.g.
 //   VITE_REFEREE_URL=https://referee.example.com npm run build
 function refereeUrl(): string {
-  let url: string | undefined;
-  try {
-    url = import.meta.env.VITE_REFEREE_URL; // the browser build
-  } catch {
-    // running in Node (server, scripts, vite config): there is no import.meta.env
-  }
-  if (!url && typeof process !== "undefined") url = process.env.VITE_REFEREE_URL;
-  return (url ?? "http://127.0.0.1:8787").replace(/\/$/, "");
+  return (setting("VITE_REFEREE_URL") ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 }
 
 
 export const CONFIG = {
-  network: "chipnet" as Net,
-    // Chipnet Electrum WebSocket servers, tried in order. The library's own default (chipnet.bch.ninja) is flaky.
-  chipnetServers: ["chipnet.imaginary.cash", "chipnet.bch.ninja"],
+  network: NETWORK,
+  // Electrum servers (secure WebSocket, port 50004), tried in order, slow ones hedged by the next (src/lib/provider.ts).
+  // Chipnet: the library's own default (chipnet.bch.ninja) is flaky.
+  // Mainnet: each checked on 2026-11-20 for the block height and for coins carrying PUSD; six different operators.
+  servers: {
+    chipnet: ["chipnet.imaginary.cash", "chipnet.bch.ninja"],
+    mainnet: [
+      "bch.imaginary.cash",
+      "cashnode.bch.ninja",
+      "fulcrum.greyh.at",
+      "electroncash.dk",
+      "fulcrum.criptolayer.net",
+      "blackie.c3-soft.com",
+    ],
+  } as Record<Net, string[]>,
 
   // PUSD token category (standard 64-char hex, as shown by explorers/BCMR).
   // chipnet: our own test token (filled in after Step 3a). mainnet: from the official PUSD docs.
@@ -51,7 +78,7 @@ export const CONFIG = {
   // Where "View on the explorer" opens a transaction (the withdraw screen)
   explorerTx: {
     chipnet: "https://chipnet.imaginary.cash/tx/",
-    mainnet: "https://blockchair.com/bitcoin-cash/transaction/",
+    mainnet: "https://explorer.bch.ninja/tx/",
   },
 
   // The Funge referee server (runs the game clock)

@@ -15,8 +15,7 @@ export const CONNECT_SOURCES: string[] = [
   "'self'", // this site, including the game file
 
   // Electrum servers (chain data and broadcasting)
-  ...CONFIG.chipnetServers.map((host) => `wss://${host}:${ELECTRUM_WSS_PORT}`),
-  `wss://bch.imaginary.cash:${ELECTRUM_WSS_PORT}`, // mainnet default
+  ...CONFIG.servers[CONFIG.network].map((host) => `wss://${host}:${ELECTRUM_WSS_PORT}`), // this build's network only
    "wss://relay.riften.net",
    "wss://relay.cauldron.quest",
    "https://indexer.riften.net", // Cauldron's pool list (mainnet swap: BCH to PUSD)

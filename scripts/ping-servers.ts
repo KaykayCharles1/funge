@@ -6,7 +6,7 @@ const TIMEOUT_MS = 20_000;
 async function tryServer(hostname: string) {
   const started = Date.now();
   try {
-    const provider = new ElectrumNetworkProvider("chipnet", { hostname });
+    const provider = new ElectrumNetworkProvider(CONFIG.network, { hostname });
     const height = await Promise.race([
       provider.getBlockHeight(),
       new Promise<never>((_, reject) =>
@@ -20,7 +20,7 @@ async function tryServer(hostname: string) {
 }
 
 async function main() {
-  const lines = await Promise.all(CONFIG.chipnetServers.map(tryServer));
+  const lines = await Promise.all(CONFIG.servers[CONFIG.network].map(tryServer));
   console.log(lines.join("\n"));
 }
 

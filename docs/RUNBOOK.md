@@ -84,10 +84,10 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 
 ## If the referee key is lost or leaked
 - **Lost:** running rounds can only end through the fallback (12 blocks). Deploy a new game with a new key.
-- **Leaked:** an attacker could refuse players or end rounds early, but cannot move the pool or choose who is paid. Stop the server, deploy a new game with a new key, and tell players.
+- **Leaked:** the contract leaves timing to the referee, so an attacker could refuse players, end rounds early, or conquer after the clock ran out (paying the normal price) and so take the pool. They cannot change the prices or who a settlement pays. Stop the server, deploy a new game with a new key, and tell players.
 
 ## For the mainnet round (not done yet)
 - Generate the mainnet referee key on the production host only, never on a development machine.
-- Set `network` to mainnet in `src/config.ts`, fill in the real PUSD category (and check its decimals), choose a mainnet Electrum server list, and rebuild.
+- The network is a setting, `VITE_FUNGE_NETWORK=mainnet` (default chipnet), read by the page build, the referee server, the robot and the scripts (`src/config.ts`). The page build, the Worker's `NETWORK` var (`wrangler.jsonc`) and the referee host must all say the same network.
 - The server refuses test timers and chipnet keys on mainnet; do not look for ways around that.
 - Start with a rehearsal at small stakes (the opening price is 5.00 PUSD). The game wallet shows a small-stakes banner on mainnet.

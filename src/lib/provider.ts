@@ -137,6 +137,5 @@ export class FailoverProvider extends ElectrumNetworkProvider {
 }
 
 export function makeProvider(): ElectrumNetworkProvider {
-  if (CONFIG.network === "chipnet") return new FailoverProvider("chipnet", CONFIG.chipnetServers);
-  return new ElectrumNetworkProvider("mainnet"); // a mainnet server list comes before the mainnet round
+  return new FailoverProvider(CONFIG.network, CONFIG.servers[CONFIG.network]);
 }
