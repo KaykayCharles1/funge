@@ -8,7 +8,7 @@ import { RULES } from "../lib/rulesNumbers.ts";
 
 const T = COPY.battlefield;
 export type PanelTab = "wallet" | "rules";
-export type Panel = { open: (tab: PanelTab) => void; close: () => void };
+export type Panel = { open: (tab: PanelTab) => void; close: () => void; walletPage: HTMLElement; onOpenWallet: (() => void) | null };
 
 export function mountPanel(host: HTMLElement, walletIds: string[]): Panel {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
@@ -97,8 +97,11 @@ export function mountPanel(host: HTMLElement, walletIds: string[]): Panel {
     if (e.key === "Escape" && !panel.hidden && !document.querySelector('[aria-modal="true"]')) hide();
   });
 
-  return {
+  const api: Panel = {
+    walletPage,
+    onOpenWallet: null,
     open: (tab) => {
+      if (tab === "wallet") api.onOpenWallet?.();
       show(tab);
       if (panel.hidden) back = document.activeElement as HTMLElement | null;
       panel.hidden = scrim.hidden = false;
@@ -106,4 +109,5 @@ export function mountPanel(host: HTMLElement, walletIds: string[]): Panel {
     },
     close: hide,
   };
+  return api;
 }

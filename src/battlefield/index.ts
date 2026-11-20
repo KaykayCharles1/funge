@@ -20,6 +20,7 @@ import { BattlefieldScene } from "./scene.ts";
 import { installUnlock, preloadTracks } from "./sound.ts";
 import { Banners } from "./banners.ts";
 import { mountPanel } from "./panel.ts";
+import { mountWalletPanel } from "./walletPanel.ts";
 import { TopBar } from "./topbar.ts";
 
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
@@ -174,7 +175,7 @@ export function mountBattlefield(opts: MountOptions): void {
   });
 
   // The action bar and the folded old page, under the field
-  const wallet = foldOldPage(host);
+  const wallet = foldOldPage(host, opts.page);
   mountInviteBanner(host, wallet.open);
   mountActionBar(host, opts.page, opts.run, (text) => banners?.popup(text, true), wallet.open, () => scene.portraits, (off) => banners?.setOffline(off));
 
@@ -382,8 +383,10 @@ function devPanel(
 // The old wallet sections move into the side panel's Wallet tab (until each screen is rebuilt); the rest of the old
 // page folds into one section under the field. Nothing is removed: the same elements move, with their handlers.
 // The old "Round is over" window gives way to the action bar's Claim.
-function foldOldPage(host: HTMLElement): { open: () => void } {
+function foldOldPage(host: HTMLElement, page: () => PageView): { open: () => void } {
   const panel = mountPanel(host, ["localWallet", "wallet", "faucet"]);
+  const screens = mountWalletPanel(panel.walletPage, page);
+  panel.onOpenWallet = screens.onOpen;
   const app = document.getElementById("app");
   const header = app?.querySelector("header") ?? null;
   const section = (label: string) => {

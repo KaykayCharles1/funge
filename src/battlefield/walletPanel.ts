@@ -1,0 +1,498 @@
+// The Wallet tab's screens for getting into a wallet: Pick a Wallet, the Funge Game Wallet start, Create (password,
+// then the recovery phrase), Import (12 or 24 words, then a password), the locked screen, Forgot Password and Reset.
+// A wallet made before passwords were required gets the Create a password screen once.
+// From the approved mockup (docs/REDESIGN_CHECKLIST.md, section 10). The vault (src/wallet/) does the keeping; this
+// file only talks to it, then tells the old wallet code (walletUI.ts) so balances and listeners follow.
+// Until the next sub-steps, a ready wallet and WizardConnect still show the old sections, moved into this tab.
+import "./walletPanel.css";
+import { COPY } from "../copy.ts";
+import { walletChanged } from "../walletUI.ts";
+import { isValidMnemonic, newMnemonic, normalizeMnemonic } from "../wallet/local.ts";
+import { requestPersistentStorage, vault } from "../wallet/vault.ts";
+import type { PageView } from "./actions.ts";
+
+const T = COPY.walletPanel;
+const MIN_PW = 8; // the vault's own minimum
+const base = `${import.meta.env.BASE_URL}assets/`;
+
+type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home-old" | "wc-old";
+const ONBOARDING: Screen[] = ["start", "pw", "phrase", "import"];
+
+const svg = (inner: string, size = 22, w = 2.2) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  arrow: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
+  chevron: svg('<path d="M15 6l-6 6 6 6"/>', 18, 2.4),
+  eye: svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', 20, 2),
+  eyeOff: svg('<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.3 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>', 54, 1.8),
+  lock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 32, 2),
+  lockAsk: svg('<rect x="4.5" y="10.5" width="15" height="11" rx="2.2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M10.4 14.6a1.7 1.7 0 1 1 2.4 1.6c-.5.3-.8.6-.8 1.2"/><path d="M12 19.3v.2"/>', 44, 1.9),
+  tick: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f243d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+};
+
+// Password boxes the browser leaves alone: no "strong password" suggestion and no offer to save it. A text box
+// whose letters are drawn as dots does that; a browser that cannot draw them so gets a password box with autofill off.
+const MASKS = typeof CSS !== "undefined" && CSS.supports("-webkit-text-security", "disc");
+export function secretInput(placeholder: string, cls = ""): { input: HTMLInputElement; reveal: (on: boolean) => void } {
+  const input = document.createElement("input");
+  if (cls) input.className = cls;
+  input.type = MASKS ? "text" : "password";
+  if (MASKS) input.classList.add("fg-w-secret");
+  input.autocomplete = "off";
+  input.name = `fg-${Math.random().toString(36).slice(2)}`; // no name a password manager knows
+  input.spellcheck = false;
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("autocorrect", "off");
+  for (const a of ["data-lpignore", "data-1p-ignore", "data-bwignore", "data-form-type"]) input.setAttribute(a, a === "data-form-type" ? "other" : "true");
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", placeholder);
+  return {
+    input,
+    reveal: (on) => {
+      if (MASKS) input.classList.toggle("fg-w-secret", !on);
+      else input.type = on ? "text" : "password";
+    },
+  };
+}
+
+export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onOpen: () => void } {
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  };
+  const button = (cls: string, text: string, onClick: () => void) => {
+    const b = el("button", cls, text);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  const icon = (html: string) => {
+    const s = el("span");
+    s.style.display = "inline-flex";
+    s.innerHTML = html; // fixed icons only
+    return s;
+  };
+
+  const box = el("div", "fg-w");
+  page.prepend(box);
+  const old = {
+    local: document.getElementById("localWallet"),
+    own: document.getElementById("wallet"),
+    faucet: document.getElementById("faucet"),
+  };
+
+  // What the player is doing (secrets live only here, and only until the wallet is saved)
+  let screen: Screen = "pick";
+  let flow: "create" | "import" = "create";
+  let mnemonic: string | null = null;
+  let p1 = "", p2 = "";
+  let saved = false;
+  let words: string[] = [];
+  let long = false; // 24 words
+  let error = "";
+  let wantsOwn = false; // picked WizardConnect
+  let pickFirst = false; // the player stepped back to Pick a Wallet (or reset): a locked wallet waits behind it
+
+  const clearSecrets = () => {
+    mnemonic = null;
+    p1 = p2 = "";
+    saved = false;
+    words = [];
+    long = false;
+  };
+
+  // The screen the wallet's state calls for (an onboarding flow in progress keeps its screen)
+  function auto(): Screen {
+    const own = view().wallet.externalName !== null;
+    if (own || wantsOwn) return "wc-old";
+    const state = vault.state();
+    if (state === "unlocked") return vault.hasPassword() ? "home-old" : "upgrade";
+    if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
+    return ONBOARDING.includes(screen) ? screen : "pick";
+  }
+
+  function go(next: Screen): void {
+    if (next !== screen) error = "";
+    screen = next;
+    draw();
+  }
+
+  function draw(): void {
+    box.replaceChildren();
+    const oldHome = screen === "home-old", oldOwn = screen === "wc-old";
+    if (old.local) old.local.style.display = oldHome ? "" : "none";
+    if (old.own) old.own.style.display = oldOwn ? "" : "none";
+    if (old.faucet) old.faucet.style.display = oldHome || oldOwn ? "" : "none";
+    box.hidden = oldHome;
+    if (oldOwn) {
+      if (old.own?.classList.contains("hidden")) document.getElementById("useOwnWalletBtn")?.click();
+      box.append(walletBack(() => {
+        wantsOwn = false;
+        pickFirst = true;
+        go(auto());
+      }));
+      return;
+    }
+    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true) }[screen as Exclude<Screen, "home-old" | "wc-old">];
+    build?.();
+  }
+
+  // ---- pieces ----
+  const steps = (index: number, onBack: () => void) => {
+    const bar = el("div", "fg-w-steps");
+    const back = button("fg-w-back", "", onBack);
+    back.setAttribute("aria-label", T.back);
+    back.append(icon(ICON.arrow));
+    const dots = el("div", "fg-w-dots");
+    for (let i = 0; i < 3; i++) dots.append(el("span", i <= index ? "fg-w-dot fg-on" : "fg-w-dot"));
+    bar.append(back, dots);
+    return bar;
+  };
+  const walletBack = (onClick: () => void) => {
+    const b = button("fg-w-back", "", onClick);
+    b.append(icon(ICON.chevron), T.walletBack);
+    return b;
+  };
+  const errLine = () => {
+    const p = el("p", "fg-w-err", error);
+    p.setAttribute("role", "alert");
+    return p;
+  };
+  // A gold button that is on only when ready() says so
+  const goldWhen = (text: string, ready: () => boolean, onClick: () => void) => {
+    const b = button("fg-w-gold", text, () => {
+      if (ready()) onClick();
+    });
+    const refresh = () => (b.disabled = !ready());
+    refresh();
+    return { b, refresh };
+  };
+
+  // ---- Pick a Wallet ----
+  function pick(): void {
+    const row = (label: string, img: string, white: boolean, onClick: () => void) => {
+      const b = button("fg-w-row", "", onClick);
+      const ic = el("span", white ? "fg-w-icon fg-white" : "fg-w-icon");
+      const i = el("img");
+      i.src = base + img;
+      i.alt = "";
+      i.style.width = white ? "40px" : "34px";
+      ic.append(i);
+      b.append(ic, label);
+      return b;
+    };
+    const t = el("h2", "fg-w-title", T.pickTitle);
+    t.style.fontSize = "32px";
+    t.style.marginBottom = "10px";
+    box.append(
+      t,
+      row(T.gameWallet, "icons/crown.webp", false, () => {
+        pickFirst = false;
+        go(vault.state() === "none" ? "start" : auto());
+      }),
+      row(T.wizardConnect, "icons/wizardconnect.png", true, () => {
+        wantsOwn = true;
+        go("wc-old");
+      }),
+    );
+  }
+
+  // ---- Funge Game Wallet start ----
+  function start(): void {
+    const crown = el("img");
+    crown.src = `${base}icons/crown.webp`;
+    crown.alt = "";
+    crown.style.cssText = "width: 76px; margin: 26px auto 0";
+    const t = el("h2", "fg-w-title fg-w-center", T.gameWallet);
+    t.style.fontSize = "34px";
+    const text = el("p", "fg-w-mute fg-w-center", T.startText);
+    text.style.marginBottom = "120px";
+    box.append(
+      steps(0, () => go("pick")), crown, t, text,
+      button("fg-w-gold", T.createNew, () => {
+        clearSecrets();
+        flow = "create";
+        mnemonic = newMnemonic();
+        go("pw");
+      }),
+      button("fg-w-dark", T.haveWallet, () => {
+        clearSecrets();
+        flow = "import";
+        go("import");
+      }),
+    );
+  }
+
+  // ---- Create a password (both flows, and the one-time upgrade) ----
+  function password(upgrading: boolean): void {
+    const hint = el("p", "fg-w-err");
+    const field = (placeholder: string, value: string, onInput: (v: string) => void) => {
+      const wrap = el("div", "fg-w-pw");
+      const { input, reveal } = secretInput(placeholder);
+      input.value = value;
+      input.addEventListener("input", () => {
+        onInput(input.value);
+        update();
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") cont.b.click();
+      });
+      const eye = button("fg-w-eye", "", () => {
+        const showing = eye.getAttribute("aria-pressed") === "true";
+        reveal(!showing);
+        eye.setAttribute("aria-pressed", String(!showing));
+      });
+      eye.setAttribute("aria-label", T.showPassword);
+      eye.setAttribute("aria-pressed", "false");
+      eye.append(icon(ICON.eye));
+      wrap.append(input, eye);
+      return { wrap, input };
+    };
+    const ok = () => p1.length >= MIN_PW && p1 === p2;
+    const a = field(T.password, p1, (v) => (p1 = v));
+    const b = field(T.confirmPassword, p2, (v) => (p2 = v));
+    const cont = goldWhen(T.continue, ok, () => {
+      if (upgrading) void upgrade();
+      else if (flow === "create") go("phrase");
+      else void save(mnemonic!, p1);
+    });
+    function update(): void {
+      const text = p1 === "" ? "" : p1.length < MIN_PW ? T.pwShort : p2 === "" ? "" : p1 !== p2 ? T.pwMismatch : T.pwMatch;
+      hint.textContent = text;
+      hint.classList.toggle("fg-w-ok", text === T.pwMatch);
+      cont.refresh();
+    }
+    const head = el("div", "fg-w fg-w-center");
+    head.style.paddingTop = upgrading ? "30px" : "40px";
+    head.append(el("h2", "fg-w-title", T.pwTitle), el("p", "fg-w-mute", T.pwText));
+    const spacer = el("div");
+    spacer.style.height = "90px";
+    if (!upgrading) box.append(steps(flow === "create" ? 1 : 2, () => go(flow === "create" ? "start" : "import")));
+    box.append(head, a.wrap, b.wrap, hint, spacer, cont.b, errLine());
+    update();
+    a.input.focus();
+  }
+
+  // ---- Recovery phrase (create): blurred until pointed at or held; never selectable or copyable ----
+  function phrase(): void {
+    const seed = el("div", "fg-w-seed");
+    seed.setAttribute("role", "img");
+    seed.setAttribute("aria-label", T.phraseAria);
+    const grid = el("div", "fg-w-seedgrid");
+    (mnemonic ?? "").split(" ").forEach((w, i) => {
+      const cell = el("div", "fg-w-word");
+      cell.append(el("i", "", String(i + 1)), el("b", "", w));
+      grid.append(cell);
+    });
+    const eye = el("div", "fg-w-seedeye");
+    eye.innerHTML = ICON.eyeOff;
+    seed.append(grid, eye);
+    for (const t of ["copy", "cut", "contextmenu", "dragstart", "selectstart"] as const) seed.addEventListener(t, (e) => e.preventDefault());
+    seed.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "mouse") seed.classList.add("fg-held");
+    });
+    for (const t of ["pointerup", "pointercancel", "pointerleave"] as const) seed.addEventListener(t, () => seed.classList.remove("fg-held"));
+
+    const check = button("fg-w-check", "", () => {
+      saved = !saved;
+      paint();
+    });
+    check.setAttribute("role", "checkbox");
+    const boxEl = el("span", "fg-w-box");
+    check.append(boxEl, T.saved);
+    const cont = goldWhen(T.continue, () => saved, () => void save(mnemonic!, p1));
+    function paint(): void {
+      check.setAttribute("aria-checked", String(saved));
+      boxEl.innerHTML = saved ? ICON.tick : "";
+      cont.refresh();
+    }
+    const head = el("div", "fg-w fg-w-center");
+    head.style.paddingTop = "24px";
+    head.append(el("h2", "fg-w-title", T.phraseTitle), el("p", "fg-w-warn", T.phraseWarn));
+    box.append(steps(2, () => go("pw")), head, seed, check, cont.b, errLine());
+    paint();
+  }
+
+  // ---- Import: type or paste the words ----
+  function importScreen(): void {
+    const head = el("div", "fg-w fg-w-center");
+    head.style.paddingTop = "16px";
+    head.append(el("h2", "fg-w-title", T.phraseTitle), el("p", "fg-w-mute", T.importText));
+    const grid = el("div", "fg-w-words");
+    const inputs: HTMLInputElement[] = [];
+    const ready = () => {
+      const n = long ? 24 : 12;
+      return Array.from({ length: n }, (_, i) => (words[i] ?? "").trim()).every((w) => /^[a-z]+$/i.test(w));
+    };
+    const imp = goldWhen(T.importBtn, ready, () => {
+      const phrase = normalizeMnemonic(words.slice(0, long ? 24 : 12).join(" "));
+      if (!isValidMnemonic(phrase)) {
+        err.textContent = error = T.badPhrase;
+        return;
+      }
+      mnemonic = phrase;
+      go("pw");
+    });
+    const err = errLine();
+    const fill = (from: number, text: string) => {
+      const parts = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      parts.forEach((w, k) => (words[from + k] = w));
+      if (from + parts.length > 12 && !long) {
+        long = true;
+        go("import"); // redraw with 24 boxes
+        return;
+      }
+      inputs.forEach((inp, i) => (inp.value = words[i] ?? ""));
+      inputs[Math.min(from + parts.length, inputs.length - 1)]?.focus();
+      imp.refresh();
+    };
+    for (let i = 0; i < (long ? 24 : 12); i++) {
+      const label = el("label", "fg-w-wordin");
+      const input = el("input");
+      input.type = "text";
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      input.setAttribute("autocapitalize", "off");
+      input.setAttribute("aria-label", T.wordAria(i + 1));
+      input.value = words[i] ?? "";
+      input.addEventListener("paste", (e) => {
+        const text = e.clipboardData?.getData("text") ?? "";
+        if (text.trim().split(/\s+/).length > 1) {
+          e.preventDefault();
+          fill(i, text);
+        }
+      });
+      input.addEventListener("input", () => {
+        if (/\s/.test(input.value.trim())) return fill(i, input.value);
+        words[i] = input.value.trim().toLowerCase();
+        imp.refresh();
+      });
+      inputs.push(input);
+      label.append(el("span", "", `${i + 1}.`), input);
+      grid.append(label);
+    }
+    box.append(steps(1, () => go("start")), head, grid, imp.b, err);
+    inputs[0]?.focus();
+  }
+
+  // ---- Locked ----
+  function locked(): void {
+    const badge = el("div", "fg-w-badge");
+    badge.innerHTML = ICON.lock;
+    badge.style.marginTop = "16px";
+    const { input } = secretInput(T.password, "fg-w-input");
+    const err = errLine();
+    const unlock = async () => {
+      if (!input.value) return;
+      const ok = await vault.unlock(input.value);
+      if (!ok) {
+        err.textContent = error = T.wrongPassword;
+        return;
+      }
+      input.value = "";
+      walletChanged();
+      go(auto());
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") void unlock();
+    });
+    const head = el("div", "fg-w fg-w-center");
+    head.append(badge, el("h2", "fg-w-title", T.lockedTitle), el("p", "fg-w-mute", T.lockedText));
+    box.append(walletBack(() => {
+      pickFirst = true;
+      go("pick");
+    }), head, input, button("fg-w-gold", T.unlock, () => void unlock()), button("fg-w-textlink", T.forgot, () => go("forgot")), err);
+    input.focus();
+  }
+
+  // ---- Forgot password: reset the wallet ----
+  function forgot(): void {
+    const badge = el("div", "fg-w-badge fg-big");
+    badge.innerHTML = ICON.lockAsk;
+    badge.style.marginTop = "70px";
+    const head = el("div", "fg-w fg-w-center");
+    const t = el("h2", "fg-w-title", T.forgotTitle);
+    t.style.fontSize = "32px";
+    head.append(badge, t, el("p", "fg-w-mute", T.forgotText));
+    const spacer = el("div");
+    spacer.style.height = "160px";
+    box.append(walletBack(() => go("locked")), head, spacer, button("fg-w-red", T.reset, confirmReset));
+  }
+  function confirmReset(): void {
+    const modal = el("div", "fg-w-modal");
+    const m = el("div", "fg-w-modal-box");
+    m.setAttribute("role", "alertdialog");
+    m.setAttribute("aria-modal", "true");
+    const warn = el("p", "fg-w-mute", T.resetWarn);
+    warn.style.color = "#fca5a5";
+    const cancel = button("fg-w-line", T.cancel, () => modal.remove());
+    const reset = button("fg-w-red", T.reset, async () => {
+      await vault.wipe();
+      clearSecrets();
+      modal.remove();
+      walletChanged();
+      pickFirst = false;
+      go("pick");
+    });
+    const two = el("div", "fg-w-two");
+    two.append(cancel, reset);
+    m.append(el("h2", "fg-w-title", T.resetTitle), el("p", "fg-w-mute", T.resetText), warn, two);
+    modal.append(m);
+    (page.closest(".fg-panel") ?? page).append(modal);
+    cancel.focus();
+  }
+
+  // ---- Saving ----
+  async function save(phrase: string, pw: string): Promise<void> {
+    try {
+      await vault.create(phrase, pw);
+      void requestPersistentStorage();
+      clearSecrets();
+      walletChanged();
+      go(auto());
+    } catch (e) {
+      console.error(e);
+      error = T.failed;
+      draw();
+    }
+  }
+
+  // An old wallet without a password: save the same phrase again, now behind the new password
+  async function upgrade(): Promise<void> {
+    const phrase = vault.revealMnemonic();
+    if (!phrase) return;
+    await vault.wipe();
+    try {
+      await vault.create(phrase, p1);
+    } catch (e) {
+      console.error(e);
+      await vault.create(phrase); // put it back as it was, so it is never lost from this browser
+      error = T.failed;
+      draw();
+      return;
+    }
+    clearSecrets();
+    walletChanged();
+    go(auto());
+  }
+
+  // The vault or the own wallet changed somewhere else
+  let lastKey = "";
+  setInterval(() => {
+    const key = `${vault.state()}|${vault.hasPassword()}|${view().wallet.externalName ?? ""}`;
+    if (key === lastKey) return;
+    lastKey = key;
+    const next = auto();
+    if (next !== screen) go(next);
+  }, 300);
+
+  go(auto());
+  return {
+    onOpen: () => {
+      const next = auto();
+      if (next !== screen) go(next);
+    },
+  };
+}
