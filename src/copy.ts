@@ -214,7 +214,7 @@ export const COPY = {
     notEnough: (coin: string) => `Not enough ${coin}`,
     tooBig: (coin: string) => `Not enough ${coin} on offer`,
     tooSmall: "Amount too small",
-    tooMuchImpact: "Price impact over 3%",
+    tooMuchImpact: (percent: string) => `Price impact over ${percent}%`,
     unavailable: "Exchange unavailable",
     // under the panels
     rate: (bch: string, usd: string) => `1 PUSD = ${bch} BCH${usd ? ` (${usd})` : ""}`,

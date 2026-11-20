@@ -8,10 +8,14 @@
 import {
   binToHex, encodeDataPush, generateSigningSerializationBch, hash160, hash256, hexToBin, lockingBytecodeToCashAddress,
 } from "@bitauth/libauth";
+import { CONFIG } from "../config.ts";
 import { buildPoolV0RedeemScriptBytecode, buildPoolV0UnlockingBytecode, ExchangeLab, type PoolV0, type TradeResult } from "@cashlab/cauldron";
 import { TransactionBuilder, type NetworkProvider, type SignatureTemplate, type SpendableUtxo, type Unlocker } from "cashscript";
 
-export const MAX_PRICE_MOVE = 0.03; // refuse a swap that pays more than 3% over the best price before it
+// Refuse a swap that pays more than this over the best price before it. Mainnet: 3%, against Cauldron's deep pools.
+// Chipnet: 25%, because the practice pool is small (a mainnet-priced pool needs more test BCH than faucets give), so
+// a swap of a few PUSD already moves its price by more than 3%. The quote shows the real rate either way.
+export const MAX_PRICE_MOVE = CONFIG.network === "chipnet" ? 0.25 : 0.03;
 const FEE_PER_BYTE = 1n; // for CashLab's choice of pools
 const FEE_RATE = 1.0; // sats per byte, the network's usual minimum
 const PUSD_OUTPUT_SATS = 1_000n; // the BCH that carries the bought PUSD

@@ -8,6 +8,7 @@ import { lockToAddress, p2pkhLock } from "../src/lib/chain.ts";
 import { newMnemonic, walletFromMnemonic } from "../src/wallet/local.ts";
 import {
   buildSwap, poolAddress, poolLock, poolsFromIndexer, poolsOnChain, poolWithdrawUnlocker, quote, sendSwap, SWAP_RESERVE, SwapFailure,
+  MAX_PRICE_MOVE,
 } from "../src/lib/swap.ts";
 
 const PUSD = "0123456789abcdef".repeat(4); // not symmetric: a byte-order mistake would show
@@ -76,19 +77,19 @@ async function refused(p: Promise<unknown> | (() => unknown), code: string) {
   console.log(`ok    300.00 PUSD from ${q.trade.entries.length} pools in one transaction (+${(q.priceMove * 100).toFixed(2)}%)`);
 }
 
-// 3. Refusals: more than 3% over the price, more than the pools hold, not enough BCH, no pools
+// 3. Refusals: past the price limit (MAX_PRICE_MOVE), more than the pools hold, not enough BCH, no pools
 {
   const { chain, owner, wallet } = setup([[10_000_000n, 20_000n]]); // a small pool: 200.00 PUSD
   const pools = await poolsOnChain(chain, owner, PUSD);
-  const big = quote(pools, PUSD, 2_000n); // 10% of the pool
-  assert.ok(big.priceMove > 0.03);
+  const big = quote(pools, PUSD, 9_000n); // 45% of the pool: far past the limit on either network
+  assert.ok(big.priceMove > MAX_PRICE_MOVE);
   await refused(buildSwap(chain, wallet, big), "price_move");
   await refused(() => quote(pools, PUSD, 20_000n), "too_big");
   await refused(() => quote([], PUSD, 100n), "no_pools");
   const poor = setup([[500_000_000n, 1_000_000n]], [50_000n]);
   const q = quote(await poolsOnChain(poor.chain, poor.owner, PUSD), PUSD, 2_000n);
   await refused(buildSwap(poor.chain, poor.wallet, q), "no_bch");
-  console.log("ok    over 3%, more than the pools hold, not enough BCH, no pools");
+  console.log("ok    over the price limit, more than the pools hold, not enough BCH, no pools");
 }
 
 // 4. Someone traded the pool first: ours is refused and nothing is spent; a fresh quote works

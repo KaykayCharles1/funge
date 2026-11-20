@@ -279,7 +279,7 @@ export function initSwap(
       if (topAmount(q) > maxSell(swap)) {
         short(true);
         action(T.notEnough(top()), false);
-      } else if (q.priceMove > swap.MAX_PRICE_MOVE) action(T.tooMuchImpact, false);
+      } else if (q.priceMove > swap.MAX_PRICE_MOVE) action(T.tooMuchImpact(String(Math.round(swap.MAX_PRICE_MOVE * 100))), false);
       else action(T.review, true);
     } catch (e) {
       if (id !== runId) return;
