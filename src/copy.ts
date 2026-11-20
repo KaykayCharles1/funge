@@ -114,6 +114,7 @@ export const COPY = {
     telegram: "Telegram",
     whatsapp: "WhatsApp",
     x: "X",
+    discord: "Discord",
     close: "Close",
     bannerQuestion: "Do you have what it takes to become the King of Funge?",
     bannerCoins: "Get free test coins",
