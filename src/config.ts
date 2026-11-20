@@ -52,9 +52,7 @@ export const CONFIG = {
 
   // Kingdom (FungeKingdom contract). Deploy-time contract settings, in base units of PUSD (2 decimals).
   kingdom: {
-    // What the first player pays; it becomes the kingdom's value. Mainnet 1.00 PUSD (small stakes for the
-    // hackathon demo), chipnet 5.00. A deployed round keeps the price it was deployed with.
-    openingPrice: NETWORK === "mainnet" ? 100n : 500n,
+    openingPrice: 500n, // 5.00 PUSD: what the first player pays; it becomes the kingdom's value
     feePercent: 2n, // whole percent of the value, paid on top by the conqueror, goes to the dethroned king
     cutPercent: 10n, // whole percent of the value taken from the dethroned king's share into the pool
     cap: 5_000n, // 50.00 PUSD: the value can never be raised above this
