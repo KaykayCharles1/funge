@@ -19,8 +19,8 @@ const T = COPY.walletPanel;
 const MIN_PW = 8; // the vault's own minimum
 const base = `${import.meta.env.BASE_URL}assets/`;
 
-type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home" | "swap-old" | "withdraw-old" | "seed-old" | "wc-old";
-const OLD_TOOLS: Screen[] = ["swap-old", "withdraw-old", "seed-old"]; // the old swap, withdraw and seed boxes, until rebuilt
+type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home" | "backup" | "delete" | "swap-old" | "withdraw-old" | "wc-old";
+const OLD_TOOLS: Screen[] = ["swap-old", "withdraw-old"]; // the swap and withdraw boxes (their own code, restyled here)
 const ONBOARDING: Screen[] = ["start", "pw", "phrase", "import"];
 
 const svg = (inner: string, size = 22, w = 2.2) =>
@@ -34,6 +34,8 @@ const ICON = {
   lockSmall: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 18, 2.2),
   disconnect: svg('<path d="M8 6.5 16 4l1.2 2.5"/><path d="M13.5 19H19a2 2 0 0 0 2-2V8.5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2.5"/><path d="M17 12.5h.5"/><circle cx="7.5" cy="16.5" r="4.5"/><path d="M5.9 14.9l3.2 3.2M9.1 14.9l-3.2 3.2"/>', 20, 2),
   lockAsk: svg('<rect x="4.5" y="10.5" width="15" height="11" rx="2.2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M10.4 14.6a1.7 1.7 0 1 1 2.4 1.6c-.5.3-.8.6-.8 1.2"/><path d="M12 19.3v.2"/>', 44, 1.9),
+  alert: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>', 20, 2),
+  shield: svg('<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><circle cx="12" cy="11" r="1.6"/><path d="M12 12.6V15"/>', 40, 1.8),
   tick: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f243d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
 };
 
@@ -87,7 +89,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // The old swap, withdraw and seed boxes wait here, with their handlers, until their screens are rebuilt
   const hold = el("div", "fg-w-hold");
   box.after(hold);
-  for (const id of ["swBox", "swReview", "wdBox", "lwSeedBox"]) {
+  for (const id of ["swBox", "swReview", "wdBox"]) {
     const e = document.getElementById(id);
     if (e) hold.append(e);
   }
@@ -108,6 +110,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   let long = false; // 24 words
   let error = "";
   let wantsOwn = false; // picked WizardConnect
+  let backupWords: string | null = null; // the seed phrase, only while the Backup screen shows it
   let pickFirst = false; // the player stepped back to Pick a Wallet (or reset): a locked wallet waits behind it
 
   const clearSecrets = () => {
@@ -123,13 +126,14 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     const own = view().wallet.externalName !== null;
     if (own || wantsOwn) return "wc-old";
     const state = vault.state();
-    if (state === "unlocked") return !vault.hasPassword() ? "upgrade" : OLD_TOOLS.includes(screen) ? screen : "home";
+    if (state === "unlocked") return !vault.hasPassword() ? "upgrade" : [...OLD_TOOLS, "backup", "delete"].includes(screen) ? screen : "home";
     if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
     return ONBOARDING.includes(screen) ? screen : "pick";
   }
 
   function go(next: Screen): void {
     if (next !== screen) error = "";
+    if (next !== "backup") backupWords = null;
     screen = next;
     draw();
   }
@@ -151,7 +155,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       }));
       return;
     }
-    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true), home }[screen as Exclude<Screen, "wc-old" | "swap-old" | "withdraw-old" | "seed-old">];
+    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true), home, backup, delete: deleteScreen }[screen as Exclude<Screen, "wc-old" | "swap-old" | "withdraw-old">];
     build?.();
   }
 
@@ -533,8 +537,8 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     // Back up and Delete (the old flows for now)
     const pills = el("div", "fg-w-pills");
     pills.append(
-      button("fg-w-pill", T.backup, () => go("seed-old")),
-      button("fg-w-pill fg-w-pill-red", T.deleteWallet, () => document.getElementById("lwDeleteBtn")?.click()),
+      button("fg-w-pill", T.backup, () => askPassword()),
+      button("fg-w-pill fg-w-pill-red", T.deleteWallet, () => go("delete")),
     );
     box.append(pills);
 
@@ -601,11 +605,11 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
 
   // The old swap, withdraw or seed box, under a way back home
   function oldTool(): void {
-    const ids = { "swap-old": "swBox", "withdraw-old": "wdBox", "seed-old": "lwSeedBox" } as const;
+    const ids = { "swap-old": "swBox", "withdraw-old": "wdBox" } as const;
     const id = ids[screen as keyof typeof ids];
     for (const e of Array.from(hold.children) as HTMLElement[]) if (e.id !== "swReview") e.style.display = e.id === id ? "" : "none";
-    const opener = { "swap-old": "lwSwapBtn", "withdraw-old": "lwWithdrawBtn", "seed-old": "lwBackupBtn" } as const;
-    const closer = { "swap-old": "lwSwapBtn", "withdraw-old": "wdCancel", "seed-old": "lwSeedDoneBtn" } as const;
+    const opener = { "swap-old": "lwSwapBtn", "withdraw-old": "lwWithdrawBtn" } as const;
+    const closer = { "swap-old": "lwSwapBtn", "withdraw-old": "wdCancel" } as const;
     const which = screen as keyof typeof ids;
     const target = document.getElementById(id);
     if (target?.classList.contains("hidden")) document.getElementById(opener[which])?.click();
@@ -615,6 +619,105 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       if (t && !t.classList.contains("hidden")) document.getElementById(closer[which])?.click();
       go("home");
     }));
+  }
+
+  // ---- Back up: the password first (askPassword), then the words under a grey cover ----
+  function backup(): void {
+    const phrase = backupWords;
+    if (!phrase) return go("home");
+    const warn = el("div", "fg-w-redbox");
+    warn.append(icon(ICON.alert), el("span", "", T.backupWarn));
+    const seed = el("div", "fg-w-seed fg-w-backup fg-w-covered");
+    seed.setAttribute("role", "img");
+    seed.setAttribute("aria-label", T.seedAria);
+    const grid = el("div", "fg-w-seedgrid");
+    phrase.split(" ").forEach((w, i) => {
+      const cell = el("div", "fg-w-word");
+      cell.append(el("i", "", String(i + 1)), el("b", "", w));
+      grid.append(cell);
+    });
+    const cover = button("fg-w-cover", "", () => {
+      seed.classList.remove("fg-w-covered");
+      cover.remove();
+    });
+    cover.append(icon(ICON.shield), el("span", "", T.showSeed));
+    seed.append(grid, cover);
+    for (const t of ["copy", "cut", "contextmenu", "dragstart", "selectstart"] as const) seed.addEventListener(t, (e) => e.preventDefault());
+    const t = el("h2", "fg-w-title fg-w-center", T.backupTitle);
+    const done = button("fg-w-gold", T.seedSaved, () => {
+      backupWords = null; // the words leave the screen and this file's memory
+      go("home");
+    });
+    box.append(walletBack(() => {
+      backupWords = null;
+      go("home");
+    }), t, warn, seed, done);
+  }
+
+  // ---- Delete ----
+  function deleteScreen(): void {
+    const card = el("div", "fg-w-card fg-w-delete");
+    const t = el("h2", "fg-w-title", T.deleteTitle);
+    t.style.color = "#fecaca";
+    t.style.fontSize = "28px";
+    const text = el("p", "fg-w-mute", T.deleteText);
+    text.style.marginTop = "8px";
+    text.style.fontSize = "15px";
+    const first = button("fg-w-pill", T.backupFirst, () => askPassword());
+    first.style.marginTop = "12px";
+    const two = el("div", "fg-w-two");
+    two.style.marginTop = "16px";
+    two.append(
+      button("fg-w-line", T.cancel, () => go("home")),
+      button("fg-w-red", T.deleteWallet, async () => {
+        await vault.wipe();
+        clearSecrets();
+        walletChanged();
+        pickFirst = false;
+        go("pick");
+      }),
+    );
+    card.append(t, text, first, two);
+    box.append(walletBack(() => go("home")), card);
+  }
+
+  // The password box before the seed phrase shows: checked against the vault, which stays open as it was
+  function askPassword(): void {
+    const modal = el("div", "fg-w-modal");
+    const m = el("div", "fg-w-modal-box fg-w-gold-box");
+    m.setAttribute("role", "dialog");
+    m.setAttribute("aria-modal", "true");
+    const t = el("h2", "fg-w-title fg-w-center", T.backupTitle);
+    const { input } = secretInput(T.confirmPassword2, "fg-w-input");
+    input.style.height = "50px";
+    const err = el("p", "fg-w-err");
+    err.setAttribute("role", "alert");
+    const close = () => {
+      modal.remove();
+      input.value = "";
+    };
+    const confirm = async () => {
+      if (!input.value) return;
+      const ok = await vault.unlock(input.value); // the same wallet opens again: a check, nothing changes
+      if (!ok) {
+        err.textContent = T.wrongPassword;
+        return;
+      }
+      backupWords = vault.revealMnemonic();
+      close();
+      walletChanged();
+      go("backup");
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") void confirm();
+      if (e.key === "Escape") close();
+    });
+    const two = el("div", "fg-w-two");
+    two.append(button("fg-w-line", T.cancel, close), button("fg-w-gold", T.confirm, () => void confirm()));
+    m.append(t, input, err, two);
+    modal.append(m);
+    (page.closest(".fg-panel") ?? page).append(modal);
+    input.focus();
   }
 
   // ---- Saving ----

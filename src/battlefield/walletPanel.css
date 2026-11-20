@@ -215,3 +215,19 @@
 .fg-panel #wdMsg { margin-top: 10px; }
 .fg-panel #wdPusd:disabled, .fg-panel #wdBch:disabled, .fg-panel #wdPusdMax:disabled, .fg-panel #wdBchMax:disabled { opacity: 0.45; cursor: not-allowed; }
 .fg-panel #wdPusdMax:disabled:hover, .fg-panel #wdBchMax:disabled:hover { background: transparent; }
+
+/* Back up and Delete (6e) */
+.fg-w-redbox { display: flex; gap: 10px; padding: 12px 14px; border-radius: 6px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(248, 113, 113, 0.55);
+  font-size: 15px; line-height: 1.45; color: #fca5a5; }
+.fg-w-redbox > span:first-child { flex-shrink: 0; margin-top: 1px; }
+/* The backup screen's words: blurred under the grey cover until it is clicked, then shown (the create screen's words
+   keep their own rule: shown only while pointed at or held) */
+.fg-w-seed.fg-w-backup .fg-w-seedgrid, .fg-w-seed.fg-w-backup:hover .fg-w-seedgrid { filter: none; }
+.fg-w-seed.fg-w-backup.fg-w-covered .fg-w-seedgrid, .fg-w-seed.fg-w-backup.fg-w-covered:hover .fg-w-seedgrid { filter: blur(6px); }
+.fg-w-cover { position: absolute; inset: 0; width: 100%; border: 0; border-radius: 8px; background: rgba(55, 58, 66, 0.88); color: #f4ead2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; font-size: 17px; }
+.fg-w-cover:hover { background: rgba(65, 68, 78, 0.92); }
+.fg-w-delete { border-color: rgba(252, 165, 165, 0.6); }
+.fg-w-modal-box.fg-w-gold-box { border-color: #e0a93a; gap: 14px; }
+.fg-w-modal-box.fg-w-gold-box .fg-w-title { color: #f8eeca; }
+.fg-w-modal-box .fg-w-err { min-height: 0; }

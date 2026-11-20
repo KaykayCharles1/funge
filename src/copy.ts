@@ -530,6 +530,18 @@ export const COPY = {
     nextClaim: (time: string) => `Next claim in ${time}`,
     backup: "Back up seed phrase",
     deleteWallet: "Delete wallet",
+    // Back up: the password first, then the words under a cover
+    backupTitle: "Backup Seed Phrase",
+    confirmPassword2: "Enter the password to confirm",
+    confirm: "Confirm",
+    backupWarn: "This Seed Phrase is the credential to your assets. DO NOT lose it or reveal it to others, otherwise you might lose your assets forever. Please view it in a secure environment and keep it carefully.",
+    showSeed: "Click to show Seed Phrase",
+    seedSaved: "I've saved the Seed Phrase",
+    seedAria: "Your seed phrase",
+    // Delete
+    deleteTitle: "Delete this wallet?",
+    deleteText: "It is removed from this browser. Without your seed phrase backup, any funds in it are lost for good.",
+    backupFirst: "Back up seed phrase first",
     failed: "Could not save the wallet. Please try again.",
   },
 
