@@ -1,0 +1,3 @@
+/* With boot.js: the battlefield's navy from the first frame, and the plain game page hidden */
+html.fg-boot, html.fg-boot body { background: #0f1a33; }
+html.fg-boot #app, html.fg-boot #overModal { display: none !important; }

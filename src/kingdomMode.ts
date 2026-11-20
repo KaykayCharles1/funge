@@ -1012,6 +1012,7 @@ function mountBattlefieldIfAsked() {
     .catch((e) => {
       console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e));
       boot.remove();
+      document.documentElement.classList.remove("fg-boot"); // public/play/boot.css hid the plain page
       $("app").style.display = ""; // the plain page still plays
     });
 }
