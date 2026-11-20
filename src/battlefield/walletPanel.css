@@ -115,3 +115,58 @@
 .fg-w-pill:hover { background: rgba(248, 238, 202, 0.16); }
 .fg-w-pill-red { background: #b91c1c; border-color: #ef4444; color: #fff; }
 .fg-w-pill-red:hover { background: #dc2626; }
+
+/* Swap (6c): the swap's own code (src/swapUI.ts) runs as before; this gives its screen the mockup's look.
+   Scoped to the panel, so the old page (without ?mode=battlefield) keeps its look. */
+.fg-panel #swBox { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; color: #f4ead2; font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-panel #swBox.hidden { display: none; }
+.fg-panel #swBox > div:first-child { position: relative; justify-content: center; margin: 0 0 6px; }
+.fg-panel #swTitle { background: transparent; padding: 0; font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 30px; line-height: 1; color: #f8eeca; }
+.fg-panel #swPractice { display: none !important; }
+.fg-panel #swGear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); margin: 0; color: #f3cf74; background: transparent; }
+.fg-panel #swGear:hover { background: #15234a; color: #f8eeca; }
+.fg-panel #swSettings { position: static; width: auto; order: 1; padding: 16px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; box-shadow: none; }
+.fg-panel #swSettings.hidden { display: none; }
+.fg-panel #swSlipHelp { display: none; }
+.fg-panel #swSlipLabel { font-size: 16px; color: #f8eeca; }
+.fg-panel #swSettings .rounded-full.bg-slate-800 { background: #0f1a33; box-shadow: 0 0 0 1px rgba(224, 169, 58, 0.45); }
+.fg-panel #swSlipAuto { font-family: inherit; font-size: 14px; }
+.fg-panel #swSlipAuto.bg-amber-400 { background: #fbbc28; color: #0f243d; }
+.fg-panel #swSlip { color: #f8eeca; font-family: inherit; }
+
+/* Sell and Buy cards */
+.fg-panel #swBox > div.rounded-2xl, .fg-panel #swBox > div > div.rounded-2xl { order: 2; }
+.fg-panel #swBox .rounded-2xl.bg-slate-900 { background: #15234a; box-shadow: none; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 8px; }
+.fg-panel #swBox > .rounded-2xl.bg-slate-900 { order: 2; }
+.fg-panel #swBox > .relative.z-10 { order: 2; }
+.fg-panel #swSellLabel, .fg-panel #swBuyLabel { color: #f3cf74; font-size: 15px; }
+.fg-panel #swSell, .fg-panel #swBuy { font-family: Cinzel, Georgia, serif; font-size: 30px; color: #f8eeca; }
+.fg-panel #swSell::placeholder, .fg-panel #swBuy::placeholder { color: #64748b; }
+.fg-panel #swSell.text-red-400 { color: #fca5a5; }
+.fg-panel #swTopToken, .fg-panel #swBotToken { background: #0f1a33; box-shadow: 0 0 0 1px rgba(224, 169, 58, 0.45); color: #f8eeca; }
+.fg-panel #swBox .text-slate-400 { color: #cbd5e1; }
+.fg-panel #swChips button { background: transparent; color: #f3cf74; box-shadow: none; border: 1px solid rgba(224, 169, 58, 0.5); font-family: inherit; font-size: 13px; padding: 2px 10px; }
+.fg-panel #swChips button:hover { background: #fbbc28; color: #0f243d; }
+.fg-panel #swFlip { background: #0f243d; color: #fbbc28; box-shadow: 0 0 0 4px #0a1226, 0 0 0 5px rgba(224, 169, 58, 0.6); }
+.fg-panel #swFlip, .fg-panel #swFlip:hover { rotate: none; transform: none; transition: color 0.15s; }
+.fg-panel #swFlip:hover { color: #f8eeca; }
+
+/* The rate and network cost, then the button, then the message */
+.fg-panel #swBox > div:has(> #swRate) { order: 3; margin: 0; font-size: 14px; color: #cbd5e1; }
+.fg-panel #swAction { order: 4; margin: 4px 0 0; height: 52px; padding: 0 16px; border-radius: 999px; background: #fbbc28; color: #0f243d; box-shadow: 0 4px 0 #0f243d;
+  font-family: inherit; font-size: 19px; font-weight: 700; }
+.fg-panel #swAction:hover:not(:disabled) { background: #fcc94d; }
+.fg-panel #swAction:disabled { background: #3a3f55; color: #a8a29e; box-shadow: none; }
+.fg-panel #swMsg { order: 5; margin: 0; }
+
+/* The review window */
+.fg-panel #swReview { position: fixed; z-index: 70; background: rgba(5, 10, 24, 0.75); font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-panel #swReview > div { background: #0f1a33; border: 2px solid #e0a93a; border-radius: 10px; box-shadow: none; color: #f4ead2; }
+.fg-panel #swRvTitle { font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 26px; color: #f8eeca; }
+.fg-panel #swRvSell, .fg-panel #swRvBuy { font-family: Cinzel, Georgia, serif; color: #f8eeca; }
+.fg-panel #swRvMore { border-color: rgba(224, 169, 58, 0.35); color: #f3cf74; font-family: inherit; }
+.fg-panel #swRvRows dt { color: #cbd5e1; }
+.fg-panel #swRvRows dd { color: #f8eeca; }
+.fg-panel #swRvSend { height: 52px; padding: 0 16px; border-radius: 999px; background: #fbbc28; color: #0f243d; box-shadow: 0 4px 0 #0f243d; font-family: inherit; font-size: 19px; font-weight: 700; }
+.fg-panel #swRvSend:disabled { opacity: 0.6; }
+.fg-panel #swRvClose { color: #f3cf74; }
