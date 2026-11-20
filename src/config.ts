@@ -48,6 +48,12 @@ export const CONFIG = {
   // Deploy-time contract setting.
   fallbackBlocks: 12, // anyone can settle without the referee after this many blocks with no action
 
+  // Where "View on the explorer" opens a transaction (the withdraw screen)
+  explorerTx: {
+    chipnet: "https://chipnet.imaginary.cash/tx/",
+    mainnet: "https://blockchair.com/bitcoin-cash/transaction/",
+  },
+
   // The Funge referee server (runs the game clock)
   referee: { url: refereeUrl() },
     

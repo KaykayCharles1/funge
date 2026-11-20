@@ -91,6 +91,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     const e = document.getElementById(id);
     if (e) hold.append(e);
   }
+  hold.addEventListener("withdraw-done", () => go("home"));
   const old = {
     local: document.getElementById("localWallet"),
     own: document.getElementById("wallet"),
