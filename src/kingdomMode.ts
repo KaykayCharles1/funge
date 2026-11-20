@@ -660,7 +660,7 @@ function waitForNextRound() {
     clearInterval(lineTimer);
     switchToRound(next);
   };
-  const poll = setInterval(async () => {
+  const check = async () => {
     if (checking) return;
     checking = true;
     try {
@@ -681,7 +681,9 @@ function waitForNextRound() {
     } finally {
       checking = false;
     }
-  }, 3_000);
+  };
+  const poll = setInterval(() => void check(), 3_000);
+  void check(); // look at once: the prepared round is usually ready already
 }
 
 // The current round's file, or the prepared next round's (null when there is none). Never from the cache.

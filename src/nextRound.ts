@@ -1,15 +1,12 @@
 // The wait between a settled round and the next one. kingdomMode.ts starts it and marks progress; the action bar,
 // the battlefield notice and the round panel show nextRoundLine().
-//   Normally the next round is already prepared (game.<network>.next.json): the winner is shown for WINNER_SECONDS,
-//   with a countdown, then the page switches. Without a prepared round, the robot has to deploy one first (the old
-//   wait, about WAIT_SECONDS).
+//   The next round is prepared in advance (game.<network>.next.json): the winner is shown for WINNER_SECONDS, with a
+//   countdown, then the page switches. The countdown is always those 10 seconds; if the new round is not ready when
+//   it reaches zero (rare: the robot had to deploy one), the line says it starts any moment.
 import { COPY } from "./copy.ts";
 
 const T = COPY.battlefield;
 export const WINNER_SECONDS = 10;
-// Measured: about 30 s for the GitHub robot, then about 50 s for Render and Cloudflare (side by side), then the
-// page's next check.
-const WAIT_SECONDS = 90;
 
 let startedAt: number | null = null;
 let almost = false;
@@ -44,8 +41,7 @@ export function nextRoundLine(): string {
     return T.nextRoundIn(`0:${String(left).padStart(2, "0")}`);
   }
   if (startedAt === null) return T.nextRound;
-  if (almost) return T.nextRoundAlmost;
-  const left = Math.ceil(WAIT_SECONDS - (Date.now() - startedAt) / 1000);
-  if (left <= 0) return T.nextRoundAnyMoment;
-  return T.nextRoundIn(`${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`);
+  const left = Math.ceil(WINNER_SECONDS - (Date.now() - startedAt) / 1000);
+  if (left > 0) return T.nextRoundIn(`0:${String(left).padStart(2, "0")}`);
+  return almost ? T.nextRoundAlmost : T.nextRoundAnyMoment;
 }
