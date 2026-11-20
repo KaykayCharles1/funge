@@ -4,7 +4,7 @@ import { hexToBin } from "@bitauth/libauth";
 import type { ElectrumNetworkProvider } from "cashscript";
 import kingdomJson from "../contracts/FungeKingdom.json";
 import potJson from "../contracts/FungePot.json";
-import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
+import { disconnectWallet, externalWanted, getWalletState, resumeIfStored, setExternalFlag, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { CONFIG } from "./config.ts";
 import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS, CONQUEST_ENDGAME_SECONDS } from "./refereeParams.ts";
@@ -99,22 +99,6 @@ const isMinePrefix = (prefix: string) => myKeys().some((k) => k.startsWith(prefi
 // The wallet that would play right now: a wallet the player explicitly connected wins; otherwise the game wallet
 const actingPkh = (): string | null => externalPkh() ?? getLocalWallet()?.pkhHex ?? null;
 
-const EXTERNAL_FLAG = "funge:external";
-const externalWanted = () => {
-  try {
-    return localStorage.getItem(EXTERNAL_FLAG) === "1";
-  } catch {
-    return false;
-  }
-};
-const setExternalFlag = (on: boolean) => {
-  try {
-    if (on) localStorage.setItem(EXTERNAL_FLAG, "1");
-    else localStorage.removeItem(EXTERNAL_FLAG);
-  } catch {
-    // optional
-  }
-};
 function setExternalVisible(visible: boolean) {
   show("wallet", visible);
   $("useOwnWalletBtn").textContent = visible ? "Hide the external wallet options" : "Use my own wallet instead (WizardConnect)";
@@ -1086,6 +1070,7 @@ export function battlefieldPage() {
     players: round?.players ?? {},
     claiming,
     claimNote,
+    provider: provider as ElectrumNetworkProvider | undefined, // the page's chain connection (the wallet panel reads balances with it)
     wallet: {
       game: getLocalWallet() !== null,
       vault: vault.state(), // "none" | "locked" | "unlocked"

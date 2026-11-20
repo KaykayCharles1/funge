@@ -542,6 +542,12 @@ export const COPY = {
     deleteTitle: "Delete this wallet?",
     deleteText: "It is removed from this browser. Without your seed phrase backup, any funds in it are lost for good.",
     backupFirst: "Back up seed phrase first",
+    // WizardConnect
+    wcScan: "Scan wallet to connect",
+    wcQrAlt: "WizardConnect QR code",
+    wcCopyLink: "Copy link",
+    wcReconnecting: "Reconnecting to your wallet…",
+    wcConnected: "Connected",
     failed: "Could not save the wallet. Please try again.",
   },
 

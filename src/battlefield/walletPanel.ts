@@ -10,7 +10,12 @@ import { CONFIG } from "../config.ts";
 import { claimFaucet, faucetBusy } from "../faucetUI.ts";
 import { formatUnits } from "../lib/format.ts";
 import { FAUCET } from "../refereeParams.ts";
+import { disconnectWallet, getWalletState, setExternalFlag, startConnection } from "../bch_wallet.ts";
+import { pusdCategory } from "../config.ts";
+import { lockToAddress, p2pkhLock } from "../lib/chain.ts";
+import { qrDataUrl } from "../lib/qr.ts";
 import { walletChanged } from "../walletUI.ts";
+import { hexToBin } from "@bitauth/libauth";
 import { isValidMnemonic, newMnemonic, normalizeMnemonic } from "../wallet/local.ts";
 import { requestPersistentStorage, vault } from "../wallet/vault.ts";
 import type { PageView } from "./actions.ts";
@@ -19,7 +24,7 @@ const T = COPY.walletPanel;
 const MIN_PW = 8; // the vault's own minimum
 const base = `${import.meta.env.BASE_URL}assets/`;
 
-type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home" | "backup" | "delete" | "swap-old" | "withdraw-old" | "wc-old";
+type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home" | "backup" | "delete" | "swap-old" | "withdraw-old" | "wc";
 const OLD_TOOLS: Screen[] = ["swap-old", "withdraw-old"]; // the swap and withdraw boxes (their own code, restyled here)
 const ONBOARDING: Screen[] = ["start", "pw", "phrase", "import"];
 
@@ -63,6 +68,13 @@ export function secretInput(placeholder: string, cls = ""): { input: HTMLInputEl
     },
   };
 }
+
+// The own wallet's balances, once read (the dock's wallet chip shows them)
+let ownBalances: { pusd: bigint; sats: bigint; pkhHex: string } | null = null;
+export const ownWalletBalances = () => {
+  const w = getWalletState();
+  return w.status === "connected" && ownBalances && ownBalances.pkhHex === w.pkhHex ? ownBalances : null;
+};
 
 export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onOpen: () => void } {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
@@ -123,8 +135,8 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
 
   // The screen the wallet's state calls for (an onboarding flow in progress keeps its screen)
   function auto(): Screen {
-    const own = view().wallet.externalName !== null;
-    if (own || wantsOwn) return "wc-old";
+    const own = getWalletState().status !== "idle";
+    if (own || wantsOwn) return "wc";
     const state = vault.state();
     if (state === "unlocked") return !vault.hasPassword() ? "upgrade" : [...OLD_TOOLS, "backup", "delete"].includes(screen) ? screen : "home";
     if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
@@ -140,22 +152,10 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
 
   function draw(): void {
     box.replaceChildren();
-    const oldOwn = screen === "wc-old";
-    if (old.local) old.local.style.display = "none";
-    if (old.own) old.own.style.display = oldOwn ? "" : "none";
-    if (old.faucet) old.faucet.style.display = oldOwn ? "" : "none";
+    for (const e of [old.local, old.own, old.faucet]) if (e) e.style.display = "none"; // the old sections are no longer shown
     hold.hidden = !OLD_TOOLS.includes(screen);
     if (OLD_TOOLS.includes(screen)) return oldTool();
-    if (oldOwn) {
-      if (old.own?.classList.contains("hidden")) document.getElementById("useOwnWalletBtn")?.click();
-      box.append(walletBack(() => {
-        wantsOwn = false;
-        pickFirst = true;
-        go(auto());
-      }));
-      return;
-    }
-    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true), home, backup, delete: deleteScreen }[screen as Exclude<Screen, "wc-old" | "swap-old" | "withdraw-old">];
+    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true), home, backup, delete: deleteScreen, wc: wcScreen }[screen as Exclude<Screen, "swap-old" | "withdraw-old">];
     build?.();
   }
 
@@ -214,7 +214,9 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       }),
       row(T.wizardConnect, "icons/wizardconnect.png", true, () => {
         wantsOwn = true;
-        go("wc-old");
+        setExternalFlag(true);
+        if (getWalletState().status === "idle") startConnection(true);
+        go("wc");
       }),
     );
   }
@@ -532,7 +534,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     );
 
     box.append(top, coins, addr, tools);
-    if (CONFIG.network === "chipnet") box.append(faucetCard());
+    if (CONFIG.network === "chipnet") box.append(faucetCard(w.pkhHex));
 
     // Back up and Delete (the old flows for now)
     const pills = el("div", "fg-w-pills");
@@ -557,11 +559,11 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   }
 
   // Free test coins: Claim, then "Next claim in 23:59:59" for a day (counted from the claim, in this browser)
-  function faucetCard(): HTMLElement {
+  function faucetCard(pkhHex: string): HTMLElement {
     const card = el("div", "fg-w-card fg-w-faucet");
     const pusdAmt = formatUnits(FAUCET.pusdUnits, CONFIG.pusdDecimals);
     const bchAmt = formatUnits(FAUCET.sats, 8);
-    const key = `funge:faucet:${vault.wallet()?.pkhHex ?? ""}`;
+    const key = `funge:faucet:${pkhHex}`;
     const claimedAt = (): number | null => {
       try {
         const v = Number(localStorage.getItem(key));
@@ -720,6 +722,122 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     input.focus();
   }
 
+  // ---- WizardConnect: the QR to scan, then the connected wallet ----
+  function wcScreen(): void {
+    const s = getWalletState();
+    if (s.status === "connected") return wcConnected();
+    const t = el("h2", "fg-w-title fg-w-center", T.wizardConnect);
+    const err = el("p", "fg-w-err fg-w-center", s.error ?? "");
+    const leave = () => {
+      if (getWalletState().status !== "idle") void disconnectWallet();
+      setExternalFlag(false);
+      wantsOwn = false;
+      pickFirst = true;
+      go(auto());
+    };
+    box.append(walletBack(leave), t);
+    if (s.status === "waiting" && s.qrUri) {
+      const lead = el("p", "fg-w-mute fg-w-center", T.wcScan);
+      const qr = el("img", "fg-w-qr");
+      qr.src = qrDataUrl(s.qrUri);
+      qr.alt = T.wcQrAlt;
+      const row = el("div", "fg-w-qrbtns");
+      const copy = button("fg-w-small", T.wcCopyLink, () => {
+        const uri = getWalletState().uri;
+        if (uri) void navigator.clipboard.writeText(uri).then(() => {
+          copy.textContent = T.copiedAddress;
+          window.setTimeout(() => (copy.textContent = T.wcCopyLink), 1500);
+        });
+      });
+      row.append(copy, button("fg-w-small", T.cancel, leave));
+      box.append(lead, qr, row, err);
+    } else if (s.status === "waiting") {
+      box.append(el("p", "fg-w-mute fg-w-center", T.wcReconnecting), err);
+    } else {
+      box.append(err);
+    }
+  }
+
+  function wcConnected(): void {
+    const s = getWalletState();
+    const top = el("div", "fg-w-top");
+    const off = button("fg-w-iconbtn", "", () => {
+      void disconnectWallet();
+      setExternalFlag(false);
+      wantsOwn = false;
+      pickFirst = true;
+      go(auto());
+    });
+    off.setAttribute("aria-label", T.disconnectWallet);
+    off.append(icon(ICON.disconnect), el("span", "fg-w-tip", T.disconnectWallet));
+    top.append(el("div", "fg-w-kick", T.wizardConnect), off);
+
+    const who = el("div", "fg-w-who");
+    const hat = el("span", "fg-w-icon fg-white");
+    const img = el("img");
+    img.src = `${base}icons/wizardconnect.png`;
+    img.alt = "";
+    img.style.width = "40px";
+    hat.append(img);
+    const names = el("span", "fg-w-whonames");
+    const ok = el("span", "fg-w-connected", T.wcConnected);
+    names.append(el("span", "fg-w-whoname", s.walletName ?? T.wizardConnect), ok);
+    who.append(hat, names);
+
+    const coin = (src: string, label: string) => {
+      const card = el("div", "fg-w-card fg-w-coin");
+      const head = el("div", "fg-w-coinhead");
+      const i = el("img");
+      i.src = base + src;
+      i.alt = "";
+      head.append(i, label);
+      const amount = el("div", "fg-w-amount", "—");
+      card.append(head, amount);
+      return { card, amount };
+    };
+    const pusd = coin("tokens/pusd.jpg", "PUSD"), bch = coin("tokens/bch.png", "BCH");
+    const coins = el("div", "fg-w-coins");
+    coins.append(pusd.card, bch.card);
+
+    box.append(top, who, coins);
+    if (s.pkhHex) {
+      const full = lockToAddress(p2pkhLock(hexToBin(s.pkhHex)), true);
+      const addr = el("div", "fg-w-addr");
+      const text = el("span", "", full.length > 28 ? `${full.slice(0, 16)}…${full.slice(-8)}` : full);
+      text.title = full;
+      const copy = button("fg-w-small", T.copyAddress, () => {
+        void navigator.clipboard.writeText(full).then(() => {
+          copy.textContent = T.copiedAddress;
+          window.setTimeout(() => (copy.textContent = T.copyAddress), 1500);
+        });
+      });
+      addr.append(text, copy);
+      box.append(addr);
+      // Balances of the own wallet's first address (what the game plays with), read from the chain
+      const read = async () => {
+        const provider = view().provider;
+        if (!provider) return;
+        try {
+          const utxos = await provider.getUtxosForLockingBytecode(p2pkhLock(hexToBin(s.pkhHex!)));
+          const category = pusdCategory();
+          let sats = 0n, units = 0n;
+          for (const u of utxos) {
+            sats += u.satoshis;
+            if (u.token && u.token.category === category && !u.token.nft) units += u.token.amount;
+          }
+          pusd.amount.textContent = Number(formatUnits(units, CONFIG.pusdDecimals)).toFixed(2);
+          bch.amount.textContent = Number(formatUnits(sats, 8)).toFixed(5);
+          ownBalances = { pusd: units, sats, pkhHex: s.pkhHex! };
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      void read();
+      const timer = window.setInterval(() => (box.isConnected && screen === "wc" ? void read() : window.clearInterval(timer)), 15_000);
+    }
+    if (CONFIG.network === "chipnet") box.append(faucetCard(s.pkhHex ?? ""));
+  }
+
   // ---- Saving ----
   async function save(phrase: string, pw: string): Promise<void> {
     try {
@@ -757,11 +875,13 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // The vault or the own wallet changed somewhere else
   let lastKey = "";
   setInterval(() => {
-    const key = `${vault.state()}|${vault.hasPassword()}|${view().wallet.externalName ?? ""}`;
+    const w = getWalletState();
+    const key = `${vault.state()}|${vault.hasPassword()}|${w.status}|${w.qrUri ?? ""}|${w.walletName ?? ""}|${w.error ?? ""}`;
     if (key === lastKey) return;
     lastKey = key;
     const next = auto();
     if (next !== screen) go(next);
+    else if (screen === "wc") draw();
   }, 300);
 
   go(auto());

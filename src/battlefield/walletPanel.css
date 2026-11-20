@@ -231,3 +231,12 @@
 .fg-w-modal-box.fg-w-gold-box { border-color: #e0a93a; gap: 14px; }
 .fg-w-modal-box.fg-w-gold-box .fg-w-title { color: #f8eeca; }
 .fg-w-modal-box .fg-w-err { min-height: 0; }
+
+/* WizardConnect (6f) */
+.fg-w-qr { display: block; width: 220px; height: 220px; margin: 4px auto 0; padding: 10px; background: #fff; border-radius: 8px; box-sizing: border-box; }
+.fg-w-qrbtns { display: flex; gap: 8px; justify-content: center; }
+.fg-w-who { display: flex; align-items: center; gap: 12px; }
+.fg-w-whonames { display: flex; flex-direction: column; gap: 3px; }
+.fg-w-whoname { font-size: 20px; font-weight: 700; color: #f8eeca; }
+.fg-w-connected { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #86efac; }
+.fg-w-connected::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #86efac; }

@@ -12,6 +12,9 @@ import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
 import type { Portrait } from "./identity.ts";
 import { openPicker } from "./picker.ts";
+import { ownWalletBalances } from "./walletPanel.ts";
+import { formatUnits } from "../lib/format.ts";
+import { CONFIG } from "../config.ts";
 
 const T = COPY.battlefield;
 export type PageView = ReturnType<typeof battlefieldPage>;
@@ -154,9 +157,15 @@ export function mountActionBar(
     // Which wallet plays
     const own = w.externalName !== null;
     const hasWallet = w.game || own;
-    toggle(chipCoins, !w.game);
-    toggle(chipWord, w.game);
-    if (w.game) {
+    const ownBal = own ? ownWalletBalances() : null;
+    const coinsShown = (w.game && !own) || ownBal !== null;
+    toggle(chipCoins, !coinsShown);
+    toggle(chipWord, coinsShown);
+    if (ownBal) {
+      set(pusdAmt, Number(formatUnits(ownBal.pusd, CONFIG.pusdDecimals)).toFixed(2));
+      set(bchAmt, Number(formatUnits(ownBal.sats, 8)).toFixed(3));
+      chip.setAttribute("aria-label", `${w.externalName ?? ""}. ${T.openWallet}`);
+    } else if (coinsShown) {
       set(pusdAmt, amountOf(w.pusdText, 2));
       set(bchAmt, amountOf(w.bchText, 3));
       chip.setAttribute("aria-label", `${T.gameWallet}: ${w.pusdText}. ${T.openWallet}`);
@@ -174,8 +183,8 @@ export function mountActionBar(
       }
       chip.setAttribute("aria-label", `${word}. ${T.openWallet}`);
     }
-    const sats = w.game ? satsOf(w.bchText) : null;
-    const lowBch = w.game && sats !== null && sats < LOW_BCH_SATS;
+    const sats = w.game && !own ? satsOf(w.bchText) : null; // the game wallet's, when it is the one that plays
+    const lowBch = w.game && !own && sats !== null && sats < LOW_BCH_SATS;
 
     // The round's state
     const king = k ? (k.holder ?? r!.king) : null;
@@ -218,7 +227,7 @@ export function mountActionBar(
         enabled = false;
       } else if (v.mock) {
         enabled = false;
-      } else if (enabled && w.game && w.pusd !== null && price !== null && w.pusd < BigInt(price)) {
+      } else if (enabled && w.game && !own && w.pusd !== null && price !== null && w.pusd < BigInt(price)) {
         // Display only: the page's own check refuses it too
         label = T.insufficient;
         enabled = false;
@@ -267,7 +276,7 @@ export function mountActionBar(
       // Why it cannot be used: only money gets words; everything else just fades
       const cap = amount !== null && BigInt(k.value) + BigInt(amount) > BigInt(k.cap);
       const usable = hasWallet && v.net !== "offline" && !closed && !cap && k.protectsLeft > 0 && !r.paused && !v.mock;
-      const poor = usable && w.game && w.pusd !== null && amount !== null && w.pusd < BigInt(amount);
+      const poor = usable && w.game && !own && w.pusd !== null && amount !== null && w.pusd < BigInt(amount);
       const words = !usable ? "" : poor ? T.insufficient : lowBch ? T.insufficientBch : p?.enabled ? aria : "";
       set(tip, words);
       off(b, !p?.enabled || !!poor || !!lowBch);
