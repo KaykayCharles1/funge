@@ -240,3 +240,12 @@
 .fg-w-whoname { font-size: 20px; font-weight: 700; color: #f8eeca; }
 .fg-w-connected { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #86efac; }
 .fg-w-connected::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #86efac; }
+
+/* Touch screens: every control at least 44px, so a finger finds it */
+@media (pointer: coarse) {
+  .fg-w-iconbtn { width: 44px; height: 44px; }
+  .fg-w-small, .fg-w-pill { height: 44px; }
+  .fg-w-eye { width: 40px; height: 40px; top: 6px; right: 6px; }
+  .fg-w-back { min-height: 44px; }
+  .fg-w-textlink { min-height: 44px; }
+}

@@ -25,8 +25,6 @@ import { TopBar } from "./topbar.ts";
 
 const UPRIGHT_TOUCH = window.matchMedia("(pointer: coarse) and (orientation: portrait)");
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
-// The phone layout comes in Phase B of the redesign; until then the field covers every screen the same way
-const COMPACT_BELOW_PX = 0;
 
 let mounted = false;
 type Fees = { feePercent: bigint; cutPercent: bigint };
@@ -119,7 +117,6 @@ export function mountBattlefield(opts: MountOptions): void {
     }));
     connection();
     loading.done();
-    layout();
     // The page may have sent its first snapshot while the art was still loading
     if (early && !held) director.onSnapshot(early, CONFIG.kingdom.openingPrice);
     early = null;
@@ -141,7 +138,7 @@ export function mountBattlefield(opts: MountOptions): void {
       };
     }
   }, (share) => loading.progress(share));
-  const game = new Phaser.Game({
+  new Phaser.Game({
     type: Phaser.AUTO,
     parent: host,
     width: W,
@@ -156,26 +153,10 @@ export function mountBattlefield(opts: MountOptions): void {
     scene: [scene],
   });
 
-  // Phone or wide: the field box changes shape and the HUD moves into bands, when the width crosses the line
-  let compact = false;
-  function layout(): void {
-    const want = host.clientWidth > 0 && host.clientWidth < COMPACT_BELOW_PX;
-    if (want === compact || !director) return;
-    compact = want;
-    scene.setCompact(compact);
-    game.scale.refresh();
-  }
-  let layoutQueued = false;
-  window.addEventListener("resize", () => {
-    if (layoutQueued) return;
-    layoutQueued = true;
-    requestAnimationFrame(() => {
-      layoutQueued = false;
-      layout();
-    });
-  });
+  // The field covers every screen (Phaser's ENVELOP); the page elements over it handle phone and laptop layouts in CSS.
+  // (The canvas's old phone layout, with the HUD in bands, is no longer used.)
 
-  // The action bar and the folded old page, under the field
+  // The dock, the panel, and the hidden old page
   const wallet = foldOldPage(host, opts.page);
   mountInviteBanner(host, wallet.open);
   mountActionBar(host, opts.page, opts.run, (text) => banners?.popup(text, true), wallet.open, () => scene.portraits, (off) => banners?.setOffline(off), () => {

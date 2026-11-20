@@ -86,3 +86,8 @@
   .fg-invited .fg-gold { flex: 1; height: 44px; }
   .fg-x { width: 44px; height: 44px; }
 }
+
+/* Touch screens: the small buttons at least 44px */
+@media (pointer: coarse) {
+  .fg-small, .fg-x { min-width: 44px; height: 44px; }
+}

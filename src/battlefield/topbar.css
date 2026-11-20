@@ -117,3 +117,7 @@
   .fg-chest { width: 40px; }
   .fg-plate-val { font-size: 24px; }
 }
+
+/* Browser surfaces in the game's colours: text selection and the text cursor (every page element of the battlefield) */
+#battlefield ::selection, .fg-dlg ::selection { background: rgba(251, 188, 40, 0.35); color: #f8eeca; }
+#battlefield input, #battlefield textarea, .fg-dlg input { caret-color: #fbbc28; }

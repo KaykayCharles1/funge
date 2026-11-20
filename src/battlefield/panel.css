@@ -33,3 +33,9 @@
   .fg-panel-head { padding: 6px 14px 12px 16px; }
   .fg-panel-body { padding: 18px 18px 28px; }
 }
+
+/* The panel's scroll bar, thin and gold */
+.fg-panel-body { scrollbar-width: thin; scrollbar-color: rgba(224, 169, 58, 0.55) transparent; }
+.fg-panel-body::-webkit-scrollbar { width: 8px; }
+.fg-panel-body::-webkit-scrollbar-thumb { background: rgba(224, 169, 58, 0.55); border-radius: 4px; }
+.fg-panel-body::-webkit-scrollbar-track { background: transparent; }
