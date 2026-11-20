@@ -1,6 +1,6 @@
 ---
 name: Funge
-description: A king-of-the-hill game on Bitcoin Cash, its landing page told as a painted medieval world in navy and gold.
+description: A king-of-the-hill game on Bitcoin Cash, its landing page and its game page told as a painted medieval world in navy and gold.
 colors:
   sky: "#125bce"
   box: "#0f1a33"
@@ -115,7 +115,7 @@ The page is a sequence of scenes, not a document:
 5. **The FAQ:** navy panels.
 6. **The footer:** King Satoshi on his throne.
 
-Scope boundary: this system covers the landing page only (`index.html` at `/`, `src/landing.ts`, `src/landing.css`). The game page (`play/index.html` at `/play/`, with `src/kingdomMode.ts`) and the Phaser battlefield in `src/battlefield/` keep their own older look and are not governed by this file. Do not restyle them from it without a separate decision.
+Scope: this system covers the landing page (`index.html` at `/`, `src/landing.ts`, `src/landing.css`) and, since the game page redesign, the game page in battlefield mode (`/play/?mode=battlefield`: the page elements in `src/battlefield/`, over the Phaser field). The sections below describe the landing page; **The game page** describes the game. The plain game page without `?mode=battlefield` (`play/index.html` on its own) keeps its older look.
 
 **Key characteristics:**
 - Night-navy ground, gold trim and cream type, all taken from the logo.
@@ -284,16 +284,62 @@ A painting with no frame. A four-sided gradient mask fades its edges into box-de
 - **Easing:** the standard ease-out is cubic-bezier(0.16, 1, 0.3, 1), used for hovers, cards, FAQ and marks.
 - **Reduced motion:** no pinning, no autoplay, no unrolling (the scroll stays open), no slides. Everything is shown at once.
 
+## The game page
+
+The game page (`/play/?mode=battlefield`) is the same painted kingdom, played. The battlefield painting fills the whole screen, and everything the player reads or presses sits on it as navy panels with gold trim. Its approved mockup is a Design canvas: https://claude.ai/artifact/2gH3dsxYuWxnHPEFp1HYBs. `docs/REDESIGN_CHECKLIST.md` lists every screen and word in it.
+
+**Character:** Operate, not Persuade. The player is mid-round, often with seconds on the clock, so the page is quiet and exact: a few words, one obvious move, nothing to scroll.
+
+### Structure
+- **The field:** the Phaser canvas covers the screen (Phaser's ENVELOP: a little sky and grass is cut, never the castle). The page never scrolls.
+- **The top bar** (`src/battlefield/topbar.ts`): the logo top left; three equal navy plates in a row, the timer, the King box (440 wide) and the Treasury; the round buttons (Invite friends, Sound, Menu) top right. A navy fade behind it keeps the plates readable over the sky.
+- **The dock** (`actions.ts`): one gold-bordered pill, bottom centre: the wallet chip, then the main button, or the king's three protect buttons and Cancel round.
+- **The middle box** (`banners.ts`): `Waiting for the first king`, the round-over box, or `You won the pool!` (brighter gold border).
+- **Popups and the status strip** (`banners.ts`): popups under the top bar (gold, Grenze Gotisch, 3.5 s; errors red-bordered in Alegreya Sans, 5.5 s); one strip for connecting, offline and pause.
+- **The side panel** (`panel.ts`, `walletPanel.ts`): 420px on the right, with the Wallet and Rules tabs. Every wallet screen lives in it. A click anywhere outside closes it.
+- **Windows** (`picker.ts`, `invite.ts`, `dialogs.css`): Choose your King or Queen, Invite friends.
+
+### Components
+- **Plate** (timer, Treasury): `box` at 90%, 2px `foil` border, radius 8px, 64px tall. Label in Cinzel caps 11px `foil-hi`; value in Cinzel 26px, tabular numerals.
+- **King box:** the same plate, 440 × 76. Round portrait 54px with a `foil-hi` ring, cropped from the full portrait around its face box at 1.45× the face size, so the whole face and crown show. Name in Grenze Gotisch 30px `logo-cream` with the hard navy edge; `Throne value · 12.00 PUSD` under it in `foil-hi`; two shields at the right, a used one grey at 30%.
+- **Main button:** `logo-gold` face, `logo-navy` text, pill, 60px, the hard edge `0 5px 0 logo-navy`. Unavailable: `#3a3f55` with cream Cinzel text and no edge (`Insufficient Amount`, `Sending…`, `Approve in your wallet · 0:28 left`).
+- **Protect button:** a small gold pill with a shield and the amount (`1`, `2`, `5`) in Cinzel. **Cancel round:** a navy pill with a gold border.
+- **Wallet chip:** a `board` pill, 1.5px `foil` border at 70%: PUSD and BCH icons with amounts, then the caret in its own small gold disc.
+- **Round button** (Invite, Sound, Menu): the landing page's corner button at 48px.
+- **Panel:** `box-deep` with a 2px `foil` left edge and a deep shadow. Tabs are pills; the active one is gold. Cards inside are `board` with a `foil` border at 45%, radius 6px.
+- **Wallet buttons:** gold pill (the screen's main action), navy pill with a gold line (Back, Cancel, Swap, Withdraw), cream pill (Back up seed phrase), red pill (`#b91c1c`, Delete wallet, Reset Wallet), and round 40px icon buttons with a gold ring (Lock, Disconnect).
+- **Recovery phrase:** a 3-column grid of `board` word tiles. On the create screen the words show only while pointed at or held; on the backup screen they sit under a grey cover until one click. Never selectable or copyable.
+- **Password box:** a text box drawn as dots, so the browser neither suggests nor saves a password; an eye button shows it.
+
+### States
+- **Unavailable controls fade to 45% with the not-allowed cursor and say nothing.** The only words for an unavailable move are about money: `Insufficient Amount`, `Insufficient BCH for the fee`.
+- **Tips** (`Protect with 1.00 PUSD`, `Get your 5.00 PUSD back`, `Lock Wallet`, `Disconnect Wallet`) show on hover with a mouse and on a long press on a touch screen; the press that shows a tip does not also press the button.
+- **Focus:** a 3px `#fcd34d` outline, 2px offset, on every control.
+- **Browser surfaces:** text selection in gold at 35%, a gold text cursor, a thin gold scroll bar in the panel.
+
+### Layouts
+- **1240px and wider (laptop):** as above.
+- **700 to 1239px (a tablet or phone turned sideways, a small laptop):** the round buttons move into the dock after the wallet chip. Below 1100px the three plates draw closer (King box 360 wide) and the logo makes room.
+- **Under 700px (a phone held upright):** the top bar becomes one 64px navy strip with a gold bottom edge (bell and clock, the king with a small throne-value line and tiny shields, the chest and Treasury). The dock becomes the bottom area: the main button full width, then a row with the wallet chip and the three round buttons. The panel becomes a sheet from the bottom with a grab handle. Popups wrap. Touch targets are at least 44px.
+- **A phone or tablet held upright** (touch as the main pointer, portrait): a conquest also shows `Enable landscape to see the battle`, because the fight plays across the field's whole width. Laptops never see it.
+
+### Words
+Every word comes from `src/copy.ts`. The game page keeps text to the minimum: no helper sentences, no captions under buttons, no "you can't do this" messages. A heading, the values, the action.
+
+### Motion
+- The bell swings from one minute left and faster from ten seconds, and tolls when time runs out; `+0:30` floats up beside the clock after a conquest; the chest bumps as coins land; the King box glows while the round waits for its claim; popups slide in.
+- Under reduced motion: no swinging, glowing or sliding.
+
 ## Do's and Don'ts
 
 ### Do:
 - **Do** take colours for new headings and controls from the logo: cream, navy, gold.
 - **Do** give cream headings the logo's hard navy edge.
-- **Do** keep Play Now the only gold-faced button, and keep every other control a navy disc or panel with gold trim.
+- **Do** keep Play Now the only gold-faced button on the landing page, and keep every other control a navy disc or panel with gold trim. On the game page, the gold face marks the one main action of each place: the dock's move, a screen's main button, the protect buttons.
 - **Do** frame paintings and video in the gold frame with corner flourishes.
 - **Do** keep touch targets at least 2.75rem, and keep a visible focus outline (3px foil-hi, 3px offset).
 - **Do** keep motion on transform and opacity, reversible with scrolling, and fully static under reduced motion.
-- **Do** take every word from `COPY.landing` in `src/copy.ts`, and every rule number from the rule constants.
+- **Do** take every word from `src/copy.ts` (`COPY.landing` for the landing page), and every rule number from the rule constants (`src/lib/rulesNumbers.ts`).
 - **Do** use self-hosted fonts and the game's own art, and draw icons as inline SVG.
 
 ### Don't:
@@ -301,7 +347,7 @@ A painting with no frame. A four-sided gradient mask fades its edges into box-de
 - **Don't** use gold as a large background, or glow anything outside the How to Play timeline.
 - **Don't** put a hard border or frame around the throne painting; it fades into the page.
 - **Don't** load the game's code (libauth, Phaser, `src/lib/kingdom.ts`) into the landing page; it stays a small bundle.
-- **Don't** apply this system to the game page (`play/index.html`, `src/battlefield/`) without a separate decision.
+- **Don't** add helper sentences or "you can't" messages to the game page; an unavailable control fades and says nothing.
 
 ## Leftovers in the code
 `landing.css` still declares tokens and classes from the earlier box-lid design that nothing on the page uses any more:
@@ -309,3 +355,7 @@ A painting with no frame. A four-sided gradient mask fades its edges into box-de
 - the button styles `.btn--small` and `.btn--quiet`.
 
 They can be removed in a clean-up pass.
+
+On the game page:
+- The old plain page (`play/index.html`) is still in the document in battlefield mode, hidden: the page's code reads and drives its elements. It shows again only if the battlefield fails to load.
+- The Phaser HUD in `src/battlefield/hud.ts` still builds its canvas plates, popups and ribbon, hidden: it keeps the sounds and the timing, and passes what it shows to the page elements. Its old phone layout (bands above and below the field) is no longer used.
