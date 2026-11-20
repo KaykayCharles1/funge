@@ -84,3 +84,34 @@
 .fg-w-modal-box .fg-w-title { font-size: 28px; color: #fecaca; }
 .fg-w-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 .fg-w-secret { -webkit-text-security: disc; }
+
+/* The game wallet's home (6b) */
+.fg-w-hold[hidden] { display: none; }
+.fg-w-top { display: flex; align-items: center; justify-content: space-between; }
+.fg-w-kick { font-family: Cinzel, Georgia, serif; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #f3cf74; }
+.fg-w-icons { display: flex; gap: 8px; }
+.fg-w-iconbtn { position: relative; width: 40px; height: 40px; border-radius: 50%; background: transparent; border: 1.5px solid #fbbc28; color: #fbbc28;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.fg-w-iconbtn:hover { background: #15234a; }
+.fg-w-tip { position: absolute; top: calc(100% + 8px); right: 0; white-space: nowrap; background: #0f1a33; border: 1.5px solid #e0a93a; color: #f8eeca;
+  font-weight: 700; font-size: 15px; padding: 6px 10px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 2; }
+@media (hover: hover) { .fg-w-iconbtn:hover .fg-w-tip { opacity: 1; } }
+.fg-w-iconbtn:focus-visible .fg-w-tip { opacity: 1; }
+.fg-w-card { padding: 16px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; }
+.fg-w-coins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fg-w-coin { padding: 14px 16px; }
+.fg-w-coinhead { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #f3cf74; }
+.fg-w-coinhead img { width: 22px; height: 22px; border-radius: 50%; }
+.fg-w-amount { font-family: Cinzel, Georgia, serif; font-weight: 700; font-size: 28px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.fg-w-addr { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #0f1a33; border: 1px solid rgba(224, 169, 58, 0.3); border-radius: 6px; }
+.fg-w-addr span { flex: 1; min-width: 0; font-size: 15px; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fg-w-small { height: 38px; padding: 0 14px; background: transparent; border: 1px solid rgba(224, 169, 58, 0.6); border-radius: 999px; color: #f3cf74; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+.fg-w-faucet { border-color: rgba(224, 169, 58, 0.6); }
+.fg-w-faucetline { font-size: 18px; margin-top: 8px; }
+.fg-w-gold.fg-w-count { font-family: Cinzel, Georgia, serif; font-variant-numeric: tabular-nums; }
+.fg-w-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+.fg-w-pill { height: 40px; padding: 0 18px; border-radius: 999px; background: rgba(248, 238, 202, 0.08); border: 1.5px solid #f4ead2; color: #f8eeca;
+  font-weight: 700; font-size: 15px; cursor: pointer; }
+.fg-w-pill:hover { background: rgba(248, 238, 202, 0.16); }
+.fg-w-pill-red { background: #b91c1c; border-color: #ef4444; color: #fff; }
+.fg-w-pill-red:hover { background: #dc2626; }

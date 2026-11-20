@@ -29,32 +29,43 @@ export function initFaucet(pkh: () => string | null, onPaid: () => void) {
   $("faucetTitle").textContent = T.title;
   $("faucetText").textContent = T.text(pusd, bch);
   $("faucetBtn").textContent = T.button;
+  paidHook = onPaid;
   $("faucetBtn").addEventListener("click", async () => {
-    const key = wallet();
-    if (!key || busy) return;
-    busy = true;
-    renderFaucet();
     say(T.sending, false);
-    try {
-      const res = await fetch(`${CONFIG.referee.url}/faucet/claim`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pkh: key }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (body.ok) {
-        say(T.paid(pusd, bch), false);
-        onPaid();
-      } else {
-        const known = body.error !== undefined && body.error in T.errors;
-        say(T.errors[known ? body.error! : res.status === 429 ? "busy" : "failed"]!, true);
-      }
-    } catch {
-      say(T.errors.failed!, true);
-    } finally {
-      busy = false;
-      renderFaucet();
-    }
+    const r = await claimFaucet();
+    if (r.ok) say(T.paid(pusd, bch), false);
+    else if (r.code !== "no_wallet") say(T.errors[r.code]!, true);
   });
   renderFaucet();
 }
+
+let paidHook: () => void = () => {};
+export type FaucetResult = { ok: true } | { ok: false; code: string };
+
+// Ask the faucet to pay the wallet that would play. code: a key of COPY.faucet.errors (or "no_wallet")
+export async function claimFaucet(): Promise<FaucetResult> {
+  const key = wallet();
+  if (!key || busy) return { ok: false, code: "no_wallet" };
+  busy = true;
+  renderFaucet();
+  try {
+    const res = await fetch(`${CONFIG.referee.url}/faucet/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pkh: key }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (body.ok) {
+      paidHook();
+      return { ok: true };
+    }
+    const known = body.error !== undefined && body.error in T.errors;
+    return { ok: false, code: known ? body.error! : res.status === 429 ? "busy" : "failed" };
+  } catch {
+    return { ok: false, code: "failed" };
+  } finally {
+    busy = false;
+    renderFaucet();
+  }
+}
+export const faucetBusy = () => busy;

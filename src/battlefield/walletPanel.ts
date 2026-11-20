@@ -6,6 +6,10 @@
 // Until the next sub-steps, a ready wallet and WizardConnect still show the old sections, moved into this tab.
 import "./walletPanel.css";
 import { COPY } from "../copy.ts";
+import { CONFIG } from "../config.ts";
+import { claimFaucet, faucetBusy } from "../faucetUI.ts";
+import { formatUnits } from "../lib/format.ts";
+import { FAUCET } from "../refereeParams.ts";
 import { walletChanged } from "../walletUI.ts";
 import { isValidMnemonic, newMnemonic, normalizeMnemonic } from "../wallet/local.ts";
 import { requestPersistentStorage, vault } from "../wallet/vault.ts";
@@ -15,7 +19,8 @@ const T = COPY.walletPanel;
 const MIN_PW = 8; // the vault's own minimum
 const base = `${import.meta.env.BASE_URL}assets/`;
 
-type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home-old" | "wc-old";
+type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home" | "swap-old" | "withdraw-old" | "seed-old" | "wc-old";
+const OLD_TOOLS: Screen[] = ["swap-old", "withdraw-old", "seed-old"]; // the old swap, withdraw and seed boxes, until rebuilt
 const ONBOARDING: Screen[] = ["start", "pw", "phrase", "import"];
 
 const svg = (inner: string, size = 22, w = 2.2) =>
@@ -26,6 +31,8 @@ const ICON = {
   eye: svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', 20, 2),
   eyeOff: svg('<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.3 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>', 54, 1.8),
   lock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 32, 2),
+  lockSmall: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 18, 2.2),
+  disconnect: svg('<path d="M8 6.5 16 4l1.2 2.5"/><path d="M13.5 19H19a2 2 0 0 0 2-2V8.5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2.5"/><path d="M17 12.5h.5"/><circle cx="7.5" cy="16.5" r="4.5"/><path d="M5.9 14.9l3.2 3.2M9.1 14.9l-3.2 3.2"/>', 20, 2),
   lockAsk: svg('<rect x="4.5" y="10.5" width="15" height="11" rx="2.2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M10.4 14.6a1.7 1.7 0 1 1 2.4 1.6c-.5.3-.8.6-.8 1.2"/><path d="M12 19.3v.2"/>', 44, 1.9),
   tick: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f243d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
 };
@@ -77,6 +84,13 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
 
   const box = el("div", "fg-w");
   page.prepend(box);
+  // The old swap, withdraw and seed boxes wait here, with their handlers, until their screens are rebuilt
+  const hold = el("div", "fg-w-hold");
+  box.after(hold);
+  for (const id of ["swBox", "swReview", "wdBox", "lwSeedBox"]) {
+    const e = document.getElementById(id);
+    if (e) hold.append(e);
+  }
   const old = {
     local: document.getElementById("localWallet"),
     own: document.getElementById("wallet"),
@@ -108,7 +122,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     const own = view().wallet.externalName !== null;
     if (own || wantsOwn) return "wc-old";
     const state = vault.state();
-    if (state === "unlocked") return vault.hasPassword() ? "home-old" : "upgrade";
+    if (state === "unlocked") return !vault.hasPassword() ? "upgrade" : OLD_TOOLS.includes(screen) ? screen : "home";
     if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
     return ONBOARDING.includes(screen) ? screen : "pick";
   }
@@ -121,11 +135,12 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
 
   function draw(): void {
     box.replaceChildren();
-    const oldHome = screen === "home-old", oldOwn = screen === "wc-old";
-    if (old.local) old.local.style.display = oldHome ? "" : "none";
+    const oldOwn = screen === "wc-old";
+    if (old.local) old.local.style.display = "none";
     if (old.own) old.own.style.display = oldOwn ? "" : "none";
-    if (old.faucet) old.faucet.style.display = oldHome || oldOwn ? "" : "none";
-    box.hidden = oldHome;
+    if (old.faucet) old.faucet.style.display = oldOwn ? "" : "none";
+    hold.hidden = !OLD_TOOLS.includes(screen);
+    if (OLD_TOOLS.includes(screen)) return oldTool();
     if (oldOwn) {
       if (old.own?.classList.contains("hidden")) document.getElementById("useOwnWalletBtn")?.click();
       box.append(walletBack(() => {
@@ -135,7 +150,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       }));
       return;
     }
-    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true) }[screen as Exclude<Screen, "home-old" | "wc-old">];
+    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true), home }[screen as Exclude<Screen, "wc-old" | "swap-old" | "withdraw-old" | "seed-old">];
     build?.();
   }
 
@@ -442,6 +457,163 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     modal.append(m);
     (page.closest(".fg-panel") ?? page).append(modal);
     cancel.focus();
+  }
+
+  // ---- The game wallet's home ----
+  function home(): void {
+    const w = vault.wallet();
+    if (!w) return;
+    // Title, then Lock and Disconnect at the right
+    const top = el("div", "fg-w-top");
+    const iconBtn = (label: string, html: string, onClick: () => void) => {
+      const b = button("fg-w-iconbtn", "", onClick);
+      b.setAttribute("aria-label", label);
+      b.append(icon(html), el("span", "fg-w-tip", label));
+      return b;
+    };
+    const lock = iconBtn(T.lockWallet, ICON.lockSmall, () => {
+      vault.lock();
+      walletChanged();
+      pickFirst = false;
+      go("locked");
+    });
+    const disconnect = iconBtn(T.disconnectWallet, ICON.disconnect, () => {
+      vault.lock(); // the wallet stays saved; picking it again asks for the password
+      walletChanged();
+      pickFirst = true;
+      go("pick");
+    });
+    const icons = el("span", "fg-w-icons");
+    icons.append(lock, disconnect);
+    top.append(el("div", "fg-w-kick", T.gameWallet), icons);
+
+    // Balances
+    const coin = (src: string, label: string) => {
+      const card = el("div", "fg-w-card fg-w-coin");
+      const head = el("div", "fg-w-coinhead");
+      const i = el("img");
+      i.src = base + src;
+      i.alt = "";
+      head.append(i, label);
+      const amount = el("div", "fg-w-amount", "—");
+      card.append(head, amount);
+      return { card, amount };
+    };
+    const pusd = coin("tokens/pusd.jpg", "PUSD"), bch = coin("tokens/bch.png", "BCH");
+    const coins = el("div", "fg-w-coins");
+    coins.append(pusd.card, bch.card);
+
+    // Address
+    const addr = el("div", "fg-w-addr");
+    const full = w.tokenAddress;
+    const shortAddr = full.length > 28 ? `${full.slice(0, 16)}…${full.slice(-8)}` : full;
+    const addrText = el("span", "", shortAddr);
+    addrText.setAttribute("aria-label", T.addressAria);
+    addrText.title = full;
+    const copy = button("fg-w-small", T.copyAddress, () => {
+      void navigator.clipboard.writeText(full).then(() => {
+        copy.textContent = T.copiedAddress;
+        window.setTimeout(() => (copy.textContent = T.copyAddress), 1500);
+      });
+    });
+    addr.append(addrText, copy);
+
+    // Swap and Withdraw (the old boxes for now)
+    const tools = el("div", "fg-w-two");
+    tools.style.marginTop = "0";
+    tools.append(
+      button("fg-w-line", COPY.swap.button, () => go("swap-old")),
+      button("fg-w-line", COPY.withdraw.button, () => go("withdraw-old")),
+    );
+
+    box.append(top, coins, addr, tools);
+    if (CONFIG.network === "chipnet") box.append(faucetCard());
+
+    // Back up and Delete (the old flows for now)
+    const pills = el("div", "fg-w-pills");
+    pills.append(
+      button("fg-w-pill", T.backup, () => go("seed-old")),
+      button("fg-w-pill fg-w-pill-red", T.deleteWallet, () => document.getElementById("lwDeleteBtn")?.click()),
+    );
+    box.append(pills);
+
+    // Balances follow the wallet
+    const num = (t: string, d: number) => {
+      const m = /^([\d.]+)/.exec(t.trim());
+      return m ? Number(m[1]).toFixed(d) : "—";
+    };
+    const paint = () => {
+      const v = view().wallet;
+      pusd.amount.textContent = num(v.pusdText, 2);
+      bch.amount.textContent = num(v.bchText, 5);
+    };
+    paint();
+    const timer = window.setInterval(() => (box.isConnected && screen === "home" ? paint() : window.clearInterval(timer)), 1000);
+  }
+
+  // Free test coins: Claim, then "Next claim in 23:59:59" for a day (counted from the claim, in this browser)
+  function faucetCard(): HTMLElement {
+    const card = el("div", "fg-w-card fg-w-faucet");
+    const pusdAmt = formatUnits(FAUCET.pusdUnits, CONFIG.pusdDecimals);
+    const bchAmt = formatUnits(FAUCET.sats, 8);
+    const key = `funge:faucet:${vault.wallet()?.pkhHex ?? ""}`;
+    const claimedAt = (): number | null => {
+      try {
+        const v = Number(localStorage.getItem(key));
+        return v > 0 ? v : null;
+      } catch {
+        return null;
+      }
+    };
+    const remember = () => {
+      try {
+        localStorage.setItem(key, String(Date.now()));
+      } catch {
+        // storage blocked: the countdown simply does not survive a reload
+      }
+    };
+    const err = el("p", "fg-w-err");
+    err.style.minHeight = "0";
+    const btn = button("fg-w-gold", T.claim, async () => {
+      if (btn.disabled) return;
+      err.textContent = "";
+      const r = await claimFaucet();
+      if (r.ok || r.code === "already_claimed") remember();
+      else if (r.code !== "no_wallet") err.textContent = COPY.faucet.errors[r.code] ?? COPY.faucet.errors.failed!;
+      paint();
+    });
+    btn.style.height = "48px";
+    btn.style.marginTop = "12px";
+    const two = (n: number) => String(n).padStart(2, "0");
+    const paint = () => {
+      const at = claimedAt();
+      const left = at === null ? 0 : Math.max(0, 86_400 - Math.floor((Date.now() - at) / 1000));
+      btn.disabled = left > 0 || faucetBusy();
+      btn.classList.toggle("fg-w-count", left > 0);
+      btn.textContent = left > 0 ? T.nextClaim(`${two(Math.floor(left / 3600))}:${two(Math.floor(left / 60) % 60)}:${two(left % 60)}`) : T.claim;
+    };
+    card.append(el("div", "fg-w-kick", COPY.faucet.title), el("div", "fg-w-faucetline", T.faucetLine(pusdAmt, bchAmt)), btn, err);
+    paint();
+    const timer = window.setInterval(() => (card.isConnected ? paint() : window.clearInterval(timer)), 1000);
+    return card;
+  }
+
+  // The old swap, withdraw or seed box, under a way back home
+  function oldTool(): void {
+    const ids = { "swap-old": "swBox", "withdraw-old": "wdBox", "seed-old": "lwSeedBox" } as const;
+    const id = ids[screen as keyof typeof ids];
+    for (const e of Array.from(hold.children) as HTMLElement[]) if (e.id !== "swReview") e.style.display = e.id === id ? "" : "none";
+    const opener = { "swap-old": "lwSwapBtn", "withdraw-old": "lwWithdrawBtn", "seed-old": "lwBackupBtn" } as const;
+    const closer = { "swap-old": "lwSwapBtn", "withdraw-old": "wdCancel", "seed-old": "lwSeedDoneBtn" } as const;
+    const which = screen as keyof typeof ids;
+    const target = document.getElementById(id);
+    if (target?.classList.contains("hidden")) document.getElementById(opener[which])?.click();
+    box.append(walletBack(() => {
+      // close the old box the way its own code does
+      const t = document.getElementById(id);
+      if (t && !t.classList.contains("hidden")) document.getElementById(closer[which])?.click();
+      go("home");
+    }));
   }
 
   // ---- Saving ----

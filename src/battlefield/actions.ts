@@ -59,8 +59,8 @@ export function mountActionBar(
     return i;
   };
   const caret = () => {
-    const s = el("span");
-    s.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+    const s = el("span", "fg-caret");
+    s.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
     return s;
   };
 
@@ -74,13 +74,13 @@ export function mountActionBar(
   chip.type = "button";
   chip.addEventListener("click", openWallet);
   const chipCoins = el("span", "");
-  chipCoins.style.display = "contents";
+  chipCoins.className = "fg-chip-part";
   const pusdAmt = el("strong"), bchAmt = el("strong");
   const bchIcon = img(BCH_ICON);
   bchIcon.style.marginLeft = "4px";
   chipCoins.append(img(PUSD_ICON), pusdAmt, bchIcon, bchAmt);
   const chipWord = el("span", "");
-  chipWord.style.display = "contents";
+  chipWord.className = "fg-chip-part";
   const chipIcon = el("span"), chipText = el("strong");
   chipText.style.fontFamily = "inherit";
   chipWord.append(chipIcon, chipText);

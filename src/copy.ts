@@ -517,6 +517,17 @@ export const COPY = {
     resetWarn: "Your wallet is removed from this browser. You can only get it back with your recovery phrase.",
     cancel: "Cancel",
     badPhrase: "That recovery phrase is not valid. Check the words and their order.",
+    // The game wallet's home
+    lockWallet: "Lock Wallet",
+    disconnectWallet: "Disconnect Wallet",
+    copyAddress: "Copy",
+    copiedAddress: "Copied",
+    addressAria: "Your game wallet address",
+    faucetLine: (pusd: string, bch: string) => `Claim ${pusd} PUSD and ${bch} BCH`,
+    claim: "Claim",
+    nextClaim: (time: string) => `Next claim in ${time}`,
+    backup: "Back up seed phrase",
+    deleteWallet: "Delete wallet",
     failed: "Could not save the wallet. Please try again.",
   },
 

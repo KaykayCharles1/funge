@@ -9,14 +9,18 @@
 .fg-dock button { font-family: inherit; }
 .fg-dock button:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
 
-.fg-chip { height: 56px; box-sizing: border-box; padding: 0 16px 0 10px; display: flex; align-items: center; gap: 10px; background: #15234a;
+.fg-chip { height: 56px; box-sizing: border-box; padding: 0 14px 0 10px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; background: #15234a;
   border: 1.5px solid rgba(224, 169, 58, 0.7); border-radius: 999px; color: #f4ead2; font-size: 17px; cursor: pointer; }
 .fg-chip:hover { background: #1c2c5a; }
 .fg-chip img { width: 26px; height: 26px; border-radius: 50%; }
 .fg-chip strong { font-family: Cinzel, Georgia, serif; }
 .fg-chip svg { flex-shrink: 0; }
+/* The coins, or the words, then the caret: all inside the chip */
+.fg-chip-part { display: flex; align-items: center; gap: 8px; }
+.fg-chip-part + .fg-chip-part { margin-left: 4px; }
+.fg-caret { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(224, 169, 58, 0.16); flex-shrink: 0; }
 
-.fg-main { height: 60px; min-width: 400px; box-sizing: border-box; padding: 0 34px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+.fg-main { height: 60px; min-width: 340px; box-sizing: border-box; padding: 0 28px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
   background: #fbbc28; color: #0f243d; border: 0; border-radius: 999px; box-shadow: 0 5px 0 #0f243d, 0 10px 24px rgba(0, 0, 0, 0.35);
   font-weight: 700; font-size: 23px; cursor: pointer; }
 .fg-main:hover { background: #fcc94d; }
