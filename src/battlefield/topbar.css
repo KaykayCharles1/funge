@@ -70,3 +70,30 @@
   .fg-bell.fg-swing, .fg-bell.fg-swing-fast, .fg-bell.fg-toll, .fg-king.fg-glow, .fg-added.fg-show { animation: none; }
   .fg-added.fg-show { opacity: 1; }
 }
+
+/* Phone (Phase B): one 64px strip. Bell and clock on the left, the king in the middle, the Treasury on the right.
+   The logo and the round buttons leave the strip (the buttons sit beside the wallet chip at the bottom). */
+@media (max-width: 699px) {
+  .fg-top { height: 64px; display: flex; align-items: center; gap: 8px; box-sizing: border-box; padding: 0 10px; background: #0f1a33; border-bottom: 2px solid #e0a93a; }
+  .fg-logo, .fg-discs { display: none; }
+  .fg-plate, .fg-king { position: static; transform: none; height: auto; min-width: 0; padding: 0; border: 0; background: transparent; }
+  .fg-timer { flex-shrink: 0; gap: 5px; }
+  .fg-timer .fg-plate-lbl, .fg-vault .fg-plate-lbl { display: none; }
+  .fg-bell { width: 22px; margin: 0; }
+  .fg-timer .fg-plate-val { font-size: 21px; }
+  .fg-added { right: auto; left: 14px; top: 68px; width: auto; font-size: 20px; }
+  .fg-king { flex: 1; width: auto; display: grid; grid-template-columns: auto minmax(0, auto) auto; grid-template-rows: auto auto; justify-content: center;
+    align-items: center; column-gap: 7px; row-gap: 1px; }
+  .fg-king.fg-glow { border-radius: 8px; }
+  .fg-avatar, .fg-noking { grid-row: 1 / 3; width: 40px; height: 40px; }
+  .fg-noking img { width: 22px; }
+  .fg-names { display: contents; }
+  .fg-name { grid-column: 2 / 4; font-size: 20px; line-height: 1.05; }
+  .fg-sub { grid-column: 2; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+  .fg-shields { grid-column: 3; grid-row: 2; gap: 2px; }
+  .fg-king.fg-empty .fg-name { grid-row: 1 / 3; }
+  .fg-shields img { width: 13px; }
+  .fg-vault { flex-shrink: 0; gap: 3px; }
+  .fg-chest { width: 28px; }
+  .fg-vault .fg-plate-val { font-size: 17px; }
+}

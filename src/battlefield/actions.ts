@@ -12,6 +12,7 @@ import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
 import type { Portrait } from "./identity.ts";
 import { openPicker } from "./picker.ts";
+import { isOn, onSoundChange, setSound } from "./sound.ts";
 import { ownWalletBalances } from "./walletPanel.ts";
 import { formatUnits } from "../lib/format.ts";
 import { CONFIG } from "../config.ts";
@@ -48,6 +49,7 @@ export function mountActionBar(
   openWallet: () => void,
   portraits: () => Portrait[],
   onNet: (offline: boolean) => void,
+  onInvite: () => void,
 ): void {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
     const e = document.createElement(tag);
@@ -129,7 +131,34 @@ export function mountActionBar(
   longPress(cancelRound);
   kingRow.append(cancelRound);
 
-  dock.append(chip, main, cancel, kingRow);
+  // On a phone the round buttons (Invite, Sound, Menu) sit beside the wallet chip, under the main button
+  const row = el("span", "fg-dockrow");
+  const phoneDiscs = el("span", "fg-phonediscs");
+  const disc = (label: string, html: string, onClick: () => void) => {
+    const b = el("button", "fg-pdisc");
+    b.type = "button";
+    b.setAttribute("aria-label", label);
+    b.innerHTML = html; // fixed icons only
+    b.addEventListener("click", onClick);
+    phoneDiscs.append(b);
+    return b;
+  };
+  const svg = (inner: string, w = 2) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+  disc(COPY.invite.button, svg('<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M19 8v6M16 11h6"/>'), onInvite);
+  const soundOn = svg('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>');
+  const soundOff = svg('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>');
+  let before = isOn();
+  const sound = disc(T.soundAria, soundOff, () => setSound(!before));
+  for (const type of ["pointerdown", "keydown"] as const) sound.addEventListener(type, () => (before = isOn()));
+  const showSound = (on: boolean) => {
+    sound.innerHTML = on ? soundOn : soundOff;
+    sound.setAttribute("aria-pressed", String(on));
+  };
+  onSoundChange(showSound);
+  showSound(isOn());
+  disc(T.menuAria, svg('<path d="M4 7h16M4 12h16M4 17h16"/>', 2.4), openWallet);
+  row.append(chip, phoneDiscs);
+  dock.append(row, main, cancel, kingRow);
 
   let mainAction: (() => void) | null = null;
   main.addEventListener("click", () => {

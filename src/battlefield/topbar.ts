@@ -10,6 +10,8 @@ import type { Identity, Portrait } from "./identity.ts";
 import { isOn, onSoundChange, setSound } from "./sound.ts";
 
 const T = COPY.battlefield;
+// The phone layout (redesign Phase B): the top bar becomes one 64px strip and the round buttons move to the bottom
+export const PHONE = window.matchMedia("(max-width: 699px)");
 const base = `${import.meta.env.BASE_URL}assets/`;
 const SVG = (paths: string, w = 2) =>
   `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -57,6 +59,7 @@ export class TopBar {
   private capMs = 0;
   private urgency: Urgency = 0;
   private open = false;
+  private last: { king: Identity; state: FieldState } | null = null;
   private left = 0;
 
   private o: TopBarOptions;
@@ -149,6 +152,10 @@ export class TopBar {
 
     this.el.append(logo, timer, this.added, this.king, vault, discs);
     host.append(this.el);
+    // The portrait's crop is worked out for its size: draw it again when the layout changes
+    PHONE.addEventListener("change", () => {
+      if (this.last) this.drawKing(this.last.king, this.last.state);
+    });
     this.paintClock(null);
     this.drawKing(null, null);
   }
@@ -234,13 +241,15 @@ export class TopBar {
     this.avatar.style.display = king ? "" : "none";
     this.noKing.style.display = king ? "none" : "";
     this.shieldBox.style.display = king ? "" : "none";
+    this.king.classList.toggle("fg-empty", !king); // no king: the name sits alone, centred
     if (!king || !state) {
       this.name.textContent = T.noKing;
       this.sub.textContent = "";
       this.sub.style.display = "none";
       return;
     }
-    this.avatar.setAttribute("style", avatarStyle(king.portrait, 54));
+    this.avatar.setAttribute("style", avatarStyle(king.portrait, PHONE.matches ? 40 : 54));
+    this.last = { king, state };
     this.avatar.setAttribute("aria-label", king.name);
     this.name.textContent = this.o.isMe(state.king) ? T.youName(king.name) : king.name;
     const ended = state.status === "over" || state.status === "settled";

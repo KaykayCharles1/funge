@@ -52,3 +52,31 @@
 @media (hover: hover) { .fg-pb:hover .fg-tip, .fg-cr:hover .fg-tip { opacity: 1; } }
 .fg-pb:focus-visible .fg-tip, .fg-cr:focus-visible .fg-tip, .fg-tip-on .fg-tip { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .fg-spin { animation-duration: 2.5s; } }
+
+/* The round buttons beside the chip: phone only (on a laptop they are in the top bar) */
+.fg-dockrow { display: contents; }
+.fg-phonediscs { display: none; }
+.fg-pdisc { width: 48px; height: 48px; flex-shrink: 0; border-radius: 50%; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28;
+  display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+
+/* Phone (Phase B): the bottom area. The main button (or the protect buttons, Cancel round under them) full width,
+   then one row: the wallet chip and Invite, Sound, Menu. */
+@media (max-width: 699px) {
+  .fg-shade-bottom { height: 240px; background: linear-gradient(0deg, #0a1226 0%, #0a1226 62%, rgba(10, 18, 38, 0) 100%); }
+  .fg-dock { left: 0; right: 0; bottom: 0; transform: none; width: auto; max-width: none; flex-direction: column; align-items: stretch; gap: 10px;
+    padding: 0 16px 18px; background: transparent; border: 0; border-radius: 0; }
+  .fg-dock[hidden] { display: flex !important; } /* the chip row stays, even when there is no move to make */
+  .fg-dockrow { display: flex; order: 10; align-items: center; gap: 8px; margin-top: 4px; }
+  .fg-phonediscs { display: flex; gap: 8px; }
+  .fg-chip { flex: 1; min-width: 0; height: 48px; padding: 0 12px 0 8px; gap: 7px; font-size: 15px; }
+  .fg-chip img { width: 22px; height: 22px; }
+  .fg-chip-part { gap: 7px; }
+  .fg-caret { margin-left: auto; }
+  .fg-main { min-width: 0; width: 100%; height: 58px; padding: 0 16px; font-size: 20px; }
+  .fg-main.fg-off { font-size: 17px; }
+  .fg-dock > .fg-line { width: 100%; height: 46px; }
+  .fg-kingrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0; }
+  .fg-pb { min-width: 0; width: 100%; }
+  .fg-cr { grid-column: 1 / -1; width: 100%; }
+  .fg-tip { font-size: 15px; }
+}

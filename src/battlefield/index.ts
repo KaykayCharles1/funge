@@ -177,7 +177,10 @@ export function mountBattlefield(opts: MountOptions): void {
   // The action bar and the folded old page, under the field
   const wallet = foldOldPage(host, opts.page);
   mountInviteBanner(host, wallet.open);
-  mountActionBar(host, opts.page, opts.run, (text) => banners?.popup(text, true), wallet.open, () => scene.portraits, (off) => banners?.setOffline(off));
+  mountActionBar(host, opts.page, opts.run, (text) => banners?.popup(text, true), wallet.open, () => scene.portraits, (off) => banners?.setOffline(off), () => {
+    const v = opts.page();
+    openInvite(inviterName({ actingPkh: v.actingPkh, players: v.players, portraits: scene.portraits }));
+  });
 
   onSceneSnapshot((s, source) => {
     if (source === "mock") mockOn = true;
