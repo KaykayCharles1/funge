@@ -231,7 +231,7 @@ the mockup wins.
 
 ## 12. To settle in code before or while building
 - [x] Required password: src/walletUI.ts already passes the password to `vault.create`; making it required needs no
-      change in src/wallet/. Existing wallets without a password: decide what Back up and Lock do for them.
+      change in src/wallet/. Existing wallets without a password are removed from the browser on the battlefield page; the player re-imports them.
 - [x] Seed reveal behind a password: check it with `vault.unlock(password)`; no src/wallet change expected.
 - [x] Faucet countdown: the server limits by "today" in blocks and does not send a next-claim time. Count 24 h from
       the claim time saved in the browser; an `already_claimed` reply shows the countdown too.
