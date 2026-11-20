@@ -80,3 +80,13 @@
   .fg-cr { grid-column: 1 / -1; width: 100%; }
   .fg-tip { font-size: 15px; }
 }
+
+/* Sideways tablet or phone, or a small laptop: the round buttons sit in the dock, after the wallet chip */
+@media (min-width: 700px) and (max-width: 1239px) {
+  .fg-dockrow { display: flex; align-items: center; gap: 10px; }
+  .fg-phonediscs { display: flex; gap: 8px; }
+  .fg-dock { gap: 10px; }
+  .fg-main { min-width: 0; padding: 0 22px; font-size: 20px; }
+  .fg-main.fg-off { font-size: 17px; }
+  .fg-chip { padding: 0 12px 0 8px; gap: 8px; font-size: 16px; }
+}

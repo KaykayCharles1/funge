@@ -23,6 +23,7 @@ import { mountPanel } from "./panel.ts";
 import { mountWalletPanel } from "./walletPanel.ts";
 import { TopBar } from "./topbar.ts";
 
+const UPRIGHT_TOUCH = window.matchMedia("(pointer: coarse) and (orientation: portrait)");
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
 // The phone layout comes in Phase B of the redesign; until then the field covers every screen the same way
 const COMPACT_BELOW_PX = 0;
@@ -209,6 +210,11 @@ export function mountBattlefield(opts: MountOptions): void {
       book.learn(d.actor, d.actorName, d.actorAvatar);
     }
     director.onEvent(e);
+    // A conquest on a phone or tablet held upright: the fight plays across the field's whole width, which only shows
+    // with the device turned sideways. Touch as the main pointer means a phone or tablet (a laptop's is a mouse or
+    // trackpad, even with a touchscreen), so laptops never see this.
+    const conquest = e.type === "deadline_changed" && (e.reason === "conquer" || e.reason === "observed_on_chain");
+    if (conquest && UPRIGHT_TOUCH.matches) banners?.popup(COPY.battlefield.landscapeHint);
   });
 
   if (import.meta.env.DEV) {

@@ -97,3 +97,23 @@
   .fg-chest { width: 28px; }
   .fg-vault .fg-plate-val { font-size: 17px; }
 }
+
+/* A tablet or phone turned sideways, or a small laptop: the round buttons leave the top bar (they would cover the
+   Treasury box) and sit in the dock beside the wallet chip, as on a phone held upright (dock.css) */
+@media (min-width: 700px) and (max-width: 1239px) {
+  .fg-discs { display: none; }
+}
+/* Narrower still: the three boxes come closer and get a little smaller so they stay on screen; the logo makes room */
+@media (min-width: 700px) and (max-width: 1099px) {
+  .fg-logo { display: none; }
+  .fg-king { width: 360px; height: 70px; top: 20px; }
+  .fg-name { font-size: 26px; }
+  .fg-sub { font-size: 15px; }
+  .fg-plate { min-width: 140px; padding: 0 14px 0 8px; }
+  .fg-timer, .fg-added { right: calc(50% + 194px); }
+  .fg-added { width: 140px; }
+  .fg-vault { left: calc(50% + 194px); }
+  .fg-bell { width: 34px; }
+  .fg-chest { width: 40px; }
+  .fg-plate-val { font-size: 24px; }
+}

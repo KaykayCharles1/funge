@@ -642,6 +642,8 @@ export const COPY = {
     connectWallet: "Connect a wallet to play",
     // The box in the middle of the field when the round is over (src/battlefield/banners.ts)
     roundOverKick: "The round is over",
+    // A conquest on a phone held upright (the fight needs the full width)
+    landscapeHint: "Enable landscape to see the battle",
     insufficient: "Insufficient Amount",
     insufficientBch: "Insufficient BCH for the fee",
     reconnecting: "Reconnecting…",
