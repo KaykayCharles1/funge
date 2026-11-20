@@ -44,6 +44,7 @@ export function mountActionBar(
   popup: (text: string) => void,
   openWallet: () => void,
   portraits: () => Portrait[],
+  onNet: (offline: boolean) => void,
 ): void {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
     const e = document.createElement(tag);
@@ -234,6 +235,7 @@ export function mountActionBar(
     toggle(spinner, !busy);
     toggle(cancel, !(v.busy && v.external));
 
+    onNet(v.net === "offline");
     // The outcome of the last move: errors as a popup (the field shows the good news itself)
     if (v.note !== lastNote) {
       lastNote = v.note;

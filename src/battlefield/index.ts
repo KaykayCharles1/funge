@@ -18,6 +18,7 @@ import { displayName, HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
 import { installUnlock, preloadTracks } from "./sound.ts";
+import { Banners } from "./banners.ts";
 import { mountPanel } from "./panel.ts";
 import { TopBar } from "./topbar.ts";
 
@@ -82,6 +83,7 @@ export function mountBattlefield(opts: MountOptions): void {
     connShown = want;
   };
   setInterval(connection, 500);
+  let banners: Banners | null = null;
   let early: RoundSnapshot | null = null; // a snapshot that came before the scene was ready
   let devMe: string | null = null; // dev panel: pretend to hold this key
   const isMe = (key: string | null) => !!key && (opts.myKeys().some((k) => sameKey(k, key)) || (devMe !== null && sameKey(devMe, key)));
@@ -101,7 +103,10 @@ export function mountBattlefield(opts: MountOptions): void {
     scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
       if (!held) director?.tick();
     });
-    // The top bar over the field takes over the canvas plates
+    // The top bar, the banners and the middle box over the field take over the canvas plates and cards
+    banners = new Banners(host, isMe);
+    scene.cardsOnPage = true;
+    scene.hud.attachBanners(banners);
     scene.hud.attachDom(new TopBar(host, {
       isMe,
       onInvite: () => {
@@ -171,9 +176,7 @@ export function mountBattlefield(opts: MountOptions): void {
   // The action bar and the folded old page, under the field
   const wallet = foldOldPage(host);
   mountInviteBanner(host, wallet.open);
-  mountActionBar(host, opts.page, opts.run, (text) => {
-    if (director) scene.hud.popup(text);
-  }, wallet.open, () => scene.portraits);
+  mountActionBar(host, opts.page, opts.run, (text) => banners?.popup(text, true), wallet.open, () => scene.portraits, (off) => banners?.setOffline(off));
 
   onSceneSnapshot((s, source) => {
     if (source === "mock") mockOn = true;

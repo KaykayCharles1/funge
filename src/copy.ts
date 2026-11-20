@@ -567,6 +567,8 @@ export const COPY = {
     cancel: "Cancel",
     createWallet: "Create your game wallet",
     connectWallet: "Connect a wallet to play",
+    // The box in the middle of the field when the round is over (src/battlefield/banners.ts)
+    roundOverKick: "The round is over",
     insufficient: "Insufficient Amount",
     insufficientBch: "Insufficient BCH for the fee",
     reconnecting: "Reconnecting…",
@@ -583,8 +585,8 @@ export const COPY = {
     gameWallet: "Game wallet",
     noWallet: "No wallet yet",
     openWallet: "Open the wallet panel",
-    nextRound: "The next round starts soon. Stay here: it appears by itself.",
-    nextRoundIn: (time: string) => `Next round in ${time}. Stay here: it appears by itself.`,
+    nextRound: "The next round starts soon",
+    nextRoundIn: (time: string) => `Next round in ${time}`,
     nextRoundAlmost: "The next round is almost ready…",
     nextRoundAnyMoment: "The next round starts any moment now…",
     roundDetails: "Round details",
@@ -605,7 +607,7 @@ export const COPY = {
 
   errors: {
     invalid: "The network did not accept that move. Nothing was sent. Please try again.",
-    state_changed: "Someone moved first. Check the new state and try again.",
+    state_changed: "Someone moved first. Check the new price and try again.",
     too_late: "Too late: the clock ran out before your move arrived.",
     round_over: "The round is over.",
     not_over: "The round is still running.",

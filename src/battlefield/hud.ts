@@ -9,6 +9,7 @@ import { avatarKey } from "./assets.ts";
 import type { FieldState } from "./director.ts";
 import type { Identity } from "./identity.ts";
 import { sfx } from "./sound.ts";
+import type { Banners } from "./banners.ts";
 import type { TopBar } from "./topbar.ts";
 
 export const W = 1280;
@@ -109,6 +110,15 @@ export class Hud {
 
   // The top bar (topbar.ts) takes over the bell, the king plate and the Treasury; the price panel goes (the main
   // button shows the price). Sounds and timing stay here.
+  private banners: Banners | null = null; // popups, the status strip and the middle box, as page elements
+
+  attachBanners(b: Banners): void {
+    this.banners = b;
+    for (const p of this.pops) p.box.setVisible(false), p.text.setVisible(false);
+    this.ribbonBox.setVisible(false);
+    this.ribbonText.setVisible(false);
+  }
+
   attachDom(bar: TopBar): void {
     this.dom = bar;
     for (const g of [this.bellGroup, this.plate, this.vault, this.price]) g.setVisible(false);
@@ -217,6 +227,10 @@ export class Hud {
   // A short message at the top of the field that fades after a few seconds. At most two show; a third pushes
   // out the oldest. highlight: about the player's own kingdom.
   popup(text: string, highlight = false): void {
+    if (this.banners) {
+      this.banners.popup(text);
+      return;
+    }
     const now = this.s.time.now;
     // A popup past its time is gone, even if its fade has not finished: tweens step with capped frame times,
     // so after slow frames (a background tab, a slow phone) the fade can lag behind the clock and two would overlap
@@ -351,6 +365,7 @@ export class Hud {
   // Fill every value from the field state. nextCost: what the next conquest costs, or null.
   show(state: FieldState, king: Identity | null, nextCost: bigint | null): void {
     this.dom?.show(state, king);
+    this.banners?.show(state, king);
     const open = state.status !== "waiting" && king !== null;
     this.drawAvatar(open ? king : null);
     this.name.setText(open ? king.name : T.noKing); // a chosen name is shown only as text
@@ -381,6 +396,12 @@ export class Hud {
 
   // A notice across the middle of the field, or null to hide it. "alert" draws it in crimson.
   ribbon(text: string | null, tone: "info" | "alert" = "info"): void {
+    if (this.banners) {
+      // Once time is up the middle box says it (and the winner's Claim is in the dock), so no strip for that
+      const said = text === T.claimReward || text === T.waitingClaim;
+      this.banners.ribbon(said ? null : text, tone === "alert");
+      return;
+    }
     const on = text !== null;
     this.ribbonBox.setVisible(on);
     this.ribbonText.setVisible(on);

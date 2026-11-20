@@ -216,6 +216,7 @@ export class BattlefieldScene extends Phaser.Scene {
   private bannerImg: Phaser.GameObjects.Image | null = null;
   private walls: Phaser.GameObjects.Image[] = [];
   private nextLine: Phaser.GameObjects.Text | null = null; // the finished notice's countdown line
+  cardsOnPage = false; // the page draws the waiting and round-over boxes (banners.ts); the field keeps only its art
   private flagSpots: [number, number][] = []; // castle flags and the banner, for the banner change glow
   private flags: WavingFlag[] = []; // the waving flags on the field
   private shadows = new Map<Phaser.GameObjects.Image, Phaser.GameObjects.Image>(); // soldier -> its ground shadow
@@ -501,6 +502,7 @@ export class BattlefieldScene extends Phaser.Scene {
 
   // The round is settled: the winner's card stays on the field
   private drawFinal(state: FieldState, king: Identity): void {
+    if (this.cardsOnPage) return;
     const objs = this.winnerCard(king, state, 0.5, 360);
     for (const o of objs) (o as unknown as Phaser.GameObjects.Components.Depth).setDepth(2000);
     this.world.add(objs);
@@ -531,9 +533,13 @@ export class BattlefieldScene extends Phaser.Scene {
   }
 
   // A faint keep and a card with a title and a line under it
-  private drawNotice(title: string, detail: string): Phaser.GameObjects.Text {
+  private drawNotice(title: string, detail: string): Phaser.GameObjects.Text | null {
     const keep = this.add.image(BASE_X, BASE_Y, "keep").setOrigin(0.5, 1).setAlpha(0.3);
     keep.setScale(KEEP_H / keep.height);
+    if (this.cardsOnPage) {
+      this.world.add(keep);
+      return null;
+    }
     const cw = 560, ch = 140, cx = W / 2 - cw / 2, cy = 430;
     const g = this.add.graphics().setDepth(1000);
     g.fillStyle(C.navy, 0.88).fillRoundedRect(cx, cy, cw, ch, 20);
