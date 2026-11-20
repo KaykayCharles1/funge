@@ -561,8 +561,9 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // Free test coins: Claim, then "Next claim in 23:59:59" for a day (counted from the claim, in this browser)
   function faucetCard(pkhHex: string): HTMLElement {
     const card = el("div", "fg-w-card fg-w-faucet");
-    const pusdAmt = formatUnits(FAUCET.pusdUnits, CONFIG.pusdDecimals);
-    const bchAmt = formatUnits(FAUCET.sats, 8);
+    const plain = (t: string) => (t.includes(".") ? t.replace(/\.?0+$/, "") : t); // "20.00" -> "20", "0.00020000" -> "0.0002"
+    const pusdAmt = plain(formatUnits(FAUCET.pusdUnits, CONFIG.pusdDecimals));
+    const bchAmt = plain(formatUnits(FAUCET.sats, 8));
     const key = `funge:faucet:${pkhHex}`;
     const claimedAt = (): number | null => {
       try {
