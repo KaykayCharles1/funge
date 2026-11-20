@@ -24,7 +24,7 @@ const T = COPY.walletPanel;
 const MIN_PW = 8; // the vault's own minimum
 const base = `${import.meta.env.BASE_URL}assets/`;
 
-type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "upgrade" | "home" | "backup" | "delete" | "swap-old" | "withdraw-old" | "wc";
+type Screen = "pick" | "start" | "pw" | "phrase" | "import" | "locked" | "forgot" | "home" | "backup" | "delete" | "swap-old" | "withdraw-old" | "wc";
 const OLD_TOOLS: Screen[] = ["swap-old", "withdraw-old"]; // the swap and withdraw boxes (their own code, restyled here)
 const ONBOARDING: Screen[] = ["start", "pw", "phrase", "import"];
 
@@ -163,7 +163,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     const own = getWalletState().status !== "idle";
     if (own || wantsOwn) return "wc";
     const state = vault.state();
-    if (state === "unlocked") return !vault.hasPassword() ? "upgrade" : [...OLD_TOOLS, "backup", "delete"].includes(screen) ? screen : "home";
+    if (state === "unlocked") return !vault.hasPassword() ? "pick" : [...OLD_TOOLS, "backup", "delete"].includes(screen) ? screen : "home";
     if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
     return ONBOARDING.includes(screen) ? screen : "pick";
   }
@@ -180,7 +180,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     for (const e of [old.local, old.own, old.faucet]) if (e) e.style.display = "none"; // the old sections are no longer shown
     hold.hidden = !OLD_TOOLS.includes(screen);
     if (OLD_TOOLS.includes(screen)) return oldTool();
-    const build = { pick, start, pw: () => password(false), phrase, import: importScreen, locked, forgot, upgrade: () => password(true), home, backup, delete: deleteScreen, wc: wcScreen }[screen as Exclude<Screen, "swap-old" | "withdraw-old">];
+    const build = { pick, start, pw: password, phrase, import: importScreen, locked, forgot, home, backup, delete: deleteScreen, wc: wcScreen }[screen as Exclude<Screen, "swap-old" | "withdraw-old">];
     build?.();
   }
 
@@ -272,8 +272,8 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     );
   }
 
-  // ---- Create a password (both flows, and the one-time upgrade) ----
-  function password(upgrading: boolean): void {
+  // ---- Create a password (create and import) ----
+  function password(): void {
     const hint = el("p", "fg-w-err");
     const field = (placeholder: string, value: string, onInput: (v: string) => void) => {
       const wrap = el("div", "fg-w-pw");
@@ -301,8 +301,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     const a = field(T.password, p1, (v) => (p1 = v));
     const b = field(T.confirmPassword, p2, (v) => (p2 = v));
     const cont = goldWhen(T.continue, ok, () => {
-      if (upgrading) void upgrade();
-      else if (flow === "create") go("phrase");
+      if (flow === "create") go("phrase");
       else void save(mnemonic!, p1);
     });
     function update(): void {
@@ -312,11 +311,11 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       cont.refresh();
     }
     const head = el("div", "fg-w fg-w-center");
-    head.style.paddingTop = upgrading ? "30px" : "40px";
+    head.style.paddingTop = "40px";
     head.append(el("h2", "fg-w-title", T.pwTitle), el("p", "fg-w-mute", T.pwText));
     const spacer = el("div");
     spacer.style.height = "90px";
-    if (!upgrading) box.append(steps(flow === "create" ? 1 : 2, () => go(flow === "create" ? "start" : "import")));
+    box.append(steps(flow === "create" ? 1 : 2, () => go(flow === "create" ? "start" : "import")));
     box.append(head, a.wrap, b.wrap, hint, spacer, cont.b, errLine());
     update();
     a.input.focus();
@@ -879,28 +878,25 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     }
   }
 
-  // An old wallet without a password: save the same phrase again, now behind the new password
-  async function upgrade(): Promise<void> {
-    const phrase = vault.revealMnemonic();
-    if (!phrase) return;
-    await vault.wipe();
-    try {
-      await vault.create(phrase, p1);
-    } catch (e) {
-      console.error(e);
-      await vault.create(phrase); // put it back as it was, so it is never lost from this browser
-      error = T.failed;
-      draw();
-      return;
-    }
-    clearSecrets();
-    walletChanged();
-    go(auto());
-  }
-
   // The vault or the own wallet changed somewhere else
+  // A wallet saved before passwords were required (no password) is removed from this browser: the player starts at
+  // Pick a Wallet and can bring it back with its recovery phrase (I Already Have a Wallet)
+  let wiping = false;
+  const wipeOld = () => {
+    if (wiping || vault.state() === "none" || vault.hasPassword()) return;
+    wiping = true;
+    void vault.wipe().then(() => {
+      wiping = false;
+      clearSecrets();
+      pickFirst = false;
+      walletChanged();
+      go(auto());
+    });
+  };
+
   let lastKey = "";
   setInterval(() => {
+    wipeOld();
     const w = getWalletState();
     const key = `${vault.state()}|${vault.hasPassword()}|${w.status}|${w.qrUri ?? ""}|${w.walletName ?? ""}|${w.error ?? ""}`;
     if (key === lastKey) return;
