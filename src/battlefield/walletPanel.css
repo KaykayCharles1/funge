@@ -1,0 +1,251 @@
+/* The wallet screens in the side panel (redesign step 6). From the approved mockup (docs/REDESIGN_CHECKLIST.md, 10). */
+.fg-w { display: flex; flex-direction: column; gap: 14px; font-family: "Alegreya Sans", "Segoe UI", sans-serif; color: #f4ead2; }
+.fg-w[hidden], .fg-w [hidden] { display: none !important; }
+.fg-w button, .fg-w input { font-family: inherit; }
+.fg-w button:focus-visible, .fg-w input:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+.fg-w-center { text-align: center; }
+.fg-w-title { margin: 0; font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 30px; line-height: 1; color: #f8eeca; }
+.fg-w-mute { margin: 0; font-size: 17px; line-height: 1.45; color: #cbd5e1; }
+.fg-w-warn { margin: 0; font-size: 17px; line-height: 1.4; color: #fbbc28; }
+.fg-w-err { margin: 0; min-height: 22px; font-size: 15px; color: #fca5a5; }
+.fg-w-ok { color: #86efac; }
+.fg-w-gold { height: 52px; width: 100%; background: #fbbc28; color: #0f243d; border: 0; border-radius: 999px; box-shadow: 0 4px 0 #0f243d;
+  font-weight: 700; font-size: 19px; cursor: pointer; }
+.fg-w-gold:disabled { background: #3a3f55; color: #a8a29e; box-shadow: none; cursor: default; }
+.fg-w-dark { height: 52px; width: 100%; background: #15234a; color: #f8eeca; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 999px;
+  font-weight: 700; font-size: 18px; cursor: pointer; }
+.fg-w-dark:hover { background: #1c2c5a; }
+.fg-w-line { height: 52px; width: 100%; background: #0f243d; border: 2px solid #fbbc28; border-radius: 999px; color: #fbbc28; font-weight: 700; font-size: 18px; cursor: pointer; }
+.fg-w-red { height: 52px; width: 100%; background: #b91c1c; color: #fff; border: 1.5px solid #ef4444; border-radius: 999px; font-weight: 700; font-size: 18px; cursor: pointer; }
+.fg-w-red:hover { background: #dc2626; }
+.fg-w-back { align-self: flex-start; display: flex; align-items: center; gap: 8px; background: transparent; border: 0; padding: 0; color: #f3cf74;
+  font-size: 16px; font-weight: 700; cursor: pointer; }
+.fg-w-textlink { align-self: center; background: transparent; border: 0; padding: 4px; color: #f8eeca; font-size: 17px; cursor: pointer; }
+.fg-w-textlink:hover { text-decoration: underline; }
+
+/* Pick a Wallet */
+.fg-w-row { display: flex; align-items: center; gap: 14px; width: 100%; height: 72px; padding: 0 14px; box-sizing: border-box; background: #15234a;
+  border: 1px solid rgba(224, 169, 58, 0.35); border-radius: 8px; color: #f8eeca; font-weight: 700; font-size: 19px; cursor: pointer; text-align: left; }
+.fg-w-row:hover { background: #1c2c5a; border-color: #fbbc28; }
+.fg-w-icon { width: 48px; height: 48px; flex-shrink: 0; border-radius: 10px; background: #0f1a33; border: 1px solid rgba(224, 169, 58, 0.35);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.fg-w-icon.fg-white { background: #fff; }
+
+/* Step bar */
+.fg-w-steps { position: relative; height: 32px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(224, 169, 58, 0.25); padding-bottom: 12px; }
+.fg-w-steps .fg-w-back { position: absolute; left: 0; top: 4px; }
+.fg-w-dots { display: flex; gap: 10px; }
+.fg-w-dot { width: 10px; height: 10px; border-radius: 50%; background: #3a3f55; }
+.fg-w-dot.fg-on { background: #fbbc28; }
+
+/* Password fields */
+.fg-w-pw { position: relative; }
+.fg-w-pw input, .fg-w-input { width: 100%; box-sizing: border-box; height: 52px; padding: 0 50px 0 20px; background: #0f1a33; border: 1px solid rgba(224, 169, 58, 0.45);
+  border-radius: 999px; color: #f4ead2; font-size: 17px; outline: none; }
+.fg-w-input { padding: 0 16px; border-radius: 6px; height: 46px; font-size: 16px; }
+.fg-w-pw input:focus, .fg-w-input:focus { border-color: #fbbc28; }
+.fg-w-eye { position: absolute; right: 8px; top: 8px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: #cbd5e1;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.fg-w-eye:hover, .fg-w-eye[aria-pressed="true"] { color: #f8eeca; }
+
+/* Recovery phrase: shown only while pointed at (or held), never selectable or copyable */
+.fg-w-seed { position: relative; border-radius: 8px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.fg-w-seedgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; filter: blur(7px); transition: filter 0.15s; }
+.fg-w-word { display: flex; gap: 6px; align-items: baseline; padding: 10px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.35); border-radius: 6px;
+  font-size: 16px; text-align: left; }
+.fg-w-word i { font-style: normal; font-family: Cinzel, Georgia, serif; font-size: 12px; color: #f3cf74; width: 18px; }
+.fg-w-word b { font-weight: 700; letter-spacing: 0.02em; }
+.fg-w-seedeye { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #f8eeca; pointer-events: none; transition: opacity 0.15s; }
+@media (hover: hover) { .fg-w-seed:hover .fg-w-seedgrid { filter: none; } .fg-w-seed:hover .fg-w-seedeye { opacity: 0; } }
+.fg-w-seed.fg-held .fg-w-seedgrid { filter: none; }
+.fg-w-seed.fg-held .fg-w-seedeye { opacity: 0; }
+.fg-w-check { display: flex; align-items: center; gap: 12px; background: transparent; border: 0; padding: 0; color: #f4ead2; font-size: 16px; cursor: pointer; text-align: left; }
+.fg-w-box { width: 26px; height: 26px; flex-shrink: 0; box-sizing: border-box; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  background: #0f1a33; border: 1.5px solid rgba(224, 169, 58, 0.6); }
+.fg-w-check[aria-checked="true"] .fg-w-box { background: #fbbc28; border: 0; }
+
+/* Import */
+.fg-w-words { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fg-w-wordin { height: 42px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: #0f1a33;
+  border: 1px solid rgba(224, 169, 58, 0.35); border-radius: 6px; }
+.fg-w-wordin:focus-within { border-color: #fbbc28; }
+.fg-w-wordin span { font-size: 14px; color: #cbd5e1; min-width: 22px; text-align: left; }
+.fg-w-wordin input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #f4ead2; font-size: 16px; }
+
+/* Locked / forgot */
+.fg-w-badge { margin: 0 auto; width: 72px; height: 72px; border-radius: 50%; background: #15234a; border: 2px solid #fbbc28; display: flex; align-items: center;
+  justify-content: center; color: #fbbc28; }
+.fg-w-badge.fg-big { width: 96px; height: 96px; }
+
+/* Reset confirmation, over the panel */
+.fg-w-modal { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(5, 10, 24, 0.75); }
+.fg-w-modal-box { width: 100%; box-sizing: border-box; padding: 22px 20px; background: #0f1a33; border: 2px solid rgba(252, 165, 165, 0.7); border-radius: 10px;
+  display: flex; flex-direction: column; gap: 12px; }
+.fg-w-modal-box .fg-w-title { font-size: 28px; color: #fecaca; }
+.fg-w-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.fg-w-secret { -webkit-text-security: disc; }
+
+/* The game wallet's home (6b) */
+.fg-w-hold[hidden] { display: none; }
+.fg-w-top { display: flex; align-items: center; justify-content: space-between; }
+.fg-w-kick { font-family: Cinzel, Georgia, serif; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #f3cf74; }
+.fg-w-icons { display: flex; gap: 8px; }
+.fg-w-iconbtn { position: relative; width: 40px; height: 40px; border-radius: 50%; background: transparent; border: 1.5px solid #fbbc28; color: #fbbc28;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.fg-w-iconbtn:hover { background: #15234a; }
+.fg-w-tip { position: absolute; top: calc(100% + 8px); right: 0; white-space: nowrap; background: #0f1a33; border: 1.5px solid #e0a93a; color: #f8eeca;
+  font-weight: 700; font-size: 15px; padding: 6px 10px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 2; }
+@media (hover: hover) { .fg-w-iconbtn:hover .fg-w-tip { opacity: 1; } }
+.fg-w-iconbtn:focus-visible .fg-w-tip, .fg-w-iconbtn.fg-tip-on .fg-w-tip { opacity: 1; }
+.fg-w-card { padding: 16px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; }
+.fg-w-coins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fg-w-coin { padding: 14px 16px; }
+.fg-w-coinhead { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #f3cf74; }
+.fg-w-coinhead img { width: 22px; height: 22px; border-radius: 50%; }
+.fg-w-amount { font-family: Cinzel, Georgia, serif; font-weight: 700; font-size: 28px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.fg-w-addr { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #0f1a33; border: 1px solid rgba(224, 169, 58, 0.3); border-radius: 6px; }
+.fg-w-addr span { flex: 1; min-width: 0; font-size: 15px; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fg-w-small { height: 38px; padding: 0 14px; background: transparent; border: 1px solid rgba(224, 169, 58, 0.6); border-radius: 999px; color: #f3cf74; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+.fg-w-faucet { border-color: rgba(224, 169, 58, 0.6); }
+.fg-w-faucetline { font-size: 18px; margin-top: 8px; }
+.fg-w-gold.fg-w-count { font-family: Cinzel, Georgia, serif; font-variant-numeric: tabular-nums; }
+.fg-w-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+.fg-w-pill { height: 40px; padding: 0 18px; border-radius: 999px; background: rgba(248, 238, 202, 0.08); border: 1.5px solid #f4ead2; color: #f8eeca;
+  font-weight: 700; font-size: 15px; cursor: pointer; }
+.fg-w-pill:hover { background: rgba(248, 238, 202, 0.16); }
+.fg-w-pill-red { background: #b91c1c; border-color: #ef4444; color: #fff; }
+.fg-w-pill-red:hover { background: #dc2626; }
+
+/* Swap (6c): the swap's own code (src/swapUI.ts) runs as before; this gives its screen the mockup's look.
+   Scoped to the panel, so the old page (without ?mode=battlefield) keeps its look. */
+.fg-panel #swBox { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; color: #f4ead2; font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-panel #swBox.hidden { display: none; }
+.fg-panel #swBox > div:first-child { position: relative; justify-content: center; margin: 0 0 6px; }
+.fg-panel #swTitle { background: transparent; padding: 0; font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 30px; line-height: 1; color: #f8eeca; }
+.fg-panel #swPractice { display: none !important; }
+.fg-panel #swGear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); margin: 0; color: #f3cf74; background: transparent; }
+.fg-panel #swGear:hover { background: #15234a; color: #f8eeca; }
+.fg-panel #swSettings { position: static; width: auto; order: 1; padding: 16px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; box-shadow: none; }
+.fg-panel #swSettings.hidden { display: none; }
+.fg-panel #swSlipHelp { display: none; }
+.fg-panel #swSlipLabel { font-size: 16px; color: #f8eeca; }
+.fg-panel #swSettings .rounded-full.bg-slate-800 { background: #0f1a33; box-shadow: 0 0 0 1px rgba(224, 169, 58, 0.45); }
+.fg-panel #swSlipAuto { font-family: inherit; font-size: 14px; }
+.fg-panel #swSlipAuto.bg-amber-400 { background: #fbbc28; color: #0f243d; }
+.fg-panel #swSlip { color: #f8eeca; font-family: inherit; }
+
+/* Sell and Buy cards */
+.fg-panel #swBox > div.rounded-2xl, .fg-panel #swBox > div > div.rounded-2xl { order: 2; }
+.fg-panel #swBox .rounded-2xl.bg-slate-900 { background: #15234a; box-shadow: none; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 8px; }
+.fg-panel #swBox > .rounded-2xl.bg-slate-900 { order: 2; }
+.fg-panel #swBox > .relative.z-10 { order: 2; }
+.fg-panel #swSellLabel, .fg-panel #swBuyLabel { color: #f3cf74; font-size: 15px; }
+.fg-panel #swSell, .fg-panel #swBuy { font-family: Cinzel, Georgia, serif; font-size: 30px; color: #f8eeca; }
+.fg-panel #swSell::placeholder, .fg-panel #swBuy::placeholder { color: #64748b; }
+.fg-panel #swSell.text-red-400 { color: #fca5a5; }
+.fg-panel #swTopToken, .fg-panel #swBotToken { background: #0f1a33; box-shadow: 0 0 0 1px rgba(224, 169, 58, 0.45); color: #f8eeca; }
+.fg-panel #swBox .text-slate-400 { color: #cbd5e1; }
+.fg-panel #swChips button { background: transparent; color: #f3cf74; box-shadow: none; border: 1px solid rgba(224, 169, 58, 0.5); font-family: inherit; font-size: 13px; padding: 2px 10px; }
+.fg-panel #swChips button:hover { background: #fbbc28; color: #0f243d; }
+.fg-panel #swFlip { background: #0f243d; color: #fbbc28; box-shadow: 0 0 0 4px #0a1226, 0 0 0 5px rgba(224, 169, 58, 0.6); }
+.fg-panel #swFlip, .fg-panel #swFlip:hover { rotate: none; transform: none; transition: color 0.15s; }
+.fg-panel #swFlip:hover { color: #f8eeca; }
+
+/* The rate and network cost, then the button, then the message */
+.fg-panel #swBox > div:has(> #swRate) { order: 3; margin: 0; font-size: 14px; color: #cbd5e1; }
+.fg-panel #swAction { order: 4; margin: 4px 0 0; height: 52px; padding: 0 16px; border-radius: 999px; background: #fbbc28; color: #0f243d; box-shadow: 0 4px 0 #0f243d;
+  font-family: inherit; font-size: 19px; font-weight: 700; }
+.fg-panel #swAction:hover:not(:disabled) { background: #fcc94d; }
+.fg-panel #swAction:disabled { background: #3a3f55; color: #a8a29e; box-shadow: none; }
+.fg-panel #swMsg { order: 5; margin: 0; }
+
+/* The review window */
+.fg-panel #swReview { position: fixed; z-index: 70; background: rgba(5, 10, 24, 0.75); font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-panel #swReview > div { background: #0f1a33; border: 2px solid #e0a93a; border-radius: 10px; box-shadow: none; color: #f4ead2; }
+.fg-panel #swRvTitle { font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 26px; color: #f8eeca; }
+.fg-panel #swRvSell, .fg-panel #swRvBuy { font-family: Cinzel, Georgia, serif; color: #f8eeca; }
+.fg-panel #swRvMore { border-color: rgba(224, 169, 58, 0.35); color: #f3cf74; font-family: inherit; }
+.fg-panel #swRvRows dt { color: #cbd5e1; }
+.fg-panel #swRvRows dd { color: #f8eeca; }
+.fg-panel #swRvSend { height: 52px; padding: 0 16px; border-radius: 999px; background: #fbbc28; color: #0f243d; box-shadow: 0 4px 0 #0f243d; font-family: inherit; font-size: 19px; font-weight: 700; }
+.fg-panel #swRvSend:disabled { opacity: 0.6; }
+.fg-panel #swRvClose { color: #f3cf74; }
+
+/* Withdraw (6d): the withdraw code (src/withdrawUI.ts) runs as before; this gives its three screens the mockup's look */
+.fg-panel #wdBox { margin-top: 10px; padding: 0; background: transparent; box-shadow: none; color: #f4ead2; font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-panel #wdBox.hidden { display: none; }
+.fg-panel #wdTitle { margin: 0 0 14px; text-align: center; font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 30px; line-height: 1; color: #f8eeca; }
+.fg-panel #wdText, .fg-panel #wdNftsRow, .fg-panel #wdCancel, .fg-panel #wdConfirmWarn { display: none !important; }
+.fg-panel #wdForm label { margin-top: 0; margin-bottom: 14px; display: grid; grid-template-columns: 1fr auto; align-items: end; row-gap: 6px; font-size: 15px; color: #f3cf74; }
+.fg-panel #wdForm label > :not(span:first-child):not(#wdPusdHave):not(#wdBchHave) { grid-column: 1 / -1; }
+.fg-panel #wdPusdHave, .fg-panel #wdBchHave { justify-self: end; font-size: 14px; color: #cbd5e1; }
+.fg-panel #wdAddress, .fg-panel #wdPusd, .fg-panel #wdBch { margin-top: 0; padding: 0 12px; height: 46px; background: #0f1a33; border-radius: 6px; box-shadow: none;
+  border: 1px solid rgba(224, 169, 58, 0.45); color: #f4ead2; font-size: 16px; font-family: inherit; }
+.fg-panel #wdAddress { height: 52px; padding: 12px; resize: none; letter-spacing: 0.01em; }
+.fg-panel #wdAddress:focus, .fg-panel #wdPusd:focus, .fg-panel #wdBch:focus { border-color: #fbbc28; }
+.fg-panel #wdPusdMax, .fg-panel #wdBchMax { height: 46px; padding: 0 16px; border-radius: 999px; background: transparent; border: 1px solid rgba(224, 169, 58, 0.6); color: #f3cf74; font-size: 15px; font-family: inherit; cursor: pointer; }
+.fg-panel #wdPusdMax:hover, .fg-panel #wdBchMax:hover { background: #15234a; }
+.fg-panel #wdReview, .fg-panel #wdSend, .fg-panel #wdBack { cursor: pointer; }
+.fg-panel #wdReview:disabled, .fg-panel #wdSend:disabled, .fg-panel #wdBack:disabled { cursor: default; }
+.fg-panel #wdReview:hover:not(:disabled), .fg-panel #wdSend:hover:not(:disabled) { background: #fcc94d; }
+.fg-panel #wdBack:hover:not(:disabled) { background: #15234a; }
+.fg-panel #wdForm > div:last-child, .fg-panel #wdConfirm > div:last-child { margin-top: 6px; }
+.fg-panel #wdReview, .fg-panel #wdSend { height: 52px; border-radius: 999px; background: #fbbc28; color: #0f243d; box-shadow: 0 4px 0 #0f243d; font-family: inherit; font-size: 19px; font-weight: 700; }
+.fg-panel #wdReview:disabled, .fg-panel #wdSend:disabled { opacity: 0.5; }
+.fg-panel #wdBack { height: 52px; flex: 1; border-radius: 999px; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28; font-family: inherit; font-size: 18px; font-weight: 700; }
+.fg-panel #wdConfirm > div:last-child { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fg-panel #wdConfirm > div:last-child #wdBack { order: 1; }
+.fg-panel #wdConfirm > div:last-child #wdSend { order: 2; }
+.fg-panel #wdConfirm { padding: 16px; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; }
+.fg-panel #wdConfirmTitle { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #f8eeca; }
+.fg-panel #wdConfirmList { list-style: none; margin: 0 0 6px; padding: 0; }
+.fg-panel #wdConfirmList li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 16px; }
+.fg-panel #wdConfirmList li span:first-child { color: #cbd5e1; }
+.fg-panel #wdConfirmList li span:last-child { color: #f8eeca; font-weight: 700; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fg-panel #wdConfirmToLabel { margin-top: 10px; font-size: 15px; color: #cbd5e1; }
+.fg-panel #wdConfirmTo { font-family: inherit; font-size: 14px; letter-spacing: 0.01em; color: #f4ead2; }
+.fg-panel #wdConfirmFee { font-size: 15px; color: #cbd5e1; }
+.fg-panel #wdDone { padding: 22px 16px; text-align: center; background: #15234a; border: 1px solid rgba(224, 169, 58, 0.45); border-radius: 6px; }
+.fg-panel #wdDone.hidden { display: none; }
+.fg-panel #wdDone .wd-tick { margin: 0 auto 10px; width: 52px; height: 52px; border-radius: 50%; background: rgba(134, 239, 172, 0.15); border: 2px solid #86efac;
+  display: flex; align-items: center; justify-content: center; color: #86efac; }
+.fg-panel #wdDoneTitle { margin: 0; font-size: 20px; font-weight: 700; color: #86efac; }
+.fg-panel #wdDoneLink { display: inline-block; margin-top: 8px; font-size: 15px; color: #f3cf74; }
+.fg-panel #wdDoneBtn { margin-top: 16px; width: 100%; height: 52px; border-radius: 999px; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28; font-family: inherit; font-size: 18px; font-weight: 700; cursor: pointer; }
+.fg-panel #wdMsg { margin-top: 10px; }
+.fg-panel #wdPusd:disabled, .fg-panel #wdBch:disabled, .fg-panel #wdPusdMax:disabled, .fg-panel #wdBchMax:disabled { opacity: 0.45; cursor: not-allowed; }
+.fg-panel #wdPusdMax:disabled:hover, .fg-panel #wdBchMax:disabled:hover { background: transparent; }
+
+/* Back up and Delete (6e) */
+.fg-w-redbox { display: flex; gap: 10px; padding: 12px 14px; border-radius: 6px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(248, 113, 113, 0.55);
+  font-size: 15px; line-height: 1.45; color: #fca5a5; }
+.fg-w-redbox > span:first-child { flex-shrink: 0; margin-top: 1px; }
+/* The backup screen's words: blurred under the grey cover until it is clicked, then shown (the create screen's words
+   keep their own rule: shown only while pointed at or held) */
+.fg-w-seed.fg-w-backup .fg-w-seedgrid, .fg-w-seed.fg-w-backup:hover .fg-w-seedgrid { filter: none; }
+.fg-w-seed.fg-w-backup.fg-w-covered .fg-w-seedgrid, .fg-w-seed.fg-w-backup.fg-w-covered:hover .fg-w-seedgrid { filter: blur(6px); }
+.fg-w-cover { position: absolute; inset: 0; width: 100%; border: 0; border-radius: 8px; background: rgba(55, 58, 66, 0.88); color: #f4ead2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; font-size: 17px; }
+.fg-w-cover:hover { background: rgba(65, 68, 78, 0.92); }
+.fg-w-delete { border-color: rgba(252, 165, 165, 0.6); }
+.fg-w-modal-box.fg-w-gold-box { border-color: #e0a93a; gap: 14px; }
+.fg-w-modal-box.fg-w-gold-box .fg-w-title { color: #f8eeca; }
+.fg-w-modal-box .fg-w-err { min-height: 0; }
+
+/* WizardConnect (6f) */
+.fg-w-qr { display: block; width: 220px; height: 220px; margin: 4px auto 0; padding: 10px; background: #fff; border-radius: 8px; box-sizing: border-box; }
+.fg-w-qrbtns { display: flex; gap: 8px; justify-content: center; }
+.fg-w-who { display: flex; align-items: center; gap: 12px; }
+.fg-w-whonames { display: flex; flex-direction: column; gap: 3px; }
+.fg-w-whoname { font-size: 20px; font-weight: 700; color: #f8eeca; }
+.fg-w-connected { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #86efac; }
+.fg-w-connected::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #86efac; }
+
+/* Touch screens: every control at least 44px, so a finger finds it */
+@media (pointer: coarse) {
+  .fg-w-iconbtn { width: 44px; height: 44px; }
+  .fg-w-small, .fg-w-pill { height: 44px; }
+  .fg-w-eye { width: 40px; height: 40px; top: 6px; right: 6px; }
+  .fg-w-back { min-height: 44px; }
+  .fg-w-textlink { min-height: 44px; }
+}

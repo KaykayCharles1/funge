@@ -8,19 +8,23 @@ import { conquestMoney } from "../lib/kingdom.ts";
 import type { GameKingdom } from "../lib/game.ts";
 import type { RoundSnapshot } from "../referee/api.ts";
 import { onSceneEvent, onSceneSnapshot } from "../sceneBus.ts";
-import { mountInviteBanner } from "./invite.ts";
+import { inviterName, mountInviteBanner, openInvite } from "./invite.ts";
 import { mountActionBar } from "./actions.ts";
 import type { PageDo, PageView } from "./actions.ts";
 import { Director } from "./director.ts";
 import type { DirectorStats, FieldState } from "./director.ts";
-import { H, H_COMPACT, W } from "./hud.ts";
+import { H, W } from "./hud.ts";
 import { displayName, HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
 import { installUnlock, preloadTracks } from "./sound.ts";
+import { Banners } from "./banners.ts";
+import { mountPanel } from "./panel.ts";
+import { mountWalletPanel } from "./walletPanel.ts";
+import { TopBar } from "./topbar.ts";
 
+const UPRIGHT_TOUCH = window.matchMedia("(pointer: coarse) and (orientation: portrait)");
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
-const COMPACT_BELOW_PX = 700; // narrower than this (a phone): the HUD moves into bands above and below the field
 
 let mounted = false;
 type Fees = { feePercent: bigint; cutPercent: bigint };
@@ -38,8 +42,9 @@ export function mountBattlefield(opts: MountOptions): void {
   mounted = true;
   const host = document.createElement("div");
   host.id = "battlefield";
-  host.className = "relative mx-auto w-full max-w-5xl";
-  host.style.aspectRatio = `${W} / ${H}`;
+  // The field fills the window (the redesign's "cover": a little sky and grass is cut, never the castle)
+  host.className = "relative w-full overflow-hidden bg-[#0a1226]";
+  host.style.height = "100dvh";
   // The page showed a placeholder while this code downloaded; the loading screen takes over from it
   document.getElementById("battlefield-boot")?.remove();
   document.body.prepend(host);
@@ -78,6 +83,7 @@ export function mountBattlefield(opts: MountOptions): void {
     connShown = want;
   };
   setInterval(connection, 500);
+  let banners: Banners | null = null;
   let early: RoundSnapshot | null = null; // a snapshot that came before the scene was ready
   let devMe: string | null = null; // dev panel: pretend to hold this key
   const isMe = (key: string | null) => !!key && (opts.myKeys().some((k) => sameKey(k, key)) || (devMe !== null && sameKey(devMe, key)));
@@ -97,9 +103,20 @@ export function mountBattlefield(opts: MountOptions): void {
     scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
       if (!held) director?.tick();
     });
+    // The top bar, the banners and the middle box over the field take over the canvas plates and cards
+    banners = new Banners(host, isMe);
+    scene.cardsOnPage = true;
+    scene.hud.attachBanners(banners);
+    scene.hud.attachDom(new TopBar(host, {
+      isMe,
+      onInvite: () => {
+        const v = opts.page();
+        openInvite(inviterName({ actingPkh: v.actingPkh, players: v.players, portraits: scene.portraits }));
+      },
+      onMenu: () => wallet.open(),
+    }));
     connection();
     loading.done();
-    layout();
     // The page may have sent its first snapshot while the art was still loading
     if (early && !held) director.onSnapshot(early, CONFIG.kingdom.openingPrice);
     early = null;
@@ -121,7 +138,7 @@ export function mountBattlefield(opts: MountOptions): void {
       };
     }
   }, (share) => loading.progress(share));
-  const game = new Phaser.Game({
+  new Phaser.Game({
     type: Phaser.AUTO,
     parent: host,
     width: W,
@@ -132,36 +149,20 @@ export function mountBattlefield(opts: MountOptions): void {
     // touch drags over the field, so the page could not scroll while the pointer or a finger was on it.
     // Each part is named: Phaser reads input.mouse, input.touch, ... and takes a missing one as "on".
     input: { mouse: false, touch: false, keyboard: false, gamepad: false },
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scale: { mode: Phaser.Scale.ENVELOP, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
   });
 
-  // Phone or wide: the field box changes shape and the HUD moves into bands, when the width crosses the line
-  let compact = false;
-  function layout(): void {
-    const want = host.clientWidth > 0 && host.clientWidth < COMPACT_BELOW_PX;
-    if (want === compact || !director) return;
-    compact = want;
-    host.style.aspectRatio = `${W} / ${compact ? H_COMPACT : H}`;
-    scene.setCompact(compact);
-    game.scale.refresh();
-  }
-  let layoutQueued = false;
-  window.addEventListener("resize", () => {
-    if (layoutQueued) return;
-    layoutQueued = true;
-    requestAnimationFrame(() => {
-      layoutQueued = false;
-      layout();
-    });
-  });
+  // The field covers every screen (Phaser's ENVELOP); the page elements over it handle phone and laptop layouts in CSS.
+  // (The canvas's old phone layout, with the HUD in bands, is no longer used.)
 
-  // The action bar and the folded old page, under the field
-  const wallet = foldOldPage();
+  // The dock, the panel, and the hidden old page
+  const wallet = foldOldPage(host, opts.page);
   mountInviteBanner(host, wallet.open);
-  mountActionBar(host, opts.page, opts.run, (text) => {
-    if (director) scene.hud.popup(text);
-  }, wallet.open, () => scene.portraits);
+  mountActionBar(host, opts.page, opts.run, (text) => banners?.popup(text, true), wallet.open, () => scene.portraits, (off) => banners?.setOffline(off), () => {
+    const v = opts.page();
+    openInvite(inviterName({ actingPkh: v.actingPkh, players: v.players, portraits: scene.portraits }));
+  });
 
   onSceneSnapshot((s, source) => {
     if (source === "mock") mockOn = true;
@@ -190,6 +191,11 @@ export function mountBattlefield(opts: MountOptions): void {
       book.learn(d.actor, d.actorName, d.actorAvatar);
     }
     director.onEvent(e);
+    // A conquest on a phone or tablet held upright: the fight plays across the field's whole width, which only shows
+    // with the device turned sideways. Touch as the main pointer means a phone or tablet (a laptop's is a mouse or
+    // trackpad, even with a touchscreen), so laptops never see this.
+    const conquest = e.type === "deadline_changed" && (e.reason === "conquer" || e.reason === "observed_on_chain");
+    if (conquest && UPRIGHT_TOUCH.matches) banners?.popup(COPY.battlefield.landscapeHint);
   });
 
   if (import.meta.env.DEV) {
@@ -364,50 +370,29 @@ function devPanel(
   };
 }
 
-// Under the field the old page folds into two sections, so the field and the actions come first. Nothing is removed:
-// the same elements move, with their handlers. The old "Round is over" window gives way to the action bar's Claim.
-function foldOldPage(): { open: () => void } {
+// The page is the battlefield and nothing else. The old page under it (round details, the old action buttons, the
+// "Round is over" window) stays in the document, hidden: the page's own code still reads and drives those elements
+// (battlefieldPage() in kingdomMode.ts), so nothing changes in how the game plays. The old wallet sections move into
+// the side panel's Wallet tab, where the new screens use them.
+function foldOldPage(host: HTMLElement, page: () => PageView): { open: () => void } {
+  const panel = mountPanel(host, ["localWallet", "wallet", "faucet"]);
+  const screens = mountWalletPanel(panel.walletPage, page);
+  panel.onOpenWallet = screens.onOpen;
   const app = document.getElementById("app");
-  const header = app?.querySelector("header") ?? null;
-  const section = (label: string) => {
-    const d = document.createElement("details");
-    d.className = "rounded-2xl bg-slate-900/60 ring-1 ring-slate-800";
-    const s = document.createElement("summary");
-    s.className = "flex min-h-11 cursor-pointer select-none items-center px-5 font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300";
-    s.textContent = label;
-    const body = document.createElement("div");
-    body.className = "flex flex-col gap-6 p-3";
-    d.append(s, body);
-    return { d, body };
-  };
-  const wallet = section(COPY.battlefield.walletSection);
-  const details = section(COPY.battlefield.roundDetails);
-  const move = (to: HTMLElement, ids: string[]) => {
-    for (const id of ids) {
-      const e = document.getElementById(id);
-      if (e) to.append(e);
-    }
-  };
-  move(wallet.body, ["localWallet", "wallet"]);
-  move(details.body, ["ended", "live", "refereeNotice", "status"]);
-  if (header) header.after(wallet.d, details.d);
-  else app?.append(wallet.d, details.d);
+  if (app) app.style.display = "none";
   const modal = document.getElementById("overModal");
   if (modal) modal.style.display = "none"; // stays hidden whatever the old page toggles
+  // One screen, no scrolling (the dev panel, ?dev=1, sits above the field and needs the page to scroll)
+  if (new URLSearchParams(location.search).get("dev") !== "1") document.documentElement.style.overflow = "hidden";
   return {
-    open: () => {
-      wallet.d.open = true;
-      wallet.d.scrollIntoView({ behavior: "smooth", block: "start" });
-      const first = wallet.body.querySelector<HTMLElement>("button:not([disabled]):not(.hidden), input:not(.hidden)");
-      first?.focus({ preventScroll: true });
-    },
+    open: () => panel.open("wallet"),
   };
 }
 
 // A loading screen over the field box until the art is in: the title and a bar that fills as files arrive
 function loadingScreen(host: HTMLElement): { progress: (share: number) => void; done: () => void } {
   const box = document.createElement("div");
-  box.className = "absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-2xl bg-[#0f1a33] text-[#f4ead2] transition-opacity duration-500";
+  box.className = "absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[#0f1a33] text-[#f4ead2] transition-opacity duration-500";
   box.setAttribute("role", "status");
   const title = document.createElement("p");
   title.className = "text-lg font-bold sm:text-2xl";

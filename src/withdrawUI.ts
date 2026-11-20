@@ -19,6 +19,20 @@ const bch = (sats: bigint) => formatUnits(sats, 8);
 const pusd = (units: bigint) => formatUnits(units, CONFIG.pusdDecimals);
 
 let bchAll = false; // "Max" on BCH: everything left after the fee, worked out when the transfer is built
+
+// One coin at a time: once there is an address and an amount of one coin, the other coin's box and Max are off
+function oneCoin() {
+  const has = (id: string) => {
+    const n = readAmount(input(id).value, 8);
+    return n === null || n > 0n; // something typed (even a wrong number) counts as chosen
+  };
+  const addr = input("wdAddress").value.trim() !== "";
+  const pusdOn = has("wdPusd");
+  const bchOn = bchAll || has("wdBch");
+  const lock = (ids: string[], off: boolean) => ids.forEach((id) => (($(id) as HTMLInputElement | HTMLButtonElement).disabled = off));
+  lock(["wdBch", "wdBchMax"], addr && pusdOn && !bchOn);
+  lock(["wdPusd", "wdPusdMax"], addr && bchOn && !pusdOn);
+}
 let plan: WithdrawPlan | null = null;
 let sending = false;
 
@@ -27,9 +41,43 @@ function say(text: string, isError: boolean) {
   $("wdMsg").className = `mt-2 min-h-5 text-sm ${isError ? "text-red-400" : "text-emerald-300"}`;
 }
 
-function step(which: "form" | "confirm") {
+function step(which: "form" | "confirm" | "done") {
   show("wdForm", which === "form");
   show("wdConfirm", which === "confirm");
+  doneBox()?.classList.toggle("hidden", which !== "done");
+}
+
+// "Transaction Successful", a link to the transaction, and Done (built here, so the page needs no new markup)
+let done: HTMLDivElement | null = null;
+function doneBox(): HTMLDivElement | null {
+  if (done) return done;
+  const box = document.getElementById("wdBox");
+  if (!box) return null;
+  done = document.createElement("div");
+  done.id = "wdDone";
+  done.className = "hidden";
+  const tick = document.createElement("div");
+  tick.className = "wd-tick";
+  tick.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+  const title = document.createElement("p");
+  title.id = "wdDoneTitle";
+  title.textContent = T.sent;
+  const link = document.createElement("a");
+  link.id = "wdDoneLink";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = T.explorer(CONFIG.network);
+  const ok = document.createElement("button");
+  ok.id = "wdDoneBtn";
+  ok.type = "button";
+  ok.textContent = T.done;
+  ok.addEventListener("click", () => {
+    close();
+    box.dispatchEvent(new CustomEvent("withdraw-done", { bubbles: true })); // the battlefield's panel goes home
+  });
+  done.append(tick, title, link, ok);
+  $("wdMsg").before(done);
+  return done;
 }
 
 function close() {
@@ -52,6 +100,8 @@ export function initWithdraw(
   input("wdAddress").placeholder = T.addressPlaceholder(CONFIG.network);
   $("wdPusdLabel").textContent = T.pusdLabel;
   $("wdBchLabel").textContent = T.bchLabel;
+  input("wdPusd").placeholder = "0.00";
+  input("wdBch").placeholder = "0.00000";
   $("wdPusdMax").textContent = T.max;
   $("wdBchMax").textContent = T.max;
   $("wdReview").textContent = T.review;
@@ -78,6 +128,7 @@ export function initWithdraw(
     input("wdNfts").checked = false;
     say("", false);
     step("form");
+    oneCoin();
     show("wdBox", true);
     $("wdBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
     try {
@@ -85,25 +136,30 @@ export function initWithdraw(
     } catch {
       held = { sats: 0n, pusd: 0n, nfts: 0 };
     }
-    $("wdPusdHave").textContent = `(${T.have(`${pusd(held.pusd)} PUSD`)})`;
-    $("wdBchHave").textContent = `(${T.have(`${bch(held.sats)} BCH`)})`;
+    $("wdPusdHave").textContent = T.have(pusd(held.pusd));
+    $("wdBchHave").textContent = T.have(bch(held.sats));
     $("wdNftsText").textContent = T.nfts(held.nfts);
     show("wdNftsRow", held.nfts > 0);
   });
 
   $("wdPusdMax").addEventListener("click", () => {
     input("wdPusd").value = pusd(held.pusd).replace(/,/g, "");
+    oneCoin();
   });
   $("wdBchMax").addEventListener("click", () => {
     bchAll = true;
     input("wdBch").value = T.allBch;
+    oneCoin();
   });
   input("wdBch").addEventListener("input", () => {
     if (bchAll) {
       bchAll = false;
       input("wdBch").value = "";
     }
+    oneCoin();
   });
+  input("wdPusd").addEventListener("input", oneCoin);
+  input("wdAddress").addEventListener("input", oneCoin);
   $("wdCancel").addEventListener("click", close);
   $("wdBack").addEventListener("click", () => {
     if (sending) return;
@@ -122,17 +178,33 @@ export function initWithdraw(
     const sats = bchAll ? "all" : readAmount(input("wdBch").value, 8);
     if (pusdUnits === null || sats === null) return say(T.errors.amount!, true);
     button("wdReview").disabled = true;
-    say(T.checking, false);
+    say("", false); // no "Checking…" line: the button waits quietly
     try {
       plan = await planWithdraw(provider, w, pusdCategory(), { to: dest.lock, pusd: pusdUnits, sats, nfts: input("wdNfts").checked });
+      // One row per thing sent (only what was filled in), then the address and the fee
       const list = $("wdConfirmList");
       list.replaceChildren();
-      const line = (text: string) => list.append(Object.assign(document.createElement("li"), { textContent: text }));
-      if (plan.pusd > 0n) line(T.confirmPusd(pusd(plan.pusd)));
-      if (plan.sats > 0n) line(T.confirmBch(bch(plan.sats)));
-      if (plan.nfts > 0) line(T.confirmNfts(plan.nfts));
-      $("wdConfirmTo").textContent = dest.address;
-      $("wdConfirmFee").textContent = T.confirmFee(bch(plan.fee));
+      const row = (label: string, value: string, title?: string) => {
+        const li = document.createElement("li");
+        const k = document.createElement("span");
+        k.textContent = label;
+        const v = document.createElement("span");
+        v.textContent = value;
+        if (title) v.title = title;
+        li.append(k, v);
+        list.append(li);
+      };
+      if (plan.pusd > 0n) row(T.pusdLabel, T.confirmPusd(pusd(plan.pusd)));
+      // BCH only when the player asked for it: a PUSD payment carries a little BCH of its own (the network's minimum
+      // for a token output), and that arrives with the PUSD, so it is not a separate line
+      if (sats === "all" || sats > 0n) row(T.bchLabel, T.confirmBch(bch(plan.sats)));
+      if (plan.nfts > 0) row("NFT", T.confirmNfts(plan.nfts));
+      const short = dest.address.length > 30 ? `${dest.address.slice(0, 16)}…${dest.address.slice(-8)}` : dest.address;
+      row(T.confirmTo, short, dest.address);
+      row(T.feeLabel, T.confirmFee(bch(plan.fee)));
+      show("wdConfirmToLabel", false);
+      show("wdConfirmTo", false);
+      show("wdConfirmFee", false);
       say("", false);
       step("confirm");
       button("wdSend").focus();
@@ -150,13 +222,14 @@ export function initWithdraw(
     sending = true;
     button("wdSend").disabled = true;
     button("wdBack").disabled = true;
-    say(T.sending, false);
+    say("", false); // no "Sending…" line: the buttons wait quietly
     try {
       const txid = await sendWithdraw(plan);
       plan = null;
-      step("form");
-      show("wdForm", false);
-      say(`${T.sent} ${T.sentId(txid)}`, false);
+      say("", false);
+      const link = doneBox()?.querySelector("a");
+      if (link) link.href = `${CONFIG.explorerTx[CONFIG.network as "mainnet" | "chipnet"]}${txid}`;
+      step("done");
       onSent();
     } catch (e) {
       console.error(e);

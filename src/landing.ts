@@ -2,11 +2,12 @@
 // is played": a pinned section where scrolling walks through the five moves. Every word comes from COPY.landing, and
 // every rule number from the rule constants. Its one action is Play Now, which opens the battlefield.
 import "./landing.css";
-import { COPY, type FaqBlock, type FaqNumbers, type HowtoNumbers, type RulesNumbers } from "./copy.ts";
+import { COPY, type FaqBlock, type FaqNumbers, type HowtoNumbers } from "./copy.ts";
 import { CONFIG } from "./config.ts"; // plain constants only: no wallet, chain or Phaser code comes with it
+import { clockText, RULES } from "./lib/rulesNumbers.ts";
 // plain constants too (its one import is a type, so no server code comes with it)
 import {
-  CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS, CONQUEST_ENDGAME_SECONDS, KEEPER_DELAY_SECONDS, PROTECT_LOCKOUT_SECONDS,
+  CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS,
 } from "./refereeParams.ts";
 
 const L = COPY.landing;
@@ -162,28 +163,6 @@ const crown = () => svg("0 0 24 24", ["M3 18.5h18l1.2-10.5-5.4 4.2L12 5 7.2 12.2
 // Fair Game Rules: a parchment scroll between two painted rollers, after the battle loop. Only the rules How to Play
 // does not already give. Each rule's number is a Roman numeral drawn by the page; the wax seal at the foot carries
 // the crown. Every number comes from the rule constants.
-const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
-const span = (seconds: number, one: string, many: string) => `${seconds} ${seconds === 1 ? one : many}`;
-// "30 seconds", "2 minutes"
-const duration = (seconds: number) => (seconds % 60 === 0 ? span(seconds / 60, "minute", "minutes") : span(seconds, "second", "seconds"));
-const clockText = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-const RULES: RulesNumbers = {
-  clock: String(CLOCK_CAP_SECONDS / 60),
-  add: duration(CONQUEST_ADD_SECONDS),
-  endgame: CONQUEST_ENDGAME_SECONDS === 60 ? "a minute" : duration(CONQUEST_ENDGAME_SECONDS),
-  endgameTime: clockText(CONQUEST_ENDGAME_SECONDS),
-  endgameAdd: duration(CONQUEST_ENDGAME_ADD_SECONDS),
-  // the three protect amounts are 1x, 2x and 5x the unit (src/lib/kingdom.ts protectAmounts, not imported: it
-  // brings the chain library)
-  amounts: `${pusd(K.unit)}, ${pusd(K.unit * 2n)} or ${pusd(K.unit * 5n)}`,
-  perReign: COUNT_WORDS[K.protectsPerReign] ?? String(K.protectsPerReign),
-  lockout: span(PROTECT_LOCKOUT_SECONDS, "second", "seconds"),
-  cap: pusd(K.cap),
-  back: `${100n - K.cutPercent}%`,
-  fee: `${K.feePercent}%`,
-  claim: duration(KEEPER_DELAY_SECONDS),
-  blocks: String(CONFIG.fallbackBlocks),
-};
 
 // the wax's outline: a disc whose rim swells and dips in eleven soft lobes, as poured wax does
 function waxRim(): string {

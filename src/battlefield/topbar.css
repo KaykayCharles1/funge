@@ -1,0 +1,123 @@
+/* The battlefield's top bar (timer, king, Treasury, round buttons), drawn over the full-screen field.
+   Laptop layout, from the approved mockup (docs/REDESIGN_CHECKLIST.md, section 1). The phone comes in Phase B. */
+@font-face { font-family: "Cinzel"; src: url("/fonts/cinzel.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: "Grenze Gotisch"; src: url("/fonts/grenze-gotisch.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("/fonts/alegreya-sans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("/fonts/alegreya-sans-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+.fg-top { position: absolute; inset: 0 0 auto 0; height: 150px; z-index: 20; pointer-events: none;
+  font-family: "Alegreya Sans", "Segoe UI", sans-serif; color: #f4ead2;
+  background: linear-gradient(180deg, rgba(10, 18, 38, 0.78) 0%, rgba(10, 18, 38, 0) 100%); }
+.fg-top a, .fg-top button { pointer-events: auto; }
+.fg-logo { position: absolute; left: 24px; top: 29px; display: block; border-radius: 8px; }
+.fg-logo img { height: 54px; display: block; }
+.fg-logo:focus-visible, .fg-disc:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+
+.fg-plate { position: absolute; top: 24px; height: 64px; min-width: 168px; box-sizing: border-box; padding: 0 18px 0 10px;
+  display: flex; align-items: center; gap: 10px; background: rgba(15, 26, 51, 0.9); border: 2px solid #e0a93a; border-radius: 8px; }
+.fg-timer { right: calc(50% + 234px); }
+.fg-vault { left: calc(50% + 234px); }
+.fg-plate-lbl { font-family: Cinzel, Georgia, serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #f3cf74; margin-bottom: 5px; }
+.fg-plate-val { font-family: Cinzel, Georgia, serif; font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums; }
+.fg-col { display: flex; flex-direction: column; line-height: 1; }
+.fg-bell { width: 40px; margin: 0 3px; transform-origin: 50% 8%; }
+.fg-chest { width: 46px; transform-origin: 50% 80%; }
+.fg-clock { color: #f8eeca; }
+.fg-clock.fg-ended { color: #f3cf74; }
+.fg-clock.fg-urgent { color: #fca5a5; }
+.fg-vault .fg-plate-val { color: #fbbc28; }
+
+.fg-added { position: absolute; right: calc(50% + 234px); top: 96px; width: 168px; text-align: center;
+  font-family: Cinzel, Georgia, serif; font-weight: 700; font-size: 24px; color: #fbbc28; text-shadow: 0 2px 0 #0f243d; opacity: 0; }
+.fg-added.fg-show { animation: fg-added 2.6s ease-in forwards; }
+@keyframes fg-added { 0%, 54% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
+
+.fg-king { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); width: 440px; height: 76px; box-sizing: border-box;
+  padding: 0 18px 0 12px; display: flex; align-items: center; gap: 14px; background: rgba(15, 26, 51, 0.9);
+  border: 2px solid #e0a93a; border-radius: 8px; transition: box-shadow 0.3s; }
+.fg-king.fg-glow { animation: fg-glow 1.8s ease-in-out infinite; }
+@keyframes fg-glow { 0%, 100% { box-shadow: 0 0 10px 2px rgba(251, 188, 40, 0.35); } 50% { box-shadow: 0 0 26px 8px rgba(251, 188, 40, 0.8); } }
+.fg-avatar { display: block; flex-shrink: 0; width: 54px; height: 54px; border-radius: 50%; border: 2px solid #f3cf74;
+  background-color: #15234a; background-repeat: no-repeat; }
+.fg-noking { width: 54px; height: 54px; flex-shrink: 0; border-radius: 50%; border: 2px solid #9c6f1c; background: #15234a;
+  display: flex; align-items: center; justify-content: center; }
+.fg-noking img { width: 32px; opacity: 0.7; }
+.fg-names { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.fg-name { font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 30px; line-height: 1; color: #f8eeca;
+  text-shadow: 0 0.055em 0 #0f243d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-sub { font-size: 16px; color: #f3cf74; margin-top: 4px; white-space: nowrap; }
+.fg-shields { display: flex; gap: 4px; }
+.fg-shields img { width: 26px; transition: opacity 0.5s, filter 0.5s; }
+.fg-shields img.fg-used { opacity: 0.3; filter: grayscale(1); }
+.fg-shields img.fg-flash { animation: fg-flash 0.3s ease-out; }
+@keyframes fg-flash { 50% { transform: scale(1.35); } }
+
+.fg-discs { position: absolute; right: 24px; top: 32px; display: flex; align-items: center; gap: 10px; }
+.fg-disc { width: 48px; height: 48px; border-radius: 50%; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.fg-disc:hover { background: #15234a; }
+
+/* The bell: a slow swing from one minute left, faster in the last ten seconds; three hard swings when it tolls */
+.fg-bell.fg-swing { animation: fg-swing 2.2s ease-in-out infinite; }
+.fg-bell.fg-swing-fast { animation: fg-swing 1s ease-in-out infinite; }
+.fg-bell.fg-toll { animation: fg-toll 0.52s ease-in-out 3; }
+.fg-chest.fg-bump { animation: fg-bump 0.16s ease-out; }
+@keyframes fg-swing { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
+@keyframes fg-toll { 0%, 100% { transform: rotate(-24deg); } 50% { transform: rotate(24deg); } }
+@keyframes fg-bump { 50% { transform: scale(1.15); } }
+.fg-paused .fg-bell { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .fg-bell.fg-swing, .fg-bell.fg-swing-fast, .fg-bell.fg-toll, .fg-king.fg-glow, .fg-added.fg-show { animation: none; }
+  .fg-added.fg-show { opacity: 1; }
+}
+
+/* Phone (Phase B): one 64px strip. Bell and clock on the left, the king in the middle, the Treasury on the right.
+   The logo and the round buttons leave the strip (the buttons sit beside the wallet chip at the bottom). */
+@media (max-width: 699px) {
+  .fg-top { height: 64px; display: flex; align-items: center; gap: 8px; box-sizing: border-box; padding: 0 10px; background: #0f1a33; border-bottom: 2px solid #e0a93a; }
+  .fg-logo, .fg-discs { display: none; }
+  .fg-plate, .fg-king { position: static; transform: none; height: auto; min-width: 0; padding: 0; border: 0; background: transparent; }
+  .fg-timer { flex-shrink: 0; gap: 5px; }
+  .fg-timer .fg-plate-lbl, .fg-vault .fg-plate-lbl { display: none; }
+  .fg-bell { width: 22px; margin: 0; }
+  .fg-timer .fg-plate-val { font-size: 21px; }
+  .fg-added { right: auto; left: 14px; top: 68px; width: auto; font-size: 20px; }
+  .fg-king { flex: 1; width: auto; display: grid; grid-template-columns: auto minmax(0, auto) auto; grid-template-rows: auto auto; justify-content: center;
+    align-items: center; column-gap: 7px; row-gap: 1px; }
+  .fg-king.fg-glow { border-radius: 8px; }
+  .fg-avatar, .fg-noking { grid-row: 1 / 3; width: 40px; height: 40px; }
+  .fg-noking img { width: 22px; }
+  .fg-names { display: contents; }
+  .fg-name { grid-column: 2 / 4; font-size: 20px; line-height: 1.05; }
+  .fg-sub { grid-column: 2; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+  .fg-shields { grid-column: 3; grid-row: 2; gap: 2px; }
+  .fg-king.fg-empty .fg-name { grid-row: 1 / 3; }
+  .fg-shields img { width: 13px; }
+  .fg-vault { flex-shrink: 0; gap: 3px; }
+  .fg-chest { width: 28px; }
+  .fg-vault .fg-plate-val { font-size: 17px; }
+}
+
+/* A tablet or phone turned sideways, or a small laptop: the round buttons leave the top bar (they would cover the
+   Treasury box) and sit in the dock beside the wallet chip, as on a phone held upright (dock.css) */
+@media (min-width: 700px) and (max-width: 1239px) {
+  .fg-discs { display: none; }
+}
+/* Narrower still: the three boxes come closer and get a little smaller so they stay on screen; the logo makes room */
+@media (min-width: 700px) and (max-width: 1099px) {
+  .fg-logo { display: none; }
+  .fg-king { width: 360px; height: 70px; top: 20px; }
+  .fg-name { font-size: 26px; }
+  .fg-sub { font-size: 15px; }
+  .fg-plate { min-width: 140px; padding: 0 14px 0 8px; }
+  .fg-timer, .fg-added { right: calc(50% + 194px); }
+  .fg-added { width: 140px; }
+  .fg-vault { left: calc(50% + 194px); }
+  .fg-bell { width: 34px; }
+  .fg-chest { width: 40px; }
+  .fg-plate-val { font-size: 24px; }
+}
+
+/* Browser surfaces in the game's colours: text selection and the text cursor (every page element of the battlefield) */
+#battlefield ::selection, .fg-dlg ::selection { background: rgba(251, 188, 40, 0.35); color: #f8eeca; }
+#battlefield input, #battlefield textarea, .fg-dlg input { caret-color: #fbbc28; }

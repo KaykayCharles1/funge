@@ -1,0 +1,92 @@
+/* The dock at the bottom of the field: wallet chip, main button, protect buttons, Cancel round (redesign step 3).
+   Laptop layout from the approved mockup (docs/REDESIGN_CHECKLIST.md, section 2). */
+.fg-shade-bottom { position: absolute; inset: auto 0 0 0; height: 170px; z-index: 19; pointer-events: none;
+  background: linear-gradient(0deg, rgba(10, 18, 38, 0.7) 0%, rgba(10, 18, 38, 0) 100%); }
+/* width: max-content, because a box placed at left: 50% is otherwise only allowed half the screen's width */
+.fg-dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 14px;
+  width: max-content; max-width: calc(100% - 32px);
+  box-sizing: border-box; padding: 12px; background: rgba(15, 26, 51, 0.92); border: 2px solid #e0a93a; border-radius: 999px;
+  font-family: "Alegreya Sans", "Segoe UI", sans-serif; color: #f4ead2; white-space: nowrap; }
+.fg-dock[hidden], .fg-dock [hidden] { display: none !important; }
+.fg-dock button { font-family: inherit; }
+.fg-dock button:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+
+.fg-chip { height: 56px; box-sizing: border-box; padding: 0 14px 0 10px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; background: #15234a;
+  border: 1.5px solid rgba(224, 169, 58, 0.7); border-radius: 999px; color: #f4ead2; font-size: 17px; cursor: pointer; }
+.fg-chip:hover { background: #1c2c5a; }
+.fg-chip img { width: 26px; height: 26px; border-radius: 50%; }
+.fg-chip strong { font-family: Cinzel, Georgia, serif; }
+.fg-chip svg { flex-shrink: 0; }
+/* The coins, or the words, then the caret: all inside the chip */
+.fg-chip-part { display: flex; align-items: center; gap: 8px; }
+.fg-chip-part + .fg-chip-part { margin-left: 4px; }
+.fg-caret { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(224, 169, 58, 0.16); flex-shrink: 0; }
+
+.fg-main { height: 60px; min-width: 340px; box-sizing: border-box; padding: 0 28px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fbbc28; color: #0f243d; border: 0; border-radius: 999px; box-shadow: 0 5px 0 #0f243d, 0 10px 24px rgba(0, 0, 0, 0.35);
+  font-weight: 700; font-size: 23px; cursor: pointer; }
+.fg-main:hover { background: #fcc94d; }
+.fg-main.fg-off { background: #3a3f55; color: #f4ead2; box-shadow: none; cursor: default; font-family: Cinzel, Georgia, serif; font-size: 21px; }
+.fg-spin { width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(244, 234, 210, 0.3); border-top-color: #f4ead2; animation: fg-spin 0.9s linear infinite; }
+@keyframes fg-spin { to { transform: rotate(360deg); } }
+
+.fg-line { height: 56px; padding: 0 22px; background: #0f243d; border: 2px solid #fbbc28; border-radius: 999px; color: #fbbc28; font-weight: 700; font-size: 18px; cursor: pointer; }
+.fg-line:hover { background: #15234a; }
+
+.fg-kingrow { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+.fg-pb, .fg-cr { position: relative; height: 56px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 999px; cursor: pointer; }
+.fg-pb { min-width: 76px; padding: 0 14px; gap: 6px; background: #fbbc28; color: #0f243d; border: 0; box-shadow: 0 5px 0 #0f243d;
+  font-family: Cinzel, Georgia, serif !important; font-weight: 700; font-size: 20px; }
+.fg-pb img { width: 22px; }
+.fg-cr { padding: 0 20px; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28; font-weight: 700; font-size: 18px; }
+.fg-cr:hover { background: #15234a; }
+/* Unavailable: faded, the not-allowed cursor, no click (aria-disabled keeps the hover tip working) */
+.fg-pb[aria-disabled="true"], .fg-cr[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.fg-cr[aria-disabled="true"]:hover { background: #0f243d; }
+
+/* Tips: on hover with a mouse, on a long press on a phone */
+.fg-tip { position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: #0f1a33;
+  border: 1.5px solid #e0a93a; color: #f8eeca; font-family: "Alegreya Sans", sans-serif; font-weight: 700; font-size: 16px;
+  padding: 8px 12px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+.fg-tip:empty { display: none; }
+@media (hover: hover) { .fg-pb:hover .fg-tip, .fg-cr:hover .fg-tip { opacity: 1; } }
+.fg-pb:focus-visible .fg-tip, .fg-cr:focus-visible .fg-tip, .fg-tip-on .fg-tip { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .fg-spin { animation-duration: 2.5s; } }
+
+/* The round buttons beside the chip: phone only (on a laptop they are in the top bar) */
+.fg-dockrow { display: contents; }
+.fg-phonediscs { display: none; }
+.fg-pdisc { width: 48px; height: 48px; flex-shrink: 0; border-radius: 50%; background: #0f243d; border: 2px solid #fbbc28; color: #fbbc28;
+  display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+
+/* Phone (Phase B): the bottom area. The main button (or the protect buttons, Cancel round under them) full width,
+   then one row: the wallet chip and Invite, Sound, Menu. */
+@media (max-width: 699px) {
+  .fg-shade-bottom { height: 240px; background: linear-gradient(0deg, #0a1226 0%, #0a1226 62%, rgba(10, 18, 38, 0) 100%); }
+  .fg-dock { left: 0; right: 0; bottom: 0; transform: none; width: auto; max-width: none; flex-direction: column; align-items: stretch; gap: 10px;
+    padding: 0 16px 18px; background: transparent; border: 0; border-radius: 0; }
+  .fg-dock[hidden] { display: flex !important; } /* the chip row stays, even when there is no move to make */
+  .fg-dockrow { display: flex; order: 10; align-items: center; gap: 8px; margin-top: 4px; }
+  .fg-phonediscs { display: flex; gap: 8px; }
+  .fg-chip { flex: 1; min-width: 0; height: 48px; padding: 0 12px 0 8px; gap: 7px; font-size: 15px; }
+  .fg-chip img { width: 22px; height: 22px; }
+  .fg-chip-part { gap: 7px; }
+  .fg-caret { margin-left: auto; }
+  .fg-main { min-width: 0; width: 100%; height: 58px; padding: 0 16px; font-size: 20px; }
+  .fg-main.fg-off { font-size: 17px; }
+  .fg-dock > .fg-line { width: 100%; height: 46px; }
+  .fg-kingrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0; }
+  .fg-pb { min-width: 0; width: 100%; }
+  .fg-cr { grid-column: 1 / -1; width: 100%; }
+  .fg-tip { font-size: 15px; }
+}
+
+/* Sideways tablet or phone, or a small laptop: the round buttons sit in the dock, after the wallet chip */
+@media (min-width: 700px) and (max-width: 1239px) {
+  .fg-dockrow { display: flex; align-items: center; gap: 10px; }
+  .fg-phonediscs { display: flex; gap: 8px; }
+  .fg-dock { gap: 10px; }
+  .fg-main { min-width: 0; padding: 0 22px; font-size: 20px; }
+  .fg-main.fg-off { font-size: 17px; }
+  .fg-chip { padding: 0 12px 0 8px; gap: 8px; font-size: 16px; }
+}

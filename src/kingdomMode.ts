@@ -4,7 +4,7 @@ import { hexToBin } from "@bitauth/libauth";
 import type { ElectrumNetworkProvider } from "cashscript";
 import kingdomJson from "../contracts/FungeKingdom.json";
 import potJson from "../contracts/FungePot.json";
-import { disconnectWallet, getWalletState, resumeIfStored, startConnection, subscribe } from "./bch_wallet.ts";
+import { disconnectWallet, externalWanted, getWalletState, resumeIfStored, setExternalFlag, startConnection, subscribe } from "./bch_wallet.ts";
 import type { WalletState } from "./bch_wallet.ts";
 import { CONFIG } from "./config.ts";
 import { CLOCK_CAP_SECONDS, CONQUEST_ADD_SECONDS, CONQUEST_ENDGAME_ADD_SECONDS, CONQUEST_ENDGAME_SECONDS } from "./refereeParams.ts";
@@ -99,22 +99,6 @@ const isMinePrefix = (prefix: string) => myKeys().some((k) => k.startsWith(prefi
 // The wallet that would play right now: a wallet the player explicitly connected wins; otherwise the game wallet
 const actingPkh = (): string | null => externalPkh() ?? getLocalWallet()?.pkhHex ?? null;
 
-const EXTERNAL_FLAG = "funge:external";
-const externalWanted = () => {
-  try {
-    return localStorage.getItem(EXTERNAL_FLAG) === "1";
-  } catch {
-    return false;
-  }
-};
-const setExternalFlag = (on: boolean) => {
-  try {
-    if (on) localStorage.setItem(EXTERNAL_FLAG, "1");
-    else localStorage.removeItem(EXTERNAL_FLAG);
-  } catch {
-    // optional
-  }
-};
 function setExternalVisible(visible: boolean) {
   show("wallet", visible);
   $("useOwnWalletBtn").textContent = visible ? "Hide the external wallet options" : "Use my own wallet instead (WizardConnect)";
@@ -1013,15 +997,21 @@ export async function startKingdomMode() {
 function mountBattlefieldIfAsked() {
   if (!CONFIG.battlefield || new URLSearchParams(location.search).get("mode") !== "battlefield") return;
   // A placeholder while the battlefield's code downloads; the battlefield's own loading screen replaces it
+  // The battlefield fills the screen; the old page stays hidden under it (it comes back only if the battlefield fails)
   const boot = document.createElement("div");
   boot.id = "battlefield-boot";
-  boot.className = "mx-auto flex aspect-video w-full max-w-5xl items-center justify-center rounded-2xl bg-[#0f1a33] text-lg font-bold text-[#f4ead2]";
+  boot.className = "flex h-[100dvh] w-full items-center justify-center bg-[#0f1a33] text-lg font-bold text-[#f4ead2]";
   boot.textContent = COPY.battlefield.loading;
   document.body.prepend(boot);
+  $("app").style.display = "none";
   import("./battlefield/index.ts")
     // "you" (both wallets), and the page's own state and handlers for the action bar (see battlefieldPage below)
     .then((m) => m.mountBattlefield({ myKeys, page: battlefieldPage, run: battlefieldDo }))
-    .catch((e) => console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e)));
+    .catch((e) => {
+      console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e));
+      boot.remove();
+      $("app").style.display = ""; // the plain page still plays
+    });
 }
 
 // Dev only: the battlefield's extra mock scenarios (src/battlefield/mockScenarios.ts) play through the same
@@ -1086,6 +1076,7 @@ export function battlefieldPage() {
     players: round?.players ?? {},
     claiming,
     claimNote,
+    provider: provider as ElectrumNetworkProvider | undefined, // the page's chain connection (the wallet panel reads balances with it)
     wallet: {
       game: getLocalWallet() !== null,
       vault: vault.state(), // "none" | "locked" | "unlocked"

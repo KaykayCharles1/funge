@@ -10,6 +10,7 @@ const field = (id: string) => $(id) as HTMLInputElement | HTMLTextAreaElement;
 const show = (id: string, visible: boolean) => $(id).classList.toggle("hidden", !visible);
 
 const listeners = new Set<() => void>();
+let providerRef: ElectrumNetworkProvider | null = null;
 let seedTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const getLocalWallet = (): LocalWallet | null => vault.wallet();
@@ -64,7 +65,16 @@ export async function refreshBalances(provider: ElectrumNetworkProvider) {
   }
 }
 
+// The battlefield's wallet panel changes the vault itself (src/battlefield/walletPanel.ts); this keeps the old
+// sections, the balances and every listener in step with it
+export function walletChanged(): void {
+  render();
+  notify();
+  if (providerRef) void refreshBalances(providerRef);
+}
+
 export async function initLocalWallet(provider: ElectrumNetworkProvider) {
+  providerRef = provider;
   show("lwStakes", CONFIG.network === "mainnet");
   try {
     await vault.init();

@@ -25,6 +25,24 @@ const set = (patch: Partial<WalletState>) => {
 };
 
 export const getWalletState = () => state;
+
+// The player chose to play with their own wallet (remembered in this browser): only then is an old pairing resumed
+const EXTERNAL_FLAG = "funge:external";
+export const externalWanted = () => {
+  try {
+    return localStorage.getItem(EXTERNAL_FLAG) === "1";
+  } catch {
+    return false;
+  }
+};
+export const setExternalFlag = (on: boolean) => {
+  try {
+    if (on) localStorage.setItem(EXTERNAL_FLAG, "1");
+    else localStorage.removeItem(EXTERNAL_FLAG);
+  } catch {
+    // optional
+  }
+};
 export function subscribe(listener: (s: WalletState) => void) {
   listeners.add(listener);
   listener(state);

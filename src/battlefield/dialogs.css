@@ -1,0 +1,93 @@
+/* Choose your King or Queen, Invite friends, and the friend's invite banner (redesign step 5).
+   From the approved mockup (docs/REDESIGN_CHECKLIST.md, sections 3 and 8). */
+.fg-dlg-back { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.7);
+  font-family: "Alegreya Sans", "Segoe UI", sans-serif; color: #f4ead2; }
+.fg-dlg { box-sizing: border-box; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 22px 24px;
+  background: #0f1a33; border: 2px solid #e0a93a; border-radius: 16px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
+.fg-dlg-title { margin: 0; font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 34px; line-height: 1; color: #f3cf74; }
+.fg-dlg button, .fg-dlg input, .fg-dlg a { font-family: inherit; }
+.fg-dlg button:focus-visible, .fg-dlg input:focus-visible, .fg-dlg a:focus-visible, .fg-invited button:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+.fg-gold { height: 52px; padding: 0 26px; background: #fbbc28; color: #0f243d; border: 0; border-radius: 999px; box-shadow: 0 4px 0 #0f243d;
+  font-weight: 700; font-size: 19px; cursor: pointer; }
+.fg-gold:disabled { background: #3a3f55; color: #a8a29e; box-shadow: none; cursor: default; }
+.fg-outline { height: 52px; padding: 0 22px; background: #0f243d; border: 2px solid #fbbc28; border-radius: 999px; color: #fbbc28; font-weight: 700; font-size: 18px; cursor: pointer; }
+.fg-small { height: 38px; padding: 0 14px; background: transparent; border: 1px solid rgba(224, 169, 58, 0.6); border-radius: 999px; color: #f3cf74; font-size: 15px; cursor: pointer; }
+
+/* Picker */
+.fg-picker { width: 780px; max-width: 100%; }
+.fg-portraits { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.fg-portrait { position: relative; padding: 0; overflow: hidden; border-radius: 12px; border: 4px solid #2a3550; background: transparent; cursor: pointer; }
+.fg-portrait img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.fg-portrait:disabled { cursor: not-allowed; }
+.fg-portrait:disabled img { opacity: 0.3; filter: grayscale(1); }
+.fg-taken { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); padding: 4px 0; background: rgba(15, 26, 51, 0.85);
+  font-weight: 700; font-size: 15px; text-align: center; }
+.fg-name-row { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fg-name-input { width: 380px; max-width: 100%; height: 48px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(224, 169, 58, 0.45);
+  background: #0f1a33; color: #f4ead2; font-size: 18px; text-align: center; outline: none; }
+.fg-name-input:focus { border-color: #fbbc28; }
+.fg-problem { min-height: 20px; margin: 0; font-size: 15px; color: #fca5a5; }
+.fg-pick-foot { display: flex; align-items: center; gap: 12px; }
+.fg-preview { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px; background: #0b1226; border: 2px solid #2a3550; border-radius: 16px; }
+.fg-preview img { width: 56px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; border: 2px solid #2a3550; flex-shrink: 0; }
+.fg-preview-name { font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 26px; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fg-preview-house { font-size: 15px; }
+.fg-pick-foot .fg-outline { width: 120px; flex-shrink: 0; }
+.fg-pick-foot .fg-gold { flex-shrink: 0; }
+
+/* Invite friends */
+.fg-invite { width: 470px; max-width: 100%; gap: 12px; }
+.fg-invite-lead { margin: 0; font-size: 16px; color: #cbd5e1; }
+.fg-invite-box { min-height: 96px; box-sizing: border-box; padding: 12px; background: #0a1226; border: 1px solid rgba(224, 169, 58, 0.5); border-radius: 8px;
+  font-size: 15px; line-height: 1.45; user-select: text; }
+.fg-invite-url { margin-top: 6px; color: #f3cf74; word-break: break-all; }
+.fg-invite-msg { min-height: 20px; margin: 0; font-size: 15px; color: #86efac; }
+.fg-invite-msg.fg-bad { color: #fca5a5; }
+.fg-share { display: flex; align-items: center; gap: 12px; }
+.fg-logo-btn { display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; flex-shrink: 0; box-sizing: border-box; border-radius: 50%;
+  border: 0; padding: 0; cursor: pointer; text-decoration: none; }
+.fg-logo-btn svg { display: block; }
+.fg-share .fg-small { margin-left: auto; }
+
+/* The friend's invite banner over the field */
+.fg-invited { position: absolute; left: 50%; top: 108px; transform: translateX(-50%); z-index: 23; width: 720px; max-width: calc(100% - 24px);
+  box-sizing: border-box; display: flex; align-items: center; gap: 16px; padding: 14px 18px; background: rgba(15, 26, 51, 0.95);
+  border: 2px solid #e0a93a; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); font-family: "Alegreya Sans", sans-serif; color: #f4ead2; }
+.fg-invited-words { flex: 1; min-width: 0; }
+.fg-invited-who { margin: 0; font-weight: 700; font-size: 18px; color: #f3cf74; }
+.fg-invited-q { margin: 2px 0 0; font-size: 16px; }
+.fg-invited .fg-gold { height: 46px; padding: 0 20px; font-size: 17px; flex-shrink: 0; }
+.fg-x { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: transparent; border: 1.5px solid rgba(224, 169, 58, 0.6); color: #f3cf74;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+
+/* Phone (Phase B) */
+@media (max-width: 699px) {
+  .fg-dlg-back { padding: 10px; }
+  .fg-dlg { padding: 16px 14px; gap: 12px; }
+  .fg-dlg-title { font-size: 28px; }
+  /* Picker: near full screen; the preview card above Cancel and the confirm button */
+  .fg-picker { width: 100%; }
+  .fg-portraits { gap: 6px; }
+  .fg-portrait { border-width: 3px; border-radius: 10px; }
+  .fg-name-input { width: 100%; }
+  .fg-pick-foot { flex-wrap: wrap; gap: 10px; }
+  .fg-preview { flex-basis: 100%; }
+  .fg-pick-foot .fg-outline { flex: 1; width: auto; }
+  .fg-pick-foot .fg-gold { flex: 2; padding: 0 12px; font-size: 17px; }
+  /* Invite friends */
+  .fg-invite { width: 100%; padding: 18px 16px; }
+  .fg-share { gap: 10px; }
+  .fg-logo-btn { width: 46px; height: 46px; }
+  /* The friend's banner: the words, then Get free test coins with the X beside it */
+  .fg-invited { left: 12px; right: 12px; top: 76px; transform: none; width: auto; max-width: none; flex-wrap: wrap; gap: 10px; padding: 12px 14px; border-radius: 14px; }
+  .fg-invited-words { flex-basis: 100%; }
+  .fg-invited-who { font-size: 16px; }
+  .fg-invited-q { font-size: 15px; }
+  .fg-invited .fg-gold { flex: 1; height: 44px; }
+  .fg-x { width: 44px; height: 44px; }
+}
+
+/* Touch screens: the small buttons at least 44px */
+@media (pointer: coarse) {
+  .fg-small, .fg-x { min-width: 44px; height: 44px; }
+}

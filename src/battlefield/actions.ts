@@ -1,253 +1,314 @@
-// The action bar under the field: Conquer (or Take back your throne), Protect +1 / +5 / +10, Claim, and a wallet chip.
-// It is only a view. Every rule comes from the page (battlefieldPage() in kingdomMode.ts: who may act, the price,
-// the wallet, pause, cooldown) and every click goes to the page's own handlers, which do the price guard, the signing
-// and the referee request. The field itself never moves on a click: scenes play only from events.
-import { COPY, pauseText } from "../copy.ts";
+// The dock at the bottom of the field: the wallet chip, the main button (Be the first king, Conquer the throne, Take
+// back your throne, Claim your reward, or what the player needs first), the king's protect buttons and Cancel round.
+// It is only a view. Every rule comes from the page (battlefieldPage() in kingdomMode.ts: who may act, the price, the
+// wallet, pause, cooldown) and every click goes to the page's own handlers, which do the price guard, the signing and
+// the referee request. The field itself never moves on a click: scenes play only from events.
+// Laptop layout from the approved mockup (docs/REDESIGN_CHECKLIST.md, section 2). An unavailable button fades with
+// the not-allowed cursor and says nothing, except a short tip when the player cannot afford it.
+import "./dock.css";
+import { COPY } from "../copy.ts";
 import type { battlefieldDo, battlefieldPage } from "../kingdomMode.ts";
-import { nextRoundLine } from "../nextRound.ts";
 import { serverNow } from "../referee/clock.ts";
 import { money } from "./hud.ts";
 import type { Portrait } from "./identity.ts";
 import { openPicker } from "./picker.ts";
-import { inviterName, openInvite } from "./invite.ts";
 import { isOn, onSoundChange, setSound } from "./sound.ts";
+import { ownWalletBalances } from "./walletPanel.ts";
+import { formatUnits } from "../lib/format.ts";
+import { CONFIG } from "../config.ts";
 
 const T = COPY.battlefield;
 export type PageView = ReturnType<typeof battlefieldPage>;
 export type PageDo = typeof battlefieldDo;
-
-const PLATE = "rounded-2xl border-2 border-[#e0a93a] bg-[#0f1a33]/95 text-[#f4ead2] shadow-lg";
-const BTN = "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2 font-bold " +
-  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed";
-const MAIN = `${BTN} bg-[#e0a93a] text-[#0f1a33] enabled:hover:bg-amber-300 disabled:bg-[#2a3550] disabled:text-[#f4ead2]/60`;
-const SMALL = `${BTN} border-2 border-[#e0a93a] bg-[#0f1a33] enabled:hover:bg-[#1f2b4d] disabled:border-[#2a3550] disabled:text-[#f4ead2]/40`;
 const DONE = new Set<string>([COPY.kingdom.doneOpen, COPY.kingdom.doneConquer, COPY.kingdom.doneProtect, COPY.kingdom.doneCancel]);
 const short = (units: string) => money(BigInt(units)).replace(/\.00$/, ""); // "500" -> "5"
+const LOW_BCH_SATS = 1000n; // below this the game wallet cannot pay a move's network fee (the send checks it exactly)
+const base = `${import.meta.env.BASE_URL}assets/`;
+const PUSD_ICON = `${base}tokens/pusd.jpg`;
+const BCH_ICON = `${base}tokens/bch.png`;
 
 function clockText(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+// "12.34 PUSD" -> "12.34"; "0.15802 BCH" -> "0.158"
+const amountOf = (text: string, decimals: number) => {
+  const m = /^([\d.]+)/.exec(text.trim());
+  return m ? (decimals >= 0 ? Number(m[1]).toFixed(decimals) : m[1]!) : "—";
+};
+const satsOf = (text: string) => {
+  const m = /^(\d+)(?:\.(\d{1,8}))?/.exec(text.trim());
+  return m ? BigInt(m[1]!) * 100_000_000n + BigInt((m[2] ?? "").padEnd(8, "0")) : null;
+};
 
 export function mountActionBar(
-  after: HTMLElement,
+  host: HTMLElement,
   page: () => PageView,
   run: PageDo,
   popup: (text: string) => void,
   openWallet: () => void,
   portraits: () => Portrait[],
+  onNet: (offline: boolean) => void,
+  onInvite: () => void,
 ): void {
-  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = "") => {
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => {
     const e = document.createElement(tag);
-    e.className = cls;
-    e.textContent = text;
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
     return e;
   };
-  const bar = el("section", `${PLATE} mx-auto mt-2 flex w-full max-w-5xl flex-col gap-3 p-3`);
-  bar.setAttribute("aria-label", T.actionsLabel);
-  after.after(bar);
+  const img = (src: string) => {
+    const i = el("img");
+    i.src = src;
+    i.alt = "";
+    return i;
+  };
+  const caret = () => {
+    const s = el("span", "fg-caret");
+    s.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+    return s;
+  };
 
-  const top = el("div", "flex flex-wrap items-center gap-3");
-  const chip = el("button", `${SMALL} text-sm font-semibold`);
+  host.append(el("div", "fg-shade-bottom"));
+  const dock = el("section", "fg-dock");
+  dock.setAttribute("aria-label", T.actionsLabel);
+  host.append(dock);
+
+  // Wallet chip: the active wallet's balances, or what the player needs to do first
+  const chip = el("button", "fg-chip");
   chip.type = "button";
-  chip.setAttribute("aria-label", T.openWallet);
   chip.addEventListener("click", openWallet);
-  const main = el("button", `${MAIN} grow text-lg`);
+  const chipCoins = el("span", "");
+  chipCoins.className = "fg-chip-part";
+  const pusdAmt = el("strong"), bchAmt = el("strong");
+  const bchIcon = img(BCH_ICON);
+  bchIcon.style.marginLeft = "4px";
+  chipCoins.append(img(PUSD_ICON), pusdAmt, bchIcon, bchAmt);
+  const chipWord = el("span", "");
+  chipWord.className = "fg-chip-part";
+  const chipIcon = el("span"), chipText = el("strong");
+  chipText.style.fontFamily = "inherit";
+  chipWord.append(chipIcon, chipText);
+  chip.append(chipCoins, chipWord, caret());
+
+  // Main button, and Cancel while an own wallet waits for approval
+  const main = el("button", "fg-main");
   main.type = "button";
-  const spinner = el("span", "h-5 w-5 animate-spin rounded-full border-4 border-[#0f1a33]/30 border-t-[#0f1a33] motion-reduce:animate-none");
+  const spinner = el("span", "fg-spin");
   spinner.setAttribute("aria-hidden", "true");
-  const mainText = el("span", "");
+  const mainText = el("span");
   main.append(spinner, mainText);
-  const cancel = el("button", SMALL, T.cancel);
+  const cancel = el("button", "fg-line", T.cancel);
   cancel.type = "button";
   cancel.addEventListener("click", () => run.cancel());
-  // Sound: off until the first tap, then on unless the player turned it off (remembered in this browser)
-  const mute = el("button", `${SMALL} text-sm`);
-  mute.type = "button";
-  mute.setAttribute("aria-label", T.soundAria);
-  const showSound = (on: boolean) => {
-    mute.textContent = on ? `🔊 ${T.soundOn}` : `🔇 ${T.soundOff}`;
-    mute.setAttribute("aria-pressed", String(on));
-  };
-  // The page's first tap also unlocks sound (on the window, just after this button sees it), so remember what the
-  // button showed before the tap: a first tap on "Sound off" turns it on, not on-and-off again
-  let before = isOn();
-  for (const type of ["pointerdown", "keydown"] as const) mute.addEventListener(type, () => (before = isOn()));
-  mute.addEventListener("click", () => {
-    setSound(!before);
-    before = isOn();
-  });
-  onSoundChange(showSound);
-  showSound(isOn());
-  // Invite friends: anyone with a wallet can share a link with their name in it
-  const invite = el("button", `${SMALL} text-sm`, COPY.invite.button);
-  invite.type = "button";
-  invite.addEventListener("click", () => {
-    const v = page();
-    openInvite(inviterName({ actingPkh: v.actingPkh, players: v.players, portraits: portraits() }));
-  });
-  top.append(chip, main, cancel, invite, mute);
 
-  const prot = el("div", "flex flex-wrap items-center gap-2");
-  const protTitle = el("span", "text-sm text-[#e0a93a]");
+  // The king's row: three protects and Cancel round
+  const kingRow = el("span", "fg-kingrow");
+  const shield = `${base}icons/shield.webp`;
   const protBtns = [0, 1, 2].map((i) => {
-    const b = el("button", SMALL);
+    const b = el("button", "fg-pb");
     b.type = "button";
-    b.addEventListener("click", () => {
-      if (!b.disabled) run.protect(i);
+    const amt = el("span");
+    const tip = el("span", "fg-tip");
+    b.append(img(shield), amt, tip);
+    b.addEventListener("click", (e) => {
+      if (b.getAttribute("aria-disabled") === "true" || pressed(e)) return;
+      run.protect(i);
     });
-    return b;
+    longPress(b);
+    kingRow.append(b);
+    return { b, amt, tip };
   });
-  prot.append(protTitle, ...protBtns);
-
-  // Cancel round: the king only, while nobody has conquered. "Get your X PUSD back" under it.
-  const cancelRow = el("div", "flex flex-wrap items-center gap-2");
-  const cancelRound = el("button", `${SMALL} flex-col items-start gap-0 text-left`);
+  const cancelRound = el("button", "fg-cr");
   cancelRound.type = "button";
   const cancelTitle = el("span", "", T.cancelRoundBtn);
-  const cancelLine = el("span", "text-xs font-normal text-[#f4ead2]/80");
-  cancelRound.append(cancelTitle, cancelLine);
-  cancelRound.addEventListener("click", () => {
-    if (!cancelRound.disabled) run.cancelRound();
+  const cancelTip = el("span", "fg-tip");
+  cancelRound.append(cancelTitle, cancelTip);
+  cancelRound.addEventListener("click", (e) => {
+    if (cancelRound.getAttribute("aria-disabled") === "true" || pressed(e)) return;
+    run.cancelRound();
   });
-  cancelRow.append(cancelRound);
+  longPress(cancelRound);
+  kingRow.append(cancelRound);
 
-  const status = el("p", "min-h-6 text-sm");
-  status.setAttribute("aria-live", "polite");
-  bar.append(top, prot, cancelRow, status);
+  // On a phone the round buttons (Invite, Sound, Menu) sit beside the wallet chip, under the main button
+  const row = el("span", "fg-dockrow");
+  const phoneDiscs = el("span", "fg-phonediscs");
+  const disc = (label: string, html: string, onClick: () => void) => {
+    const b = el("button", "fg-pdisc");
+    b.type = "button";
+    b.setAttribute("aria-label", label);
+    b.innerHTML = html; // fixed icons only
+    b.addEventListener("click", onClick);
+    phoneDiscs.append(b);
+    return b;
+  };
+  const svg = (inner: string, w = 2) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+  disc(COPY.invite.button, svg('<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M19 8v6M16 11h6"/>'), onInvite);
+  const soundOn = svg('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>');
+  const soundOff = svg('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>');
+  let before = isOn();
+  const sound = disc(T.soundAria, soundOff, () => setSound(!before));
+  for (const type of ["pointerdown", "keydown"] as const) sound.addEventListener(type, () => (before = isOn()));
+  const showSound = (on: boolean) => {
+    sound.innerHTML = on ? soundOn : soundOff;
+    sound.setAttribute("aria-pressed", String(on));
+  };
+  onSoundChange(showSound);
+  showSound(isOn());
+  disc(T.menuAria, svg('<path d="M4 7h16M4 12h16M4 17h16"/>', 2.4), openWallet);
+  row.append(chip, phoneDiscs);
+  dock.append(row, main, cancel, kingRow);
 
   let mainAction: (() => void) | null = null;
   main.addEventListener("click", () => {
-    if (!main.disabled) mainAction?.();
+    if (main.getAttribute("aria-disabled") !== "true") mainAction?.();
   });
 
   // Only touch the DOM when something changed
   const set = (e: HTMLElement, text: string) => {
     if (e.textContent !== text) e.textContent = text;
   };
-  // The hidden attribute, not a class: Tailwind's display classes (flex, inline-flex) would win over "hidden"
   const toggle = (e: HTMLElement, hidden: boolean) => {
     if (e.hidden !== hidden) e.hidden = hidden;
+  };
+  const off = (e: HTMLElement, isOff: boolean) => {
+    const v = String(isOff);
+    if (e.getAttribute("aria-disabled") !== v) e.setAttribute("aria-disabled", v);
   };
   let lastNote: string | null = null;
 
   function render(): void {
     const v = page();
     const r = v.round, k = r?.kingdom ?? null;
-
-    // Wallet chip: which wallet plays, and the game wallet's balances
     const w = v.wallet;
-    set(chip, w.externalName ?? (w.game ? [T.gameWallet, w.pusdText, w.bchText].filter(Boolean).join(" · ") : w.vault === "locked" ? T.unlockWallet : T.noWallet));
-    toggle(invite, !(w.game || w.externalName !== null));
 
-    // Main button
-    let label = "…", enabled = false, reason = "", busy = false;
+    // Which wallet plays
+    const own = w.externalName !== null;
+    const hasWallet = w.game || own;
+    const ownBal = own ? ownWalletBalances() : null;
+    const coinsShown = (w.game && !own) || ownBal !== null;
+    toggle(chipCoins, !coinsShown);
+    toggle(chipWord, coinsShown);
+    if (ownBal) {
+      set(pusdAmt, Number(formatUnits(ownBal.pusd, CONFIG.pusdDecimals)).toFixed(2));
+      set(bchAmt, Number(formatUnits(ownBal.sats, 8)).toFixed(3));
+      chip.setAttribute("aria-label", `${w.externalName ?? ""}. ${T.openWallet}`);
+    } else if (coinsShown) {
+      set(pusdAmt, amountOf(w.pusdText, 2));
+      set(bchAmt, amountOf(w.bchText, 3));
+      chip.setAttribute("aria-label", `${T.gameWallet}: ${w.pusdText}. ${T.openWallet}`);
+    } else {
+      const word = own ? (w.externalName ?? "") : w.vault === "locked" ? T.walletLocked : T.noWallet;
+      set(chipText, word);
+      const icon = own ? "own" : w.vault === "locked" ? "locked" : "none";
+      if (chipIcon.dataset.icon !== icon) {
+        chipIcon.dataset.icon = icon;
+        chipIcon.innerHTML = icon === "locked"
+          ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+          : icon === "none"
+            ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6.5 16 4l1.2 2.5"/><rect x="4" y="6.5" width="17" height="12.5" rx="2"/><path d="M17 12.5h.5"/></svg>'
+            : `<img src="${PUSD_ICON}" alt="" style="width:26px;height:26px;border-radius:50%">`;
+      }
+      chip.setAttribute("aria-label", `${word}. ${T.openWallet}`);
+    }
+    const sats = w.game && !own ? satsOf(w.bchText) : null; // the game wallet's, when it is the one that plays
+    const lowBch = w.game && !own && sats !== null && sats < LOW_BCH_SATS;
+
+    // The round's state
+    const king = k ? (k.holder ?? r!.king) : null;
+    const mine = !!r && r.status === "open" && v.actingPkh !== null && king === v.actingPkh;
+    const ended = !r || !!v.ended || r.status === "settled";
+    const claimable = !!r && r.status === "over" && v.kingIsMine;
+
+    // Main button. Hidden for the king (the protect row shows instead) and once the round is over, except the winner's Claim.
+    let label = "…", enabled = false, busy = false, show = true;
     mainAction = null;
     if (v.busy) {
       busy = true;
-      label = v.external ? (v.signLeftMs !== null ? T.approve(clockText(v.signLeftMs)) : T.sending) : T.sending;
-      reason = v.external ? v.signPrompt : "";
-    } else if (r && (v.ended || r.status === "settled")) {
-      label = COPY.kingdom.roundOver;
-      reason = nextRoundLine();
-    } else if (!r || !k) {
-      label = "…";
-    } else if (r.status === "over") {
-      if (v.kingIsMine) {
-        label = v.claiming ? T.claiming : T.claimBtn;
-        enabled = !v.claiming && !v.mock;
-        mainAction = run.claim;
-        busy = v.claiming;
-        reason = v.mock ? T.mockOff : v.claimNote;
-      } else {
-        label = T.waitingClaim;
-      }
+      label = v.external && v.signLeftMs !== null ? T.approve(clockText(v.signLeftMs)) : T.sending;
+    } else if (claimable) {
+      label = v.claiming ? T.claiming : T.claimBtn;
+      enabled = !v.claiming && !v.mock;
+      busy = v.claiming;
+      mainAction = run.claim;
+    } else if (ended || !k || r!.status === "over" || mine) {
+      show = false;
     } else {
-      const king = k.holder ?? r.king;
-      const price = r.status === "waiting" ? k.openingPrice : (k.conquest?.pay ?? null);
-      const mine = r.status === "open" && v.actingPkh !== null && king === v.actingPkh;
+      const price = r!.status === "waiting" ? k.openingPrice : (k.conquest?.pay ?? null);
       label = price === null ? COPY.kingdom.roundOver
-        : r.status === "waiting" ? T.openBtn(money(BigInt(price)))
-        : mine ? T.holdThrone
+        : r!.status === "waiting" ? T.openBtn(money(BigInt(price)))
         : v.previousKingIsMine ? T.takeBackBtn(money(BigInt(price)))
         : T.conquerBtn(money(BigInt(price)));
-      enabled = v.act.enabled && !mine;
-      reason = v.act.hint;
-      // Before the player's first open or conquest in this round: "Choose your king" first, then the same move at the
-      // price confirmed in the window (the page's price guard refuses it if the chain price moved meanwhile)
+      enabled = v.act.enabled;
+      // Before the player's first open or conquest in this round: "Choose your King or Queen" first, then the same move
+      // at the price confirmed in the window (the page's price guard refuses it if the chain price moved meanwhile)
       mainAction = v.needsProfile && portraits().length > 0 ? () => choose() : () => run.act();
       if (v.act.label === COPY.kingdom.roundOver) {
-        // The page's own clock says time is up (actState returns this label then). The referee may take a while
-        // to announce the end, so say so instead of showing a price that can no longer be paid.
-        label = COPY.kingdom.roundOver;
-        enabled = false;
-        mainAction = null;
-        reason = COPY.clock.confirming;
-      } else if (v.act.hint === COPY.grab.noWallet || v.act.hint === COPY.grab.locked) {
-        // Needs a wallet: the button opens the wallet panel instead
-        label = v.act.hint === COPY.grab.locked ? T.unlockWallet : T.createWallet;
+        // The page's own clock says time is up; the referee may take a moment to say so
+        show = false;
+      } else if (!hasWallet) {
+        label = w.vault === "locked" ? T.unlockWallet : T.connectWallet;
         enabled = true;
         mainAction = openWallet;
+      } else if (v.net === "offline") {
+        label = T.reconnecting;
+        enabled = false;
       } else if (v.mock) {
         enabled = false;
-        reason = T.mockOff;
-      } else if (enabled && !v.external && w.pusd !== null && price !== null && w.pusd < BigInt(price)) {
-        // Display only: the page's own check refuses it too, this just says so before the click
+      } else if (enabled && w.game && !own && w.pusd !== null && price !== null && w.pusd < BigInt(price)) {
+        // Display only: the page's own check refuses it too
+        label = T.insufficient;
         enabled = false;
-        reason = T.needsFunds(money(BigInt(price) - w.pusd));
+      } else if (enabled && lowBch) {
+        label = T.insufficientBch;
+        enabled = false;
       }
     }
+    toggle(main, !show);
     set(mainText, label);
-    main.disabled = !enabled;
+    off(main, !enabled);
+    main.classList.toggle("fg-off", !enabled);
     main.setAttribute("aria-busy", String(busy));
     toggle(spinner, !busy);
     toggle(cancel, !(v.busy && v.external));
 
-    // The outcome of the last move: done, or the page's own error text (also as a popup)
+    onNet(v.net === "offline");
+    // The outcome of the last move: errors as a popup (the field shows the good news itself)
     if (v.note !== lastNote) {
       lastNote = v.note;
       if (v.note && !DONE.has(v.note)) popup(v.note);
     }
-    const ok = v.note !== null && DONE.has(v.note);
-    const text = v.busy ? reason : v.note ?? reason;
-    set(status, text ? (ok ? `✓ ${text}` : text) : "");
-    status.classList.toggle("text-emerald-300", ok);
-    status.classList.toggle("text-rose-300", !ok && v.note !== null && !v.busy);
 
-    // Cancel round: shown and enabled exactly when the page offers it
+    // The king's row: while a move is on its way the main button says so instead
+    toggle(kingRow, !(mine && !v.busy && !ended));
+    toggle(dock, !show && kingRow.hidden === true);
+    if (!k || !r || kingRow.hidden) return;
+
     const c = v.cancelRound;
-    toggle(cancelRow, !c.show);
+    toggle(cancelRound, !c.show);
     if (c.show && c.pool !== null) {
       const pool = money(BigInt(c.pool));
-      set(cancelLine, T.cancelRoundLine(pool));
+      set(cancelTip, hasWallet && v.net !== "offline" ? T.cancelRoundLine(pool) : "");
       cancelRound.setAttribute("aria-label", T.cancelRoundAria(pool));
     }
-    cancelRound.disabled = !c.enabled || v.busy;
+    off(cancelRound, !c.enabled || v.busy || !hasWallet || v.net === "offline");
 
-    // Protect: enabled exactly when the page enables it; the reason is said in words
-    const open = r?.status === "open";
-    toggle(prot, !k || r?.status === "settled" || !!v.ended);
-    if (!k || !r) return;
-    const king = k.holder ?? r.king;
     const rem = r.deadline === null ? null : r.paused ? r.deadline - r.paused.since : r.deadline - serverNow();
     const closed = rem !== null && rem - k.protectLockoutSeconds * 1000 <= 0;
-    const over = (amount: string | null) => amount !== null && BigInt(k.value) + BigInt(amount) > BigInt(k.cap);
-    const why = !open ? T.protectNotOpen
-      : v.actingPkh === null || king !== v.actingPkh ? T.protectNotKing
-      : r.paused ? pauseText(r.paused.reason)
-      : closed ? T.popProtectClosed
-      : k.protectsLeft <= 0 ? COPY.errors.no_protects_left
-      : v.protect.every((p) => p.amount === null || over(p.amount)) ? T.protectCap(money(BigInt(k.cap)))
-      : v.mock ? T.mockOff
-      : "";
-    set(protTitle, why ? `${T.protectTitle(k.protectsLeft, k.protectsPerReign, money(BigInt(k.cap)))} · ${why}` : T.protectTitle(k.protectsLeft, k.protectsPerReign, money(BigInt(k.cap))));
-    protBtns.forEach((b, i) => {
+    protBtns.forEach(({ b, amt, tip }, i) => {
       const p = v.protect[i];
       const amount = p?.amount ?? (k.protectAmounts[i] ?? null);
-      set(b, amount === null ? "—" : T.protectBtn(short(amount)));
-      b.setAttribute("aria-label", amount === null ? T.protectNotOpen : T.protectAria(money(BigInt(amount))));
-      b.disabled = !p?.enabled || v.busy || v.mock;
-      b.title = amount !== null && over(amount) ? T.protectCap(money(BigInt(k.cap))) : why;
+      set(amt, amount === null ? "—" : short(amount));
+      const aria = amount === null ? T.protectNotOpen : T.protectAria(money(BigInt(amount)));
+      b.setAttribute("aria-label", aria);
+      // Why it cannot be used: only money gets words; everything else just fades
+      const cap = amount !== null && BigInt(k.value) + BigInt(amount) > BigInt(k.cap);
+      const usable = hasWallet && v.net !== "offline" && !closed && !cap && k.protectsLeft > 0 && !r.paused && !v.mock;
+      const poor = usable && w.game && !own && w.pusd !== null && amount !== null && w.pusd < BigInt(amount);
+      const words = !usable ? "" : poor ? T.insufficient : lowBch ? T.insufficientBch : p?.enabled ? aria : "";
+      set(tip, words);
+      off(b, !p?.enabled || !!poor || !!lowBch);
     });
   }
 
@@ -279,4 +340,31 @@ export function mountActionBar(
 
   render();
   setInterval(render, 250);
+}
+
+// A long press shows a button's tip on a touch screen; the click that ends that press does nothing else
+const LONG_MS = 450;
+const longPressed = new WeakSet<HTMLElement>();
+function longPress(b: HTMLElement): void {
+  let timer = 0;
+  b.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse") return;
+    longPressed.delete(b);
+    timer = window.setTimeout(() => {
+      longPressed.add(b);
+      b.classList.add("fg-tip-on");
+    }, LONG_MS);
+  });
+  const end = () => {
+    clearTimeout(timer);
+    window.setTimeout(() => b.classList.remove("fg-tip-on"), 1200);
+  };
+  for (const t of ["pointerup", "pointercancel", "pointerleave"] as const) b.addEventListener(t, end);
+  b.addEventListener("contextmenu", (e) => e.preventDefault()); // no copy menu over the button on a long press
+}
+function pressed(e: Event): boolean {
+  const b = e.currentTarget as HTMLElement;
+  if (!longPressed.has(b)) return false;
+  longPressed.delete(b);
+  return true;
 }

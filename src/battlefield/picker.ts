@@ -5,6 +5,7 @@ import { COPY } from "../copy.ts";
 import type { PlayerProfile } from "../referee/api.ts";
 import { checkName, nameKey } from "../lib/playerName.ts";
 import { css } from "./hud.ts";
+import "./dialogs.css";
 import { HOUSES, type Portrait } from "./identity.ts";
 
 const T = COPY.battlefield;
@@ -35,8 +36,6 @@ function remember(p: { name: string; avatarId: string }): void {
 }
 
 const houseOf = (p: Portrait | undefined) => HOUSES.find((h) => h.id === p?.house) ?? HOUSES[0]!;
-const BTN = "inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl px-4 py-2 font-bold " +
-  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed";
 
 let openNow: (() => void) | null = null; // closes the window that is open, if any
 
@@ -56,31 +55,31 @@ export function openPicker(o: PickerOpen): void {
   const last = lastChoice();
   let chosen: Portrait | undefined = o.portraits.find((p) => p.id === last?.avatarId && !takenAvatars.has(p.id)) ?? free[0];
 
-  const overlay = el("div", "fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4");
-  const box = el("div", "max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl border-2 border-[#e0a93a] bg-[#0f1a33] p-4 text-[#f4ead2] shadow-2xl sm:p-5");
+  const overlay = el("div", "fg-dlg-back");
+  const box = el("div", "fg-dlg fg-picker");
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-modal", "true");
   box.setAttribute("aria-labelledby", "pickTitle");
-  const title = el("h2", "text-xl font-extrabold text-[#e0a93a]", T.pickTitle);
+  const title = el("h2", "fg-dlg-title", T.pickTitle);
   title.id = "pickTitle";
 
   // the portraits
-  const grid = el("div", "mt-3 grid grid-cols-5 gap-2");
+  const grid = el("div", "fg-portraits");
   grid.setAttribute("role", "radiogroup");
   grid.setAttribute("aria-label", T.pickPortraits);
   const tiles = o.portraits.map((p) => {
     const taken = takenAvatars.has(p.id);
-    const b = el("button", "relative min-h-11 overflow-hidden rounded-xl border-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed");
+    const b = el("button", "fg-portrait");
     b.type = "button";
     b.disabled = taken;
     b.setAttribute("role", "radio");
     b.setAttribute("aria-label", taken ? T.pickTakenAria(p.title) : T.pickPortraitAria(p.title, houseName(p)));
     // The whole portrait, so the colour of the outfit (the house) shows
-    const img = el("img", `block aspect-[4/5] w-full object-cover ${taken ? "opacity-30 grayscale" : ""}`);
+    const img = el("img");
     (img as HTMLImageElement).src = base + p.image;
     (img as HTMLImageElement).alt = "";
     b.append(img);
-    if (taken) b.append(el("span", "absolute inset-x-0 top-1/2 -translate-y-1/2 bg-[#0f1a33]/85 py-1 text-center text-sm font-bold", T.pickTaken));
+    if (taken) b.append(el("span", "fg-taken", T.pickTaken));
     b.addEventListener("click", () => {
       chosen = p;
       render();
@@ -90,8 +89,8 @@ export function openPicker(o: PickerOpen): void {
   });
 
   // the name
-  const nameRow = el("div", "mx-auto mt-2 flex w-full max-w-md flex-col items-center gap-1 text-center");
-  const input = el("input", "min-h-11 w-full rounded-xl border-2 border-[#2a3550] bg-[#0b1226] px-3 text-center text-lg text-[#f4ead2] focus-visible:border-[#e0a93a] focus-visible:outline-none") as HTMLInputElement;
+  const nameRow = el("div", "fg-name-row");
+  const input = el("input", "fg-name-input") as HTMLInputElement;
   input.id = "pickName";
   input.type = "text";
   input.autocomplete = "off";
@@ -101,31 +100,29 @@ export function openPicker(o: PickerOpen): void {
   input.placeholder = T.pickNameLabel;
   input.setAttribute("aria-label", T.pickNameLabel);
   input.setAttribute("aria-describedby", "pickProblem"); // what is wrong with the name, if anything
-  const problem = el("p", "min-h-5 text-sm text-rose-300");
+  const problem = el("p", "fg-problem");
   problem.id = "pickProblem";
   problem.setAttribute("aria-live", "polite");
   nameRow.append(input, problem);
 
   // the preview card in the house colour
-  const preview = el("div", "flex min-w-0 grow items-center gap-3 rounded-2xl border-2 bg-[#0b1226] p-2");
-  const pImg = el("img", "aspect-[4/5] w-14 shrink-0 rounded-lg border-2 object-cover") as HTMLImageElement;
+  const preview = el("div", "fg-preview");
+  const pImg = el("img") as HTMLImageElement;
   pImg.alt = "";
-  const pText = el("div", "flex min-w-0 flex-col");
-  const pName = el("span", "truncate text-lg font-extrabold");
-  const pHouse = el("span", "text-sm");
+  const pText = el("div");
+  pText.style.cssText = "display:flex;flex-direction:column;min-width:0";
+  const pName = el("span", "fg-preview-name");
+  const pHouse = el("span", "fg-preview-house");
   pText.append(pName, pHouse);
   preview.append(pImg, pText);
 
   // the buttons
-  const actions = el("div", "flex flex-wrap items-center justify-end gap-2");
-  const cancel = el("button", `${BTN} border-2 border-[#e0a93a] bg-[#0f1a33] hover:bg-[#1f2b4d]`, T.pickCancel);
+  const cancel = el("button", "fg-outline", T.pickCancel);
   cancel.type = "button";
-  const confirm = el("button", `${BTN} bg-[#e0a93a] text-[#0f1a33] enabled:hover:bg-amber-300 disabled:bg-[#2a3550] disabled:text-[#f4ead2]/60`);
+  const confirm = el("button", "fg-gold");
   confirm.type = "button";
-  actions.append(cancel, confirm);
-
-  const bottom = el("div", "flex flex-wrap items-center gap-3");
-  bottom.append(preview, actions);
+  const bottom = el("div", "fg-pick-foot");
+  bottom.append(preview, cancel, confirm);
   box.append(title, grid, nameRow, bottom);
   overlay.append(box);
   document.body.append(overlay);
