@@ -7,14 +7,18 @@ import { CONFIG } from "../src/config.ts";
 import { p2pkhLock, pkhOf } from "./helpers.ts";
 import { makeProvider } from "../src/lib/provider.ts";
 
-// The paying wallet. On a computer: the wif in .wallet.<network>.json. On the GitHub robot: the seed phrase in
-// FUNGE_DEPLOY_SEED (BCH's usual path m/44'/145'/0'/0/0, or FUNGE_DEPLOY_PATH), or a WIF in FUNGE_DEPLOY_WIF.
+// The paying wallet. On the GitHub robot: the seed phrase in FUNGE_DEPLOY_SEED (BCH's usual path m/44'/145'/0'/0/0,
+// or FUNGE_DEPLOY_PATH), or a WIF in FUNGE_DEPLOY_WIF. On a computer: .wallet.<network>.json (scripts/wallet.ts),
+// which holds a seed phrase (mainnet) or a WIF (chipnet).
 async function openWallet() {
   const W = CONFIG.network === "mainnet" ? Wallet : TestNetWallet;
-  const seed = process.env.FUNGE_DEPLOY_SEED?.trim();
-  if (seed) return W.fromSeed(seed, process.env.FUNGE_DEPLOY_PATH || "m/44'/145'/0'/0/0");
-  const wif = process.env.FUNGE_DEPLOY_WIF?.trim() || JSON.parse(readFileSync(`.wallet.${CONFIG.network}.json`, "utf8")).wif;
-  return W.fromWIF(wif);
+  const path = process.env.FUNGE_DEPLOY_PATH || "m/44'/145'/0'/0/0";
+  const envSeed = process.env.FUNGE_DEPLOY_SEED?.trim();
+  if (envSeed) return W.fromSeed(envSeed, path);
+  const envWif = process.env.FUNGE_DEPLOY_WIF?.trim();
+  if (envWif) return W.fromWIF(envWif);
+  const file = JSON.parse(readFileSync(`.wallet.${CONFIG.network}.json`, "utf8")) as { seed?: string; wif?: string };
+  return file.seed ? W.fromSeed(file.seed, path) : W.fromWIF(String(file.wif));
 }
 
 // Most scripts are chipnet tools (test token, practice pool, test coins). Only deploying rounds
