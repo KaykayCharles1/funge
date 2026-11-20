@@ -484,6 +484,13 @@ export const COPY = {
     nextConquest: "Next conquest costs",
     noKing: "No king yet",
     currency: "PUSD",
+    // The top bar over the full-screen field (src/battlefield/topbar.ts)
+    throneValue: (value: string) => `Throne value · ${value} PUSD`,
+    lastKingSub: "Last king · wins the treasury",
+    youName: (name: string) => `${name} (you)`,
+    homeAria: "Funge home",
+    menuAria: "Menu",
+    protectsLeftAria: "Protects left this reign",
     conquests: (n: number) => (n === 1 ? "1 conquest" : `${n} conquests`),
     waitingTitle: "Waiting for the first king",
     waitingDetail: (price: string) => `The first king pays ${price} PUSD`,

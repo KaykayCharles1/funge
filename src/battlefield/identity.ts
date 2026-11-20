@@ -19,7 +19,8 @@ export const HOUSES: readonly House[] = [
   { id: "sapphire", color: 0x2f73e0, text: 0x7fb0f5, soldier: "soldier_sapphire" },
 ];
 
-export type Portrait = { id: string; title: string; name: string; image: string; avatar: string; house?: string };
+// face: the face box in the full portrait's pixels (manifest.json), for round avatars cropped from the portrait
+export type Portrait = { id: string; title: string; name: string; image: string; avatar: string; house?: string; face?: { x: number; y: number; size: number } };
 
 // name: what the page shows, "King Charles" (chosen) or "Queen Maelis" (derived)
 export type Identity = { key: string; house: House; portrait: Portrait; name: string };

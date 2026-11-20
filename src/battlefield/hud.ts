@@ -9,6 +9,7 @@ import { avatarKey } from "./assets.ts";
 import type { FieldState } from "./director.ts";
 import type { Identity } from "./identity.ts";
 import { sfx } from "./sound.ts";
+import type { TopBar } from "./topbar.ts";
 
 export const W = 1280;
 export const H = 720; // the field
@@ -104,6 +105,14 @@ export class Hud {
   private beat: Phaser.Tweens.Tween | null = null;
   private compact = false;
   fieldTop = 0; // where the field starts in the HUD's coordinates (0 wide, BAND_TOP on a phone)
+  private dom: TopBar | null = null; // the page's top bar, once attached: the canvas plates hide and it shows the same
+
+  // The top bar (topbar.ts) takes over the bell, the king plate and the Treasury; the price panel goes (the main
+  // button shows the price). Sounds and timing stay here.
+  attachDom(bar: TopBar): void {
+    this.dom = bar;
+    for (const g of [this.bellGroup, this.plate, this.vault, this.price]) g.setVisible(false);
+  }
 
   constructor(s: Phaser.Scene) {
     this.s = s;
@@ -194,6 +203,11 @@ export class Hud {
 
   // Where the Treasury chest is, in the HUD's coordinates (coins fly there)
   chestAt(): { x: number; y: number } {
+    if (this.dom) {
+      // The page's chest, in the canvas's own coordinates
+      const c = this.dom.chestCenter(), r = this.s.game.canvas.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return { x: ((c.x - r.left) * W) / r.width, y: ((c.y - r.top) * H) / r.height };
+    }
     const v = this.vault;
     return { x: v.x + this.chest.x * v.scaleX, y: v.y + this.chest.y * v.scaleY };
   }
@@ -241,6 +255,7 @@ export class Hud {
 
   // 60 s: the bell swings slowly. 30 s: protect closed. 10 s: the ring beats like a heart. frozen: the clock is paused.
   setUrgency(level: Urgency, frozen: boolean): void {
+    this.dom?.setUrgency(level, frozen);
     if (level === this.urgency && frozen === this.urgencyFrozen) return;
     const s = this.s, calm = reducedMotion();
     if (level !== this.urgency) {
@@ -287,6 +302,7 @@ export class Hud {
     this.swing?.remove();
     this.swing = null;
     sfx.toll(3);
+    this.dom?.toll();
     if (!calm) s.tweens.add({ targets: this.bell, angle: { from: -24, to: 24 }, duration: 260, yoyo: true, repeat: 2, ease: "Sine.easeInOut", onComplete: () => this.bell.setAngle(0) });
     this.tollRings.forEach((r, i) => {
       s.tweens.killTweensOf(r);
@@ -297,6 +313,7 @@ export class Hud {
 
   // The time a conquest added, floating up beside the bell and fading
   floatAdded(text: string): void {
+    this.dom?.floatAdded(text);
     const s = this.s, t = this.added, calm = reducedMotion();
     this.addedTween?.remove();
     t.setText(text).setY(-6).setAlpha(1);
@@ -311,6 +328,7 @@ export class Hud {
 
   // The king plate glows while the round waits for its claim
   glowPlate(on: boolean): void {
+    this.dom?.glowPlate(on);
     this.s.tweens.killTweensOf(this.plateGlow);
     if (!on) {
       this.plateGlow.setAlpha(0);
@@ -322,6 +340,7 @@ export class Hud {
 
   // A protect was used: that shield flashes and dims
   useShield(protectsLeft: number): void {
+    this.dom?.useShield(protectsLeft);
     const sh = this.shields[protectsLeft];
     if (!sh) return;
     const sx = sh.scaleX, sy = sh.scaleY;
@@ -331,6 +350,7 @@ export class Hud {
 
   // Fill every value from the field state. nextCost: what the next conquest costs, or null.
   show(state: FieldState, king: Identity | null, nextCost: bigint | null): void {
+    this.dom?.show(state, king);
     const open = state.status !== "waiting" && king !== null;
     this.drawAvatar(open ? king : null);
     this.name.setText(open ? king.name : T.noKing); // a chosen name is shown only as text
@@ -352,6 +372,7 @@ export class Hud {
 
   // The bell: time left and the ring, whose full circle is the cap (5:00). remainingMs null: no clock running.
   setClock(remainingMs: number | null, capMs: number): void {
+    this.dom?.setClock(remainingMs, capMs);
     const text = remainingMs === null ? "" : clockText(remainingMs);
     if (this.time.text !== text) this.time.setText(text);
     const frac = remainingMs === null || capMs <= 0 ? 1 : remainingMs / capMs;
@@ -376,6 +397,7 @@ export class Hud {
   // A coin landed in the chest
   bumpChest(): void {
     sfx.coin();
+    this.dom?.bumpChest();
     const c = this.chest, [sx, sy] = this.chestScale;
     this.s.tweens.killTweensOf(c);
     c.setScale(sx, sy);

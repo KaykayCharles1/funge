@@ -8,19 +8,21 @@ import { conquestMoney } from "../lib/kingdom.ts";
 import type { GameKingdom } from "../lib/game.ts";
 import type { RoundSnapshot } from "../referee/api.ts";
 import { onSceneEvent, onSceneSnapshot } from "../sceneBus.ts";
-import { mountInviteBanner } from "./invite.ts";
+import { inviterName, mountInviteBanner, openInvite } from "./invite.ts";
 import { mountActionBar } from "./actions.ts";
 import type { PageDo, PageView } from "./actions.ts";
 import { Director } from "./director.ts";
 import type { DirectorStats, FieldState } from "./director.ts";
-import { H, H_COMPACT, W } from "./hud.ts";
+import { H, W } from "./hud.ts";
 import { displayName, HOUSES, IdentityBook } from "./identity.ts";
 import type { Identity } from "./identity.ts";
 import { BattlefieldScene } from "./scene.ts";
 import { installUnlock, preloadTracks } from "./sound.ts";
+import { TopBar } from "./topbar.ts";
 
 const OUTAGE_AFTER_MS = 10_000; // no snapshot for this long after mounting: show the outage ribbon
-const COMPACT_BELOW_PX = 700; // narrower than this (a phone): the HUD moves into bands above and below the field
+// The phone layout comes in Phase B of the redesign; until then the field covers every screen the same way
+const COMPACT_BELOW_PX = 0;
 
 let mounted = false;
 type Fees = { feePercent: bigint; cutPercent: bigint };
@@ -38,8 +40,9 @@ export function mountBattlefield(opts: MountOptions): void {
   mounted = true;
   const host = document.createElement("div");
   host.id = "battlefield";
-  host.className = "relative mx-auto w-full max-w-5xl";
-  host.style.aspectRatio = `${W} / ${H}`;
+  // The field fills the window (the redesign's "cover": a little sky and grass is cut, never the castle)
+  host.className = "relative w-full overflow-hidden bg-[#0a1226]";
+  host.style.height = "100dvh";
   // The page showed a placeholder while this code downloaded; the loading screen takes over from it
   document.getElementById("battlefield-boot")?.remove();
   document.body.prepend(host);
@@ -97,6 +100,15 @@ export function mountBattlefield(opts: MountOptions): void {
     scene.events.on(Phaser.Scenes.Events.UPDATE, () => {
       if (!held) director?.tick();
     });
+    // The top bar over the field takes over the canvas plates
+    scene.hud.attachDom(new TopBar(host, {
+      isMe,
+      onInvite: () => {
+        const v = opts.page();
+        openInvite(inviterName({ actingPkh: v.actingPkh, players: v.players, portraits: scene.portraits }));
+      },
+      onMenu: () => wallet.open(),
+    }));
     connection();
     loading.done();
     layout();
@@ -132,7 +144,7 @@ export function mountBattlefield(opts: MountOptions): void {
     // touch drags over the field, so the page could not scroll while the pointer or a finger was on it.
     // Each part is named: Phaser reads input.mouse, input.touch, ... and takes a missing one as "on".
     input: { mouse: false, touch: false, keyboard: false, gamepad: false },
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scale: { mode: Phaser.Scale.ENVELOP, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
   });
 
@@ -142,7 +154,6 @@ export function mountBattlefield(opts: MountOptions): void {
     const want = host.clientWidth > 0 && host.clientWidth < COMPACT_BELOW_PX;
     if (want === compact || !director) return;
     compact = want;
-    host.style.aspectRatio = `${W} / ${compact ? H_COMPACT : H}`;
     scene.setCompact(compact);
     game.scale.refresh();
   }
