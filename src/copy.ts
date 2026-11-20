@@ -663,7 +663,6 @@ export const COPY = {
     nextRoundIn: (time: string) => `Next round in ${time}`,
     nextRoundAlmost: "The next round is almost ready…",
     nextRoundAnyMoment: "The next round starts any moment now…",
-    roundDetails: "Round details",
     walletSection: "Wallet",
     // The side panel (src/battlefield/panel.ts): Wallet and Rules tabs
     rulesTab: "Rules",

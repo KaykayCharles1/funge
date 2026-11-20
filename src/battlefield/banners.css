@@ -9,7 +9,7 @@
 .fg-pop.fg-fade { opacity: 0; }
 @keyframes fg-pop-in { from { opacity: 0; transform: translateY(-6px); } }
 
-.fg-strip { position: absolute; left: 50%; top: 106px; transform: translateX(-50%); z-index: 21; display: flex; align-items: center; gap: 10px;
+.fg-strip { position: absolute; left: 50%; top: 106px; transform: translateX(-50%); z-index: 21; display: flex; align-items: center; gap: 10px; width: max-content;
   padding: 9px 18px; background: rgba(15, 26, 51, 0.94); border: 1.5px solid #fbbc28; border-radius: 999px; color: #f8eeca;
   font-family: "Alegreya Sans", sans-serif; font-size: 17px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 .fg-strip[hidden], .fg-strip .fg-spin[hidden] { display: none; }

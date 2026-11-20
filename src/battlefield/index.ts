@@ -380,38 +380,20 @@ function devPanel(
   };
 }
 
-// The old wallet sections move into the side panel's Wallet tab (until each screen is rebuilt); the rest of the old
-// page folds into one section under the field. Nothing is removed: the same elements move, with their handlers.
-// The old "Round is over" window gives way to the action bar's Claim.
+// The page is the battlefield and nothing else. The old page under it (round details, the old action buttons, the
+// "Round is over" window) stays in the document, hidden: the page's own code still reads and drives those elements
+// (battlefieldPage() in kingdomMode.ts), so nothing changes in how the game plays. The old wallet sections move into
+// the side panel's Wallet tab, where the new screens use them.
 function foldOldPage(host: HTMLElement, page: () => PageView): { open: () => void } {
   const panel = mountPanel(host, ["localWallet", "wallet", "faucet"]);
   const screens = mountWalletPanel(panel.walletPage, page);
   panel.onOpenWallet = screens.onOpen;
   const app = document.getElementById("app");
-  const header = app?.querySelector("header") ?? null;
-  const section = (label: string) => {
-    const d = document.createElement("details");
-    d.className = "rounded-2xl bg-slate-900/60 ring-1 ring-slate-800";
-    const s = document.createElement("summary");
-    s.className = "flex min-h-11 cursor-pointer select-none items-center px-5 font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300";
-    s.textContent = label;
-    const body = document.createElement("div");
-    body.className = "flex flex-col gap-6 p-3";
-    d.append(s, body);
-    return { d, body };
-  };
-  const details = section(COPY.battlefield.roundDetails);
-  const move = (to: HTMLElement, ids: string[]) => {
-    for (const id of ids) {
-      const e = document.getElementById(id);
-      if (e) to.append(e);
-    }
-  };
-  move(details.body, ["ended", "live", "refereeNotice", "status"]);
-  if (header) header.after(details.d);
-  else app?.append(details.d);
+  if (app) app.style.display = "none";
   const modal = document.getElementById("overModal");
   if (modal) modal.style.display = "none"; // stays hidden whatever the old page toggles
+  // One screen, no scrolling (the dev panel, ?dev=1, sits above the field and needs the page to scroll)
+  if (new URLSearchParams(location.search).get("dev") !== "1") document.documentElement.style.overflow = "hidden";
   return {
     open: () => panel.open("wallet"),
   };
@@ -420,7 +402,7 @@ function foldOldPage(host: HTMLElement, page: () => PageView): { open: () => voi
 // A loading screen over the field box until the art is in: the title and a bar that fills as files arrive
 function loadingScreen(host: HTMLElement): { progress: (share: number) => void; done: () => void } {
   const box = document.createElement("div");
-  box.className = "absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-2xl bg-[#0f1a33] text-[#f4ead2] transition-opacity duration-500";
+  box.className = "absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[#0f1a33] text-[#f4ead2] transition-opacity duration-500";
   box.setAttribute("role", "status");
   const title = document.createElement("p");
   title.className = "text-lg font-bold sm:text-2xl";

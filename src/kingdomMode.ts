@@ -997,15 +997,21 @@ export async function startKingdomMode() {
 function mountBattlefieldIfAsked() {
   if (!CONFIG.battlefield || new URLSearchParams(location.search).get("mode") !== "battlefield") return;
   // A placeholder while the battlefield's code downloads; the battlefield's own loading screen replaces it
+  // The battlefield fills the screen; the old page stays hidden under it (it comes back only if the battlefield fails)
   const boot = document.createElement("div");
   boot.id = "battlefield-boot";
-  boot.className = "mx-auto flex aspect-video w-full max-w-5xl items-center justify-center rounded-2xl bg-[#0f1a33] text-lg font-bold text-[#f4ead2]";
+  boot.className = "flex h-[100dvh] w-full items-center justify-center bg-[#0f1a33] text-lg font-bold text-[#f4ead2]";
   boot.textContent = COPY.battlefield.loading;
   document.body.prepend(boot);
+  $("app").style.display = "none";
   import("./battlefield/index.ts")
     // "you" (both wallets), and the page's own state and handlers for the action bar (see battlefieldPage below)
     .then((m) => m.mountBattlefield({ myKeys, page: battlefieldPage, run: battlefieldDo }))
-    .catch((e) => console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e)));
+    .catch((e) => {
+      console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e));
+      boot.remove();
+      $("app").style.display = ""; // the plain page still plays
+    });
 }
 
 // Dev only: the battlefield's extra mock scenarios (src/battlefield/mockScenarios.ts) play through the same
