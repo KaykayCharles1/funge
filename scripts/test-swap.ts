@@ -2,13 +2,14 @@
 // Cauldron contract from CashLab, real signatures, every transaction checked by the BCH VM.   node scripts/test-swap.ts
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { binToHex, hash160 } from "@bitauth/libauth";
-import { MockNetworkProvider, SignatureTemplate, TransactionBuilder } from "cashscript";
+import { binToHex, encodeTransaction, hash160 } from "@bitauth/libauth";
+import { MockNetworkProvider, SignatureTemplate, TransactionBuilder, placeholderP2PKHUnlocker } from "cashscript";
+import type { SpendableUtxo } from "cashscript";
 import { lockToAddress, p2pkhLock } from "../src/lib/chain.ts";
 import { newMnemonic, walletFromMnemonic } from "../src/wallet/local.ts";
 import {
   buildSwap, poolAddress, poolLock, poolsFromIndexer, poolsOnChain, poolWithdrawUnlocker, quote, sendSwap, SWAP_RESERVE, SwapFailure,
-  MAX_PRICE_MOVE,
+  MAX_PRICE_MOVE, type SwapWallet,
 } from "../src/lib/swap.ts";
 
 const PUSD = "0123456789abcdef".repeat(4); // not symmetric: a byte-order mistake would show
@@ -194,6 +195,39 @@ async function refused(p: Promise<unknown> | (() => unknown), code: string) {
   assert.equal(pools[0]!.output.amount, 1_000_000n);
   assert.equal(pools[0]!.outpoint.index, 1);
   console.log("ok    the mainnet pool list");
+}
+
+// 9. An own wallet (WizardConnect): coins on two of its addresses, each a placeholder that the wallet app signs later
+{
+  const { chain, owner } = setup([[500_000_000n, 1_000_000n]], []);
+  const a = walletFromMnemonic(newMnemonic()), b = walletFromMnemonic(newMnemonic()); // two addresses of one own wallet
+  chain.addUtxo(lockToAddress(a.lock, false), { txid: hex32(), vout: 0, satoshis: 600_000n });
+  chain.addUtxo(lockToAddress(b.lock, false), { txid: hex32(), vout: 0, satoshis: 900_000n }); // neither pays 1.0M alone
+  const key = (u: SpendableUtxo) => `${u.txid}:${u.vout}`;
+  const where = new Map<string, string>();
+  const coins: SpendableUtxo[] = [];
+  for (const w of [a, b]) {
+    for (const u of await chain.getUtxosForLockingBytecode(w.lock)) {
+      coins.push(u);
+      where.set(key(u), lockToAddress(w.lock, false));
+    }
+  }
+  const own: SwapWallet = {
+    lock: a.lock, tokenAddress: a.tokenAddress, unlockP2PKH: () => { throw new Error("the wallet signs"); },
+    coins, unlockFor: (u) => placeholderP2PKHUnlocker(where.get(key(u))!), feeRate: 1.2,
+  };
+  const q = quote(await poolsOnChain(chain, owner, PUSD), PUSD, 2_000n);
+  const tx = await buildSwap(chain, own, q);
+  assert.equal(tx.firstWalletInput, 1, "the wallet's inputs come after the one pool input");
+  assert.equal(tx.walletInputs.length, 2, "coins from both addresses");
+  const wc = tx.builder.generateWcTransactionObject({ broadcast: false, userPrompt: "test" });
+  assert.ok(wc.transaction.inputs[0]!.unlockingBytecode.length > 0, "the pool input carries its own script");
+  for (const i of [1, 2]) assert.equal(wc.transaction.inputs[i]!.unlockingBytecode.length, 0, `input ${i} waits for the wallet`);
+  const bought = wc.transaction.outputs.find((o) => o.token?.amount === q.pusd);
+  assert.ok(bought && binToHex(bought.lockingBytecode) === binToHex(a.lock), "the PUSD goes to the wallet's first address");
+  const signedSize = encodeTransaction(wc.transaction).length + 2 * 108; // a P2PKH signature and key are at most 108 bytes
+  assert.ok(Number(tx.fee) >= signedSize, `fee ${tx.fee} covers 1 sat a byte once signed (${signedSize} bytes)`);
+  console.log("ok    an own wallet: coins on two addresses, the wallet signs only its own inputs");
 }
 
 console.log("\nall swap tests passed");

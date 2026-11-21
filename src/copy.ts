@@ -235,6 +235,8 @@ export const COPY = {
     rateLine: (bch: string) => `1 BCH = ${bch} PUSD`,
     send: "Swap",
     sending: "Swapping…",
+    approve: "Approve in your wallet…", // an own wallet (WizardConnect) is asked to sign
+    walletPrompt: (sell: string, buy: string) => `Swap ${sell} for ${buy} on Funge`, // shown in the wallet app
     retrying: "Price moved a little. Trying again…",
     done: (amount: string, coin: string) => `Swapped. +${amount} ${coin}`,
     errors: {
