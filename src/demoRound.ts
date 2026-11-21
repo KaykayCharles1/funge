@@ -19,7 +19,10 @@ const OPENER = "c3".repeat(20); // who opened before Satoshi conquered (only the
 
 const START_SECONDS = 60;
 const START_BALANCE = 5_000n; // 50.00 demo PUSD
-const BOT_ANSWER_MS: [number, number] = [3_500, 5_500]; // how soon Satoshi takes the throne back
+// How soon Satoshi takes the throne back: after the player's conquest has played on the field (the full fight is
+// 6.3 s, src/battlefield/scene.ts CONQUEST) and about 3 s more as king
+const FIGHT_MS = 6_300;
+const BOT_ANSWER_MS: [number, number] = [FIGHT_MS + 3_000, FIGHT_MS + 3_600];
 
 const P = CONFIG.kingdom;
 const str = (n: bigint | number) => n.toString();
