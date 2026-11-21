@@ -47,7 +47,7 @@ function signRequest(builder: TransactionBuilder, walletInputs: WalletCoin[], us
   return { request, feeSats };
 }
 
-async function signWithWallet(
+export async function signWithWallet(
   request: Parameters<typeof manager.signTransaction>[0],
   signal: AbortSignal,
 ): Promise<{ ok: true; signedHex: string } | ExternalFailure> {

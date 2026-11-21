@@ -160,7 +160,7 @@
 .fg-panel #swMsg { order: 5; margin: 0; }
 
 /* The review window */
-.fg-panel #swReview { position: fixed; z-index: 70; background: rgba(5, 10, 24, 0.75); font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
+.fg-panel #swReview { position: absolute; inset: 0; z-index: 70; overflow: auto; background: rgba(5, 10, 24, 0.82); font-family: "Alegreya Sans", "Segoe UI", sans-serif; }
 .fg-panel #swReview > div { background: #0f1a33; border: 2px solid #e0a93a; border-radius: 10px; box-shadow: none; color: #f4ead2; }
 .fg-panel #swRvTitle { font-family: "Grenze Gotisch", Georgia, serif; font-weight: 700; font-size: 26px; color: #f8eeca; }
 .fg-panel #swRvSell, .fg-panel #swRvBuy { font-family: Cinzel, Georgia, serif; color: #f8eeca; }

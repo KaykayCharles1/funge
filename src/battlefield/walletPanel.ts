@@ -126,10 +126,14 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // The old swap, withdraw and seed boxes wait here, with their handlers, until their screens are rebuilt
   const hold = el("div", "fg-w-hold");
   box.after(hold);
-  for (const id of ["swBox", "swReview", "wdBox"]) {
+  for (const id of ["swBox", "wdBox"]) {
     const e = document.getElementById(id);
     if (e) hold.append(e);
   }
+  // The swap's review window covers the side panel, not the field (walletPanel.css)
+  const review = document.getElementById("swReview");
+  const panelEl = page.closest(".fg-panel");
+  if (review) (panelEl ?? hold).append(review);
   hold.addEventListener("withdraw-done", () => go("home"));
   const old = {
     local: document.getElementById("localWallet"),
@@ -161,7 +165,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // The screen the wallet's state calls for (an onboarding flow in progress keeps its screen)
   function auto(): Screen {
     const own = getWalletState().status !== "idle";
-    if (own || wantsOwn) return "wc";
+    if (own || wantsOwn) return screen === "swap-old" && getWalletState().status === "connected" ? "swap-old" : "wc";
     const state = vault.state();
     if (state === "unlocked") return !vault.hasPassword() ? "pick" : [...OLD_TOOLS, "backup", "delete"].includes(screen) ? screen : "home";
     if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
@@ -644,7 +648,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       // close the old box the way its own code does
       const t = document.getElementById(id);
       if (t && !t.classList.contains("hidden")) document.getElementById(closer[which])?.click();
-      go("home");
+      go(getWalletState().status === "connected" ? "wc" : "home"); // back to the screen the swap was opened from
     }));
   }
 
@@ -860,6 +864,10 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       void read();
       const timer = window.setInterval(() => (box.isConnected && screen === "wc" ? void read() : window.clearInterval(timer)), 15_000);
     }
+    // Swap (Get PUSD): the same box as the game wallet's; the wallet app approves it. No Withdraw: the coins are
+    // already in the player's own wallet.
+    const swap = button("fg-w-line", COPY.swap.button, () => go("swap-old"));
+    box.append(swap);
     if (CONFIG.network === "chipnet") box.append(faucetCard(s.pkhHex ?? ""));
   }
 

@@ -21,7 +21,17 @@ const FEE_RATE = 1.0; // sats per byte, the network's usual minimum
 const PUSD_OUTPUT_SATS = 1_000n; // the BCH that carries the bought PUSD
 export const MIN_SELL_SATS = 1_000n; // a smaller swap would cost more in network fee than it buys
 
-export type SwapWallet = { lock: Uint8Array; tokenAddress: string; unlockP2PKH: () => Unlocker };
+// The game wallet: one address, signed here (unlockP2PKH). An own wallet (WizardConnect): its coins across several
+// addresses (coins), each with a placeholder the wallet signs later (unlockFor), and a slightly higher fee rate so
+// the wallet's real signatures cannot take the transaction under the network's minimum.
+export type SwapWallet = {
+  lock: Uint8Array; // where the bought coins and the change go
+  tokenAddress: string;
+  unlockP2PKH: () => Unlocker;
+  coins?: SpendableUtxo[];
+  unlockFor?: (coin: SpendableUtxo) => Unlocker;
+  feeRate?: number;
+};
 
 export type SwapError = "no_pools" | "too_big" | "too_small" | "price_move" | "no_bch" | "no_pusd" | "pools_changed";
 export class SwapFailure extends Error {
@@ -123,7 +133,11 @@ export function quote(pools: PoolV0[], category: string, amount: bigint, side: S
 // The most BCH a swap can spend: the plain BCH coins, less the BCH that carries the PUSD and room for the fee
 export const SWAP_RESERVE = 4_000n;
 
-export type SwapTx = { hex: string; fee: bigint; pusd: bigint; sats: bigint; direction: Direction };
+// builder and walletInputs: for an own wallet, which signs the wallet's inputs (they follow the pool inputs)
+export type SwapTx = {
+  hex: string; fee: bigint; pusd: bigint; sats: bigint; direction: Direction;
+  builder: TransactionBuilder; walletInputs: SpendableUtxo[]; firstWalletInput: number;
+};
 
 const largestFirst = (a: SpendableUtxo, b: SpendableUtxo) => (a.satoshis < b.satoshis ? 1 : a.satoshis > b.satoshis ? -1 : 0);
 const tokensFirst = (a: SpendableUtxo, b: SpendableUtxo) =>
@@ -135,7 +149,8 @@ const tokensFirst = (a: SpendableUtxo, b: SpendableUtxo) =>
 export async function buildSwap(provider: NetworkProvider, wallet: SwapWallet, q: SwapQuote): Promise<SwapTx> {
   if (q.priceMove > MAX_PRICE_MOVE) throw new SwapFailure("price_move");
   const toPusd = q.direction === "toPusd";
-  const coins = await provider.getUtxosForLockingBytecode(wallet.lock);
+  const coins = wallet.coins ?? (await provider.getUtxosForLockingBytecode(wallet.lock));
+  const feeRate = wallet.feeRate ?? FEE_RATE;
   const plainCoins = coins.filter((u) => !u.token).sort(largestFirst);
   const pick = (list: SpendableUtxo[], enough: (picked: SpendableUtxo[]) => boolean) => {
     const picked: SpendableUtxo[] = [];
@@ -185,13 +200,13 @@ export async function buildSwap(provider: NetworkProvider, wallet: SwapWallet, q
         token: { amount: toPusd ? p.output.token.amount - e.demand : p.output.token.amount + e.supply, category: p.output.token.token_id },
       });
     }
-    builder.addInputs([...paying, ...extra], wallet.unlockP2PKH());
+    for (const c of [...paying, ...extra]) builder.addInput(c, wallet.unlockFor ? wallet.unlockFor(c) : wallet.unlockP2PKH());
     if (toPusd) {
       builder.addOutput({ to: wallet.lock, amount: PUSD_OUTPUT_SATS, token: { amount: q.pusd, category: q.category } });
     } else {
       builder.addTokenChangeOutputIfNeeded({ category: q.category, to: wallet.tokenAddress }); // PUSD not sold
     }
-    builder.addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate: FEE_RATE }); // toBch: this is the BCH they get
+    builder.addBchChangeOutputIfNeeded({ to: wallet.lock, feeRate }); // toBch: this is the BCH they get
     return { builder, inputs: [...paying, ...extra] };
   };
   let built: ReturnType<typeof attempt>;
@@ -209,7 +224,10 @@ export async function buildSwap(provider: NetworkProvider, wallet: SwapWallet, q
   const hex = built.builder.build(); // CashScript refuses a transaction that would destroy tokens
   const inSats = satsOf(built.inputs) + q.trade.entries.reduce((n, e) => n + e.pool.output.amount, 0n);
   const fee = inSats - built.builder.outputs.reduce((n, o) => n + o.amount, 0n);
-  return { hex, fee, pusd: q.pusd, sats: q.sats, direction: q.direction };
+  return {
+    hex, fee, pusd: q.pusd, sats: q.sats, direction: q.direction,
+    builder: built.builder, walletInputs: built.inputs, firstWalletInput: q.trade.entries.length,
+  };
 }
 
 // Send it. If someone traded with one of these pools a moment ago, the network refuses it and nothing is spent.

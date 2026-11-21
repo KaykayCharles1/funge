@@ -235,8 +235,9 @@ export const COPY = {
     rateLine: (bch: string) => `1 BCH = ${bch} PUSD`,
     send: "Swap",
     sending: "Swapping…",
+    approve: "Approve in your wallet…", // an own wallet (WizardConnect) is asked to sign
+    walletPrompt: (sell: string, buy: string) => `Swap ${sell} for ${buy} on Funge`, // shown in the wallet app
     retrying: "Price moved a little. Trying again…",
-    done: (amount: string, coin: string) => `Swapped. +${amount} ${coin}`,
     errors: {
       pools_changed: "The price moved more than your slippage. Nothing was spent. Review again.",
       busy: "Wait until your move is confirmed, then try again.",

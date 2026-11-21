@@ -29,7 +29,7 @@ import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
 import { getLocalWallet, initLocalWallet, onLocalWalletChange, refreshBalances } from "./walletUI.ts";
 import { initWithdraw, withdrawing } from "./withdrawUI.ts";
-import { initSwap, swapping } from "./swapUI.ts";
+import { initSwap, swapping, type SwapSource } from "./swapUI.ts";
 import { initFaucet, renderFaucet } from "./faucetUI.ts";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -959,7 +959,14 @@ export async function startKingdomMode() {
     setTimeout(() => void refreshBalances(provider), 2_000);
     setTimeout(() => void refreshBalances(provider), 8_000);
   });
-  initSwap(provider, getLocalWallet, () => acting || withdrawing(), () => {
+  // The swap is for the wallet that plays: the connected own wallet, else the game wallet (as for moves)
+  const swapSource = (): SwapSource | null => {
+    const own = externalPkh();
+    if (own) return { kind: "external", pkhHex: own };
+    const local = getLocalWallet();
+    return local ? { kind: "local", wallet: local } : null;
+  };
+  initSwap(provider, swapSource, () => acting || withdrawing(), () => {
     setTimeout(() => void refreshBalances(provider), 2_000);
     setTimeout(() => void refreshBalances(provider), 8_000);
   });

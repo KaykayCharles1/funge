@@ -6,11 +6,14 @@ import { formatUnits } from "./lib/format.ts";
 import { readAmount } from "./lib/withdraw.ts";
 import type { LocalWallet } from "./wallet/local.ts";
 import { onLocalWalletChange } from "./walletUI.ts";
+import type { ExternalSwapWallet } from "./swapExternal.ts";
 
 // "Swap" in the game wallet: BCH and PUSD, either way, through Cauldron's pools, laid out like any exchange. The top
 // coin is sold and the bottom one bought; the arrow switches them. Type either amount and the other fills in. Review
 // shows the exact swap, which is then sent unchanged.
 // The swap itself: src/lib/swap.ts, loaded the first time the box opens (it brings CashLab with it).
+// It swaps for the wallet that plays: the game wallet (signed here) or an own wallet through WizardConnect, which
+// signs in the wallet app (src/swapExternal.ts); then the button waits with "Approve in your wallet".
 type SwapLib = typeof import("./lib/swap.ts");
 type Quote = ReturnType<SwapLib["quote"]>;
 type Ready = Awaited<ReturnType<SwapLib["buildSwap"]>>;
@@ -131,19 +134,27 @@ function setSlippage(v: number | null) {
 let sendingNow: () => boolean = () => false;
 export const swapping = () => sendingNow();
 
-// wallet: the game wallet when it is unlocked; busy: a move is being sent; onDone: refresh the balances
+export type SwapSource = { kind: "local"; wallet: LocalWallet } | { kind: "external"; pkhHex: string };
+const SIGN_TIMEOUT_MS = 180_000; // how long the own wallet has to approve, as for a move
+let external: Promise<typeof import("./swapExternal.ts")> | null = null;
+const loadExternal = () => (external ??= import("./swapExternal.ts"));
+
+// source: the wallet that plays (null: none); busy: a move is being sent; onDone: refresh the balances
 export function initSwap(
   provider: ElectrumNetworkProvider,
-  wallet: () => LocalWallet | null,
+  source: () => SwapSource | null,
   busy: () => boolean,
   onDone: () => void,
 ) {
+  const wallet = source;
   let direction: Direction = "toPusd";
   let side: Side = "sell";
   let spendable = 0n; // plain BCH coins: what a BCH sale can spend
   let pusdHeld = 0n;
   let quoted: Quote | null = null;
-  let ready: { tx: Ready; q: Quote; panelUsd: number | null; realUsd: number | null; side: Side; amount: bigint } | null = null;
+  let ready: {
+    tx: Ready; q: Quote; panelUsd: number | null; realUsd: number | null; side: Side; amount: bigint; own: ExternalSwapWallet | null;
+  } | null = null;
   let sending = false;
   let runId = 0;
   sendingNow = () => sending;
@@ -239,9 +250,17 @@ export function initSwap(
     const w = wallet();
     if (!w) return;
     try {
-      const coins = await provider.getUtxosForLockingBytecode(w.lock);
-      spendable = coins.filter((u) => !u.token).reduce((s, u) => s + u.satoshis, 0n);
-      pusdHeld = coins.reduce((s, u) => s + (u.token?.category === pusdCategory() && !u.token.nft ? u.token.amount : 0n), 0n);
+      if (w.kind === "external") {
+        const ext = await loadExternal();
+        const own = await ext.externalSwapWallet(provider, w.pkhHex);
+        const b = ext.externalBalances(own.coins, pusdCategory());
+        spendable = b.sats;
+        pusdHeld = b.pusd;
+      } else {
+        const coins = await provider.getUtxosForLockingBytecode(w.wallet.lock);
+        spendable = coins.filter((u) => !u.token).reduce((s, u) => s + u.satoshis, 0n);
+        pusdHeld = coins.reduce((s, u) => s + (u.token?.category === pusdCategory() && !u.token.nft ? u.token.amount : 0n), 0n);
+      }
       renderCoins();
     } catch {
       /* keep the last figures */
@@ -438,8 +457,9 @@ export function initSwap(
       const swap = await loadLib();
       const [list, realUsd] = await Promise.all([getPools(swap, provider, true), realBchUsd()]);
       const q = swap.quote(list, pusdCategory(), amount, side, direction);
-      const tx = await swap.buildSwap(provider, w, q);
-      ready = { tx, q, panelUsd: panelBchUsd(swap, list, realUsd), realUsd, side, amount };
+      const own = w.kind === "external" ? await (await loadExternal()).externalSwapWallet(provider, w.pkhHex) : null;
+      const tx = await swap.buildSwap(provider, w.kind === "external" ? own!.wallet : w.wallet, q);
+      ready = { tx, q, panelUsd: panelBchUsd(swap, list, realUsd), realUsd, side, amount, own };
       openReview();
       action(T.review, true);
     } catch {
@@ -464,6 +484,44 @@ export function initSwap(
     button("swRvSend").textContent = T.sending;
     msg("", "info");
     let got: bigint | null = null;
+    // An own wallet: it signs in its app, then the page sends it. A moved pool means a new review (and approval).
+    if (w.kind === "external") {
+      button("swRvSend").textContent = T.approve;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS);
+      try {
+        const prompt = T.walletPrompt(`${amountText(top(), topAmount(r.tx))} ${top()}`, `${amountText(bottom(), bottomAmount(r.tx))} ${bottom()}`);
+        const signed = await (await loadExternal()).signSwap(r.tx, r.own!.coins, prompt, controller.signal);
+        if (!signed.ok) msg(signed.text, "error");
+        else {
+          button("swRvSend").textContent = T.sending;
+          await swap.sendSwap(provider, { ...r.tx, hex: signed.signedHex });
+          got = bottomAmount(r.tx);
+        }
+      } catch (e) {
+        if (e instanceof swap.SwapFailure && e.code === "pools_changed") msg(T.errors.pools_changed!, "error");
+        else {
+          console.error(e);
+          msg(T.errors.failed!, "error");
+        }
+      } finally {
+        clearTimeout(timer);
+        sending = false;
+      }
+      if (got === null) {
+        button("swRvSend").textContent = T.send;
+        button("swRvSend").disabled = false;
+        return;
+      }
+      closeReview();
+      input("swSell").value = "";
+      input("swBuy").value = "";
+      void update();
+      onDone();
+      setTimeout(() => void balances(), 2_000);
+      setTimeout(() => void balances(), 8_000);
+      return;
+    }
     try {
       await swap.sendSwap(provider, r.tx);
       got = bottomAmount(r.tx);
@@ -478,7 +536,7 @@ export function initSwap(
             ? Number(bottomAmount(q)) >= Number(bottomAmount(r.tx)) * (1 - slip)
             : Number(topAmount(q)) <= Number(topAmount(r.tx)) * (1 + slip);
           if (within) {
-            const tx = await swap.buildSwap(provider, w, q);
+            const tx = await swap.buildSwap(provider, w.wallet, q);
             await swap.sendSwap(provider, tx);
             got = bottomAmount(tx);
           }
@@ -501,7 +559,6 @@ export function initSwap(
     input("swSell").value = "";
     input("swBuy").value = "";
     void update();
-    say(T.done(amountText(bottom(), got), bottom()), false);
     onDone();
     setTimeout(() => void balances(), 2_000);
     setTimeout(() => void balances(), 8_000);
