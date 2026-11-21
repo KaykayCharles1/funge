@@ -584,7 +584,8 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       bch.amount.textContent = num(v.bchText, 5);
     };
     paint();
-    const timer = window.setInterval(() => (box.isConnected && screen === "home" ? paint() : window.clearInterval(timer)), 1000);
+    // Stops once these cards are off the screen (box itself always stays on the page)
+    const timer = window.setInterval(() => (coins.isConnected ? paint() : window.clearInterval(timer)), 1000);
   }
 
   // Free test coins: Claim, then "Next claim in 23:59:59" for a day (counted from the claim, in this browser)
@@ -851,9 +852,11 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       box.append(addr);
       // Balances across the own wallet's addresses, the same ones moves and swaps spend from (src/lib/walletCoins.ts):
       // a wallet app puts change and some incoming coins on new addresses, and shows the total
+      let reading = false; // one search at a time: a wallet with many addresses can take a few seconds
       const read = async () => {
         const provider = view().provider;
-        if (!provider) return;
+        if (!provider || reading) return;
+        reading = true;
         try {
           const utxos = (await findWalletCoins(provider)).map((c) => c.utxo);
           const category = pusdCategory();
@@ -864,13 +867,16 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
           }
           pusd.amount.textContent = Number(formatUnits(units, CONFIG.pusdDecimals)).toFixed(2);
           bch.amount.textContent = Number(formatUnits(sats, 8)).toFixed(5);
-          ownBalances = { pusd: units, sats, pkhHex: s.pkhHex! };
+          if (getWalletState().pkhHex === s.pkhHex) ownBalances = { pusd: units, sats, pkhHex: s.pkhHex! };
         } catch (e) {
           console.error(e);
+        } finally {
+          reading = false;
         }
       };
       void read();
-      const timer = window.setInterval(() => (box.isConnected && screen === "wc" ? void read() : window.clearInterval(timer)), 15_000);
+      // Stops once these cards are off the screen: a reconnect draws new ones, and only their timer keeps reading
+      const timer = window.setInterval(() => (coins.isConnected ? void read() : window.clearInterval(timer)), 15_000);
     }
     // Swap (Get PUSD): the same box as the game wallet's; the wallet app approves it. No Withdraw: the coins are
     // already in the player's own wallet.
