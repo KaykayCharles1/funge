@@ -14,6 +14,7 @@ import { disconnectWallet, getWalletState, setExternalFlag, startConnection } fr
 import { pusdCategory } from "../config.ts";
 import { lockToAddress, p2pkhLock } from "../lib/chain.ts";
 import { qrDataUrl } from "../lib/qr.ts";
+import { findWalletCoins } from "../lib/walletCoins.ts";
 import { walletChanged } from "../walletUI.ts";
 import { hexToBin } from "@bitauth/libauth";
 import { isValidMnemonic, newMnemonic, normalizeMnemonic } from "../wallet/local.ts";
@@ -842,12 +843,13 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       });
       addr.append(text, copy);
       box.append(addr);
-      // Balances of the own wallet's first address (what the game plays with), read from the chain
+      // Balances across the own wallet's addresses, the same ones moves and swaps spend from (src/lib/walletCoins.ts):
+      // a wallet app puts change and some incoming coins on new addresses, and shows the total
       const read = async () => {
         const provider = view().provider;
         if (!provider) return;
         try {
-          const utxos = await provider.getUtxosForLockingBytecode(p2pkhLock(hexToBin(s.pkhHex!)));
+          const utxos = (await findWalletCoins(provider)).map((c) => c.utxo);
           const category = pusdCategory();
           let sats = 0n, units = 0n;
           for (const u of utxos) {
