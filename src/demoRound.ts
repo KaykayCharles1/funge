@@ -8,7 +8,7 @@ import { CLOCK_SETTINGS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refere
 // wallet, a rival or any money. Nothing goes to the referee or the chain. Like the dev mock round (mockRound.ts),
 // every step goes through the page's two doors (the event and snapshot handlers), so the field plays it for real.
 // The script: King Satoshi (a bot) holds the throne with one minute left. The player's first conquest is answered:
-// Satoshi takes the throne back a few seconds later. A second conquest wins: Satoshi stops, and the last king when
+// Satoshi takes the throne back a few seconds later and raises his walls (+1.00 PUSD). A second conquest wins: Satoshi stops, and the last king when
 // the clock runs out takes the pool. The money follows the real rules (src/lib/kingdom.ts); so does the clock.
 
 export const DEMO_ROUND_ID = "de".repeat(32);
@@ -23,6 +23,9 @@ const START_BALANCE = 5_000n; // 50.00 demo PUSD
 // 6.3 s, src/battlefield/scene.ts CONQUEST) and about 3 s more as king
 const FIGHT_MS = 6_300;
 const BOT_ANSWER_MS: [number, number] = [FIGHT_MS + 3_000, FIGHT_MS + 3_600];
+// Right after taking the throne back, Satoshi raises his walls with +1.00 PUSD: the player sees a protect, and the
+// next conquest costs more. The field plays it after his fight.
+const BOT_PROTECT_AFTER_MS = 1_500;
 
 const P = CONFIG.kingdom;
 const str = (n: bigint | number) => n.toString();
@@ -137,6 +140,21 @@ export class DemoRound {
     const money = conquestMoney(this.value, P);
     this.balance += money.kingGets; // the dethroned king's share, as in a real round
     this.takeThrone(BOT, money);
+    this.h.changed();
+    this.timers.push(window.setTimeout(() => this.botProtects(), BOT_PROTECT_AFTER_MS));
+  }
+
+  private botProtects(): void {
+    const amount = P.unit; // 1.00 PUSD
+    const open = this.status === "open" && this.king === BOT && this.left() - PROTECT_LOCKOUT_SECONDS * 1000 > 1_000;
+    if (!open || this.protectsUsed >= P.protectsPerReign || this.value + amount > P.cap) return;
+    this.value += amount;
+    this.treasury += amount;
+    this.protectsUsed++;
+    this.deliver(this.event("protect_applied", "protect", {
+      txid: fakeTx(this.seq + 1), actor: BOT, paid: str(amount), refunded: "0", toTreasury: str(amount), amount: str(amount),
+      protectsUsed: this.protectsUsed, ...this.chosen(BOT),
+    }));
     this.h.changed();
   }
 
