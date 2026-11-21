@@ -7,9 +7,10 @@ import { CLOCK_SETTINGS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refere
 // "Play a demo round": a round played on the page alone, with demo PUSD, so one person can feel the game without a
 // wallet, a rival or any money. Nothing goes to the referee or the chain. Like the dev mock round (mockRound.ts),
 // every step goes through the page's two doors (the event and snapshot handlers), so the field plays it for real.
-// The script: King Satoshi (a bot) holds the throne with one minute left. The player's first conquest is answered:
-// Satoshi takes the throne back a few seconds later and raises his walls (+1.00 PUSD). A second conquest wins: Satoshi stops, and the last king when
-// the clock runs out takes the pool. The money follows the real rules (src/lib/kingdom.ts); so does the clock.
+// The script: King Satoshi (a bot) holds the throne with one minute left and raises his walls (+5.00). The player's
+// first conquest is answered: Satoshi takes the throne back a few seconds later and raises his walls twice more
+// (+5.00, +2.00). A second conquest wins: Satoshi stops, and the last king when the clock runs out takes the pool.
+// The money follows the real rules (src/lib/kingdom.ts); so does the clock.
 
 export const DEMO_ROUND_ID = "de".repeat(32);
 export const DEMO_ME = "d1".repeat(20); // the player's key in the demo
@@ -23,9 +24,11 @@ const START_BALANCE = 5_000n; // 50.00 demo PUSD
 // 6.3 s, src/battlefield/scene.ts CONQUEST) and about 3 s more as king
 const FIGHT_MS = 6_300;
 const BOT_ANSWER_MS: [number, number] = [FIGHT_MS + 3_000, FIGHT_MS + 3_600];
-// Right after taking the throne back, Satoshi raises his walls with +1.00 PUSD: the player sees a protect, and the
-// next conquest costs more. The field plays it after his fight.
-const BOT_PROTECT_AFTER_MS = 1_500;
+// Satoshi's protects, each played on a calm field (a protect sent during a fight would play in the field's quick
+// catch-up form): +5.00 soon after the demo opens; after taking the throne back, once his fight has played,
+// +5.00 and then +2.00, two seconds apart
+const OPENING_PROTECT_MS = 2_000;
+const COMEBACK_PROTECTS: [number, bigint][] = [[FIGHT_MS + 2_000, 5n], [FIGHT_MS + 4_000, 2n]]; // [ms after his conquest, units]
 
 const P = CONFIG.kingdom;
 const str = (n: bigint | number) => n.toString();
@@ -62,6 +65,7 @@ export class DemoRound {
 
   start(): void {
     this.h.onSnapshot(this.snapshot());
+    this.timers.push(window.setTimeout(() => this.botProtects(P.unit * 5n), OPENING_PROTECT_MS));
     // The end of the round: the page's own countdown shows the clock; this notices zero (plus the grace second)
     this.timers.push(window.setInterval(() => {
       if (this.status === "open" && this.h.now() > this.deadline + GRACE_SECONDS * 1000) this.finish();
@@ -141,11 +145,11 @@ export class DemoRound {
     this.balance += money.kingGets; // the dethroned king's share, as in a real round
     this.takeThrone(BOT, money);
     this.h.changed();
-    this.timers.push(window.setTimeout(() => this.botProtects(), BOT_PROTECT_AFTER_MS));
+    for (const [ms, units] of COMEBACK_PROTECTS) this.timers.push(window.setTimeout(() => this.botProtects(P.unit * units), ms));
   }
 
-  private botProtects(): void {
-    const amount = P.unit; // 1.00 PUSD
+  // The real protect rules apply: not in the last 30 seconds, two per reign, never above the cap
+  private botProtects(amount: bigint): void {
     const open = this.status === "open" && this.king === BOT && this.left() - PROTECT_LOCKOUT_SECONDS * 1000 > 1_000;
     if (!open || this.protectsUsed >= P.protectsPerReign || this.value + amount > P.cap) return;
     this.value += amount;
