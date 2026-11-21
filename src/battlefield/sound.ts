@@ -2,9 +2,10 @@
 // chime, a fanfare, a heartbeat and a battle march. Two are recorded tracks (public/assets/audio, from art-source/audio):
 //   waiting-theme.mp3  the medieval theme that loops while no war is on (before the first king, between wars, after one)
 //   war-start.mp3      the opening of a war, with the march underneath, until the new king is crowned
-// Off until the player's first tap or click (browsers allow audio only after one), then on unless they turned it off.
+// Muted by default: on only once the player turns it on with the Sound button (remembered in this browser), and even
+// then silent until their first tap or click (browsers allow audio only after one).
 
-const PREF_KEY = "funge:sound"; // "off" when the player muted it; remembered in this browser only
+const PREF_KEY = "funge:sound"; // "on" when the player turned the sound on; remembered in this browser only
 
 type Note = { at: number; freq: number; len: number; gain?: number };
 
@@ -18,15 +19,15 @@ const listeners = new Set<(on: boolean) => void>();
 
 function readPref(): boolean {
   try {
-    return localStorage.getItem(PREF_KEY) !== "off";
+    return localStorage.getItem(PREF_KEY) === "on";
   } catch {
-    return true;
+    return false;
   }
 }
 function writePref(on: boolean): void {
   try {
-    if (on) localStorage.removeItem(PREF_KEY);
-    else localStorage.setItem(PREF_KEY, "off");
+    if (on) localStorage.setItem(PREF_KEY, "on");
+    else localStorage.removeItem(PREF_KEY);
   } catch {
     // remembering is a nicety
   }
