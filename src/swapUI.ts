@@ -517,7 +517,6 @@ export function initSwap(
       input("swSell").value = "";
       input("swBuy").value = "";
       void update();
-      say(T.done(amountText(bottom(), got), bottom()), false);
       onDone();
       setTimeout(() => void balances(), 2_000);
       setTimeout(() => void balances(), 8_000);
@@ -560,7 +559,6 @@ export function initSwap(
     input("swSell").value = "";
     input("swBuy").value = "";
     void update();
-    say(T.done(amountText(bottom(), got), bottom()), false);
     onDone();
     setTimeout(() => void balances(), 2_000);
     setTimeout(() => void balances(), 8_000);
