@@ -126,10 +126,14 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // The old swap, withdraw and seed boxes wait here, with their handlers, until their screens are rebuilt
   const hold = el("div", "fg-w-hold");
   box.after(hold);
-  for (const id of ["swBox", "swReview", "wdBox"]) {
+  for (const id of ["swBox", "wdBox"]) {
     const e = document.getElementById(id);
     if (e) hold.append(e);
   }
+  // The swap's review window covers the side panel, not the field (walletPanel.css)
+  const review = document.getElementById("swReview");
+  const panelEl = page.closest(".fg-panel");
+  if (review) (panelEl ?? hold).append(review);
   hold.addEventListener("withdraw-done", () => go("home"));
   const old = {
     local: document.getElementById("localWallet"),
