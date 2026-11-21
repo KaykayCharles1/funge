@@ -86,8 +86,11 @@ Only one server may run for a game at a time. Two servers would have two clocks 
 - **Lost:** running rounds can only end through the fallback (12 blocks). Deploy a new game with a new key.
 - **Leaked:** the contract leaves timing to the referee, so an attacker could refuse players, end rounds early, or conquer after the clock ran out (paying the normal price) and so take the pool. They cannot change the prices or who a settlement pays. Stop the server, deploy a new game with a new key, and tell players.
 
-## For the mainnet round (not done yet)
-- Generate the mainnet referee key on the production host only, never on a development machine.
+## Mainnet (live since 2026-11-21, a small-stakes hackathon demo)
+- funge.cash is mainnet (Worker `funge`, referee `funge-referee-mainnet` on Render at referee-mainnet.funge.cash). test.funge.cash is chipnet (Worker `funge-test`, referee `funge` on Render at referee.funge.cash).
+- The demo's referee key was generated on the owner's computer (`scripts/gen-referee-key.ts --demo`), because Render's free plan has no shell. Before real stakes: a paid host with a disk, and a new key generated on that host.
+- The mainnet deploy wallet (`scripts/wallet.ts`, GitHub secret FUNGE_DEPLOY_SEED_MAINNET) pays about 13,000 sats per round; top it up when `VITE_FUNGE_NETWORK=mainnet node scripts/wallet.ts` shows less than about 50,000.
+- Render's free plan gives 750 hours a month; two always-on referees need about 1,440. Keep only the mainnet referee awake (UptimeRobot) when hours run short.
 - The network is a setting, `VITE_FUNGE_NETWORK=mainnet` (default chipnet), read by the page build, the referee server, the robot and the scripts (`src/config.ts`). The page build, the Worker's `NETWORK` var (`wrangler.jsonc`) and the referee host must all say the same network.
 - The server refuses test timers and chipnet keys on mainnet; do not look for ways around that.
 - Start with a rehearsal at small stakes (the opening price is 5.00 PUSD). The game wallet shows a small-stakes banner on mainnet.

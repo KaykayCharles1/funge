@@ -1,7 +1,7 @@
 // Cloudflare Workers for the site: the built site (dist) plus the /next-round route in worker/index.ts, and the
 // invite-link card on the game page (/play/).
 // Two Workers from this one file, both built from `main`:
-//   funge        funge.cash        (deploy command: npx wrangler deploy)
+//   funge        funge.cash        mainnet (deploy command: npx wrangler deploy)
 //   funge-test   test.funge.cash   chipnet with free test coins (deploy command: npx wrangler deploy --env test)
 // Each Worker's build in the Cloudflare dashboard must use the same network and referee as its vars below:
 // build variables VITE_FUNGE_NETWORK and VITE_REFEREE_URL.
@@ -16,8 +16,8 @@
     "run_worker_first": ["/next-round", "/play/", "/play/index.html"]
   },
   "vars": {
-    "NETWORK": "chipnet",
-    "REFEREE_URL": "https://referee.funge.cash",
+    "NETWORK": "mainnet",
+    "REFEREE_URL": "https://referee-mainnet.funge.cash",
     "GITHUB_REPO": "KaykayCharles1/funge"
   },
   "env": {

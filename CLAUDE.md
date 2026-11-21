@@ -4,13 +4,15 @@ Funge is a kingdom game on Bitcoin Cash: CashScript contracts, a referee server 
 TypeScript front end with Tailwind, and an in-browser game wallet. Owner: Charles. Windows with Git Bash.
 
 ## Where things stand
-Funge is live on chipnet. The landing page is at https://funge.cash (index.html) and the game at
-https://funge.cash/play/ (play/index.html). The site is a Cloudflare Worker that rebuilds on every push to
-`main` (wrangler.jsonc; worker/index.ts serves dist and adds one route). The referee runs on Render (free plan) at
-https://referee.funge.cash; UptimeRobot keeps it awake.
+Funge is live on mainnet at https://funge.cash (a small-stakes hackathon demo) and on chipnet, with free test coins,
+at https://test.funge.cash. The landing page is index.html and the game is /play/ (play/index.html). Each site is a
+Cloudflare Worker that rebuilds on every push to `main` (wrangler.jsonc: Worker `funge` for mainnet, `funge-test`
+for chipnet; worker/index.ts serves dist and adds one route). The network is the build setting VITE_FUNGE_NETWORK
+(default chipnet; src/config.ts). Each network has its own referee on Render (free plan): mainnet at
+https://referee-mainnet.funge.cash, chipnet at https://referee.funge.cash. UptimeRobot keeps them awake.
 
 New rounds are automatic, and the next one is always prepared in advance:
-- public/game.chipnet.kingdom.json is the current round; public/game.chipnet.next.json is the next round, already
+- public/game.<network>.kingdom.json is the current round; public/game.<network>.next.json is the next round, already
   deployed and waiting. The referee reads both from the published site every 10 s (Render setting FUNGE_GAMES_URL)
   and refuses to open the next one until the current one is settled.
 - When a round is settled, the page shows the winner for 10 seconds, then switches to the prepared round, without a
@@ -18,11 +20,13 @@ New rounds are automatic, and the next one is always prepared in advance:
   GitHub workflow .github/workflows/next-round.yml (Cloudflare secret GITHUB_TOKEN). A 15-minute schedule is a backup.
 - The workflow runs scripts/next-round.ts (decisions in scripts/robot-plan.ts): it promotes the prepared round to
   current once the current one is settled, deploys a new prepared round with deploy-kingdom.ts --next (paid by a
-  separate deploy wallet, GitHub secret FUNGE_DEPLOY_SEED), and commits the files to `main` as github-actions[bot].
-  Render's deploy hook (GitHub secret RENDER_DEPLOY_HOOK) is used only when the referee has not picked a file up
+  separate deploy wallet per network, GitHub secrets FUNGE_DEPLOY_SEED and FUNGE_DEPLOY_SEED_MAINNET), and commits
+  the files to `main` as github-actions[bot]. The schedule runs both networks; a run by hand picks one. Render's
+  deploy hooks (RENDER_DEPLOY_HOOK, RENDER_DEPLOY_HOOK_MAINNET) are used only when a referee has not picked a file up
   for 5 minutes.
 - Because the robot commits to `main`, run `git pull` before starting work.
-- Test scripts/next-round.ts with `--check` only: a plain run really deploys rounds (paid by the deploy wallet).
+- Test scripts/next-round.ts with `--check` only: a plain run really deploys rounds (paid by the deploy wallet; on
+  mainnet with real BCH).
 - Manual fallback: GitHub, Actions, Next round, Run workflow (tick "Rule change" only after a contract or PUSD change).
 
 Background reading: docs/RUNBOOK.md, docs/KINGDOM.md, docs/REFEREE.md, docs/EVENTS.md, docs/KNOWN_ISSUES.md.
