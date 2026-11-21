@@ -1,9 +1,11 @@
 import qrcode from "qrcode-generator";
 
-// The WizardConnect "qrUri" is built to be alphanumeric-safe; fall back to byte mode if not
+// The WizardConnect "qrUri" is built to be alphanumeric-safe; fall back to byte mode if not.
+// Error correction "Q" (a quarter of the code can be covered and it still scans): the battlefield lays the
+// WizardConnect logo over the middle.
 export function qrDataUrl(text: string): string {
   const build = (mode?: "Alphanumeric") => {
-    const qr = qrcode(0, "L");
+    const qr = qrcode(0, "Q");
     if (mode) qr.addData(text, mode);
     else qr.addData(text);
     qr.make();

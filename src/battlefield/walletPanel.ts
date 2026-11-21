@@ -768,9 +768,15 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
     box.append(walletBack(leave), t);
     if (s.status === "waiting" && s.qrUri) {
       const lead = el("p", "fg-w-mute fg-w-center", T.wcScan);
-      const qr = el("img", "fg-w-qr");
-      qr.src = qrDataUrl(s.qrUri);
-      qr.alt = T.wcQrAlt;
+      // The code with the WizardConnect logo in the middle (the code's error correction leaves room for it)
+      const qr = el("div", "fg-w-qr");
+      const code = el("img", "fg-w-qrcode");
+      code.src = qrDataUrl(s.qrUri);
+      code.alt = T.wcQrAlt;
+      const logo = el("img", "fg-w-qrlogo");
+      logo.src = `${base}icons/wizardconnect.png`;
+      logo.alt = "";
+      qr.append(code, logo);
       const row = el("div", "fg-w-qrbtns");
       const copy = button("fg-w-small", T.wcCopyLink, () => {
         const uri = getWalletState().uri;

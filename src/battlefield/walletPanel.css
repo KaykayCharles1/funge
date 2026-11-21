@@ -233,7 +233,10 @@
 .fg-w-modal-box .fg-w-err { min-height: 0; }
 
 /* WizardConnect (6f) */
-.fg-w-qr { display: block; width: 220px; height: 220px; margin: 4px auto 0; padding: 10px; background: #fff; border-radius: 8px; box-sizing: border-box; }
+.fg-w-qr { position: relative; display: block; width: 220px; height: 220px; margin: 4px auto 0; padding: 10px; background: #fff; border-radius: 8px; box-sizing: border-box; }
+.fg-w-qrcode { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+/* The logo on a white tile in the middle: about 20% of the code's width, well within what error correction "Q" repairs */
+.fg-w-qrlogo { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; transform: translate(-50%, -50%); padding: 4px; background: #fff; border-radius: 10px; box-sizing: border-box; }
 .fg-w-qrbtns { display: flex; gap: 8px; justify-content: center; }
 .fg-w-who { display: flex; align-items: center; gap: 12px; }
 .fg-w-whonames { display: flex; flex-direction: column; gap: 3px; }
