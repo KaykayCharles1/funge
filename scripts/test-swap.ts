@@ -230,4 +230,16 @@ async function refused(p: Promise<unknown> | (() => unknown), code: string) {
   console.log("ok    an own wallet: coins on two addresses, the wallet signs only its own inputs");
 }
 
+// 10. A tiny pool priced off the market does not make a small trade look expensive (the price is size-weighted)
+{
+  // a deep pool at 500 sats per unit, and a 3.00 PUSD pool at 520: a seller would get 4% "worse" than that pool
+  const { chain, owner } = setup([[5_000_000_000n, 10_000_000n], [156_000n, 300n]], []);
+  const pools = await poolsOnChain(chain, owner, PUSD);
+  const sell = quote(pools, PUSD, 100n, "sell", "toBch"); // sell 1.00 PUSD
+  assert.ok(sell.priceMove < 0.01, `selling 1.00 PUSD: ${(sell.priceMove * 100).toFixed(2)}%`);
+  const buy = quote(pools, PUSD, 500n); // buy 5.00 PUSD
+  assert.ok(buy.priceMove > 0 && buy.priceMove < 0.01, `buying 5.00 PUSD: ${(buy.priceMove * 100).toFixed(2)}%`);
+  console.log(`ok    a tiny pool off the market: selling 1.00 PUSD ${(sell.priceMove * 100).toFixed(2)}%, buying 5.00 ${(buy.priceMove * 100).toFixed(2)}%`);
+}
+
 console.log("\nall swap tests passed");

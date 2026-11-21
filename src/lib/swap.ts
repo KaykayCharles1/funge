@@ -123,10 +123,12 @@ export function quote(pools: PoolV0[], category: string, amount: bigint, side: S
   const sats = toPusd ? supply : demand;
   const pusd = toPusd ? demand : supply;
   if (sats < MIN_SELL_SATS) throw new SwapFailure("too_small");
-  // The best price before the swap: the cheapest pool to buy from, or the dearest to sell to (sats per PUSD unit)
-  const rates = pools.map((p) => Number(p.output.amount) / Number(p.output.token.amount));
+  // The market price before the swap: all the pools' BCH over all their PUSD, so each pool counts by its size. (The
+  // single best pool is no measure: a pool of a few PUSD can sit several percent off the market and absorb nothing.)
+  // Negative when the trade beats the market; the review shows that as 0.
+  const market = marketPrice(pools)!;
   const rate = Number(sats) / Number(pusd);
-  const priceMove = toPusd ? rate / Math.min(...rates) - 1 : Math.max(...rates) / rate - 1;
+  const priceMove = toPusd ? rate / market - 1 : market / rate - 1;
   return { trade, category, direction, pusd, sats, poolFee: trade_fee, priceMove };
 }
 
