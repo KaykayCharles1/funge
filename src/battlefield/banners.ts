@@ -25,7 +25,7 @@ export class Banners {
   private midKick: HTMLDivElement;
   private midTitle: HTMLDivElement;
   private midNext: HTMLDivElement;
-  private midDemo: HTMLButtonElement; // "Play a demo round", or "Play again" when a demo round is over
+  private midDemo: HTMLButtonElement; // "Play again" when a demo round is over
   private counting = false; // the box shows the next round's countdown
 
   private isMe: (key: string | null) => boolean;
@@ -109,9 +109,9 @@ export class Banners {
       this.midKick.hidden = kick === "";
       this.midTitle.textContent = title;
       this.midNext.textContent = "";
-      // A demo round from any quiet moment; "Play again" once a demo round is over
+      // "Play again" once a demo round is over (the corner button starts the first one)
       const demoOn = this.demo?.active() ?? false;
-      const demoLabel = !this.demo ? null : !demoOn ? T.demoPlay : state.status === "over" ? T.demoAgain : null;
+      const demoLabel = demoOn && state.status === "over" ? T.demoAgain : null;
       this.midDemo.hidden = demoLabel === null;
       if (demoLabel !== null) this.midDemo.textContent = demoLabel;
       this.mid.hidden = false;

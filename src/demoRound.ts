@@ -7,19 +7,19 @@ import { CLOCK_SETTINGS, GRACE_SECONDS, PROTECT_LOCKOUT_SECONDS } from "./refere
 // "Play a demo round": a round played on the page alone, with demo PUSD, so one person can feel the game without a
 // wallet, a rival or any money. Nothing goes to the referee or the chain. Like the dev mock round (mockRound.ts),
 // every step goes through the page's two doors (the event and snapshot handlers), so the field plays it for real.
-// The script: King Brannoc (a bot) holds the throne with one minute left. The player's first conquest is answered:
-// Brannoc takes the throne back a few seconds later. A second conquest wins: Brannoc stops, and the last king when
+// The script: King Satoshi (a bot) holds the throne with one minute left. The player's first conquest is answered:
+// Satoshi takes the throne back a few seconds later. A second conquest wins: Satoshi stops, and the last king when
 // the clock runs out takes the pool. The money follows the real rules (src/lib/kingdom.ts); so does the clock.
 
 export const DEMO_ROUND_ID = "de".repeat(32);
 export const DEMO_ME = "d1".repeat(20); // the player's key in the demo
 const BOT = "b0".repeat(20);
-const BOT_PLAYER = { name: "Brannoc", avatarId: "king_03", title: "King", house: null };
-const OPENER = "c3".repeat(20); // who opened before Brannoc conquered (only the King box's "previous king" uses it)
+const BOT_PLAYER = { name: "Satoshi", avatarId: "king_03", title: "King", house: null };
+const OPENER = "c3".repeat(20); // who opened before Satoshi conquered (only the King box's "previous king" uses it)
 
 const START_SECONDS = 60;
 const START_BALANCE = 5_000n; // 50.00 demo PUSD
-const BOT_ANSWER_MS: [number, number] = [3_500, 5_500]; // how soon Brannoc takes the throne back
+const BOT_ANSWER_MS: [number, number] = [3_500, 5_500]; // how soon Satoshi takes the throne back
 
 const P = CONFIG.kingdom;
 const str = (n: bigint | number) => n.toString();
@@ -38,7 +38,7 @@ export class DemoRound {
   private status: RoundSnapshot["status"] = "open";
   private deadline: number;
   private lastClock = START_SECONDS;
-  private passCount = 2; // opened, then conquered by Brannoc
+  private passCount = 2; // opened, then conquered by Satoshi
   private king = BOT;
   private previous: string | null = OPENER;
   private value = P.openingPrice;

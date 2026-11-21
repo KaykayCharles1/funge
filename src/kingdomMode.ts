@@ -23,7 +23,7 @@ import { kingdomAct, kingdomCancel, kingdomProtect } from "./referee/kingdomActi
 import { kingdomActExternal, kingdomCancelExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
-import { playMockRound } from "./mockRound.ts";
+import type { playMockRound } from "./mockRound.ts";
 import { DEMO_ME, DEMO_ROUND_ID, DemoRound } from "./demoRound.ts";
 import { markNextRoundAlmost, nextRoundLine, nextRoundReady, resetNextRoundWait, startNextRoundWait } from "./nextRound.ts";
 import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
@@ -82,7 +82,6 @@ let fallbackBusy = false;
 let fallbackNote = "";
 let mockActive = false; // the dev-only mock round is on screen: the real server is not asked about anything
 let demo: DemoRound | null = null; // "Play a demo round" is on screen (src/demoRound.ts); mockActive is on with it
-let beforeDemo: RoundSnapshot | null = null; // the real round as it was when the demo started
 let mockShift = 0; // how far the mock moved the clock, so it can be put back
 let mockRun = 0; // changes when a mock is started or stopped, so an old script notices it was cancelled
 const warned = new Set<string>(); // "deadline:level" for each clock warning already raised
@@ -819,29 +818,6 @@ function checkClockWarnings() {
   );
 }
 
-// Dev page only: replay a scripted round through the same handlers that real events use
-async function startMock(label: (t: string) => void) {
-  mockActive = true;
-  const me = ++mockRun;
-  clearTimeout(timer);
-  watcher?.close();
-  watcher = null;
-  feed.clear();
-  warned.clear();
-  round = null;
-  await playMockRound({
-    now: serverNow,
-    shiftClock: (ms) => {
-      mockShift += ms;
-      shiftClockForMock(ms);
-    },
-    onEvent,
-    onSnapshot: applySnapshot,
-    sleep,
-    cancelled: () => me !== mockRun,
-    label,
-  });
-}
 function stopMock() {
   mockRun++;
   shiftClockForMock(-mockShift);
@@ -856,8 +832,7 @@ function stopMock() {
 // "Play a demo round": the real round steps aside (nothing is asked of the server meanwhile, as for the mock round)
 // and the demo plays through the same handlers. Leaving it brings the real round back.
 export function startDemo(): void {
-  if (demo) demo.stop();
-  else beforeDemo = round;
+  demo?.stop();
   mockActive = true;
   mockRun++;
   clearTimeout(timer);
@@ -869,44 +844,14 @@ export function startDemo(): void {
   demo = new DemoRound({ now: serverNow, onEvent, onSnapshot: applySnapshot, changed: renderAll });
   demo.start();
 }
-export function stopDemo(): void {
-  if (!demo) return;
-  demo.stop();
-  demo = null;
-  stopMock();
-  // The real round straight away, as it was; the server's fresh answer follows (stopMock asked for it)
-  if (beforeDemo) applySnapshot(beforeDemo);
-  beforeDemo = null;
+// Leaving the demo reloads the battlefield page as it is without the demo (a ?demo=1 link loses its demo=1): the
+// cleanest way back to the real round, whatever the server answers meanwhile
+export function leaveDemo(): void {
+  const url = new URL(location.href);
+  url.searchParams.delete("demo");
+  location.assign(url.toString());
 }
 export const demoActive = () => demo !== null;
-
-function installMockButton() {
-  if (!import.meta.env.DEV) return; // not part of the production build
-  const bar = document.createElement("div");
-  bar.className = "fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-xs text-slate-200 ring-1 ring-slate-600";
-  const text = document.createElement("span");
-  text.textContent = "Dev: mock round";
-  const play = document.createElement("button");
-  play.id = "mockPlayBtn";
-  play.className = "rounded-lg bg-amber-500 px-3 py-1 font-semibold text-slate-900";
-  play.textContent = "Play mock round";
-  const stop = document.createElement("button");
-  stop.id = "mockStopBtn";
-  stop.className = "hidden rounded-lg bg-slate-600 px-3 py-1";
-  stop.textContent = "Back to the real round";
-  play.addEventListener("click", () => {
-    play.disabled = true;
-    show("mockStopBtn", true);
-    void startMock((t) => (text.textContent = t)).finally(() => (play.disabled = false));
-  });
-  stop.addEventListener("click", () => {
-    stopMock();
-    text.textContent = "Dev: mock round";
-    stop.classList.add("hidden");
-  });
-  bar.append(text, play, stop);
-  document.body.append(bar);
-}
 
 async function tick() {
   if (running || mockActive) return;
@@ -1030,7 +975,6 @@ export async function startKingdomMode() {
     }
   });
   renderAll();
-  installMockButton();
   void tick();
 }
 
@@ -1052,7 +996,7 @@ function mountBattlefieldIfAsked() {
       // ?demo=1: straight into a demo round once the field is ready (a link for people trying the game on their own)
       const demoLink = new URLSearchParams(location.search).get("demo") === "1";
       m.mountBattlefield({
-        myKeys, page: battlefieldPage, run: battlefieldDo, demo: { start: startDemo, stop: stopDemo, active: demoActive },
+        myKeys, page: battlefieldPage, run: battlefieldDo, demo: { start: startDemo, stop: leaveDemo, active: demoActive },
         onReady: demoLink ? startDemo : undefined,
       });
     })

@@ -40,7 +40,20 @@
 .fg-demo button { height: 34px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #fbbc28; background: #0f243d; color: #fbbc28;
   font: inherit; cursor: pointer; }
 .fg-demo button:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
-@media (max-width: 699px) { .fg-demo { top: 76px; left: 12px; font-size: 13px; } .fg-mid-demo { height: 44px; font-size: 16px; } }
+/* "Play a demo round": the navy pill with the gold edge, like Leave demo and Cancel round */
+.fg-demo-play { position: absolute; left: 24px; bottom: 24px; z-index: 19; height: 48px; padding: 0 22px; border-radius: 999px; cursor: pointer;
+  background: rgba(15, 36, 61, 0.95); border: 2px solid #fbbc28; color: #fbbc28; box-shadow: 0 4px 0 #0f243d;
+  font-family: "Alegreya Sans", sans-serif; font-size: 18px; font-weight: 700; }
+.fg-demo-play:hover { background: #16324f; }
+.fg-demo-play:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+.fg-demo-play[hidden] { display: none; }
+/* Below 1240px the bottom belongs to the action bar: the button goes where the demo badge appears */
+@media (max-width: 1239px) { .fg-demo-play { bottom: auto; top: 104px; height: 42px; font-size: 16px; } }
+@media (max-width: 699px) {
+  .fg-demo { top: 76px; left: 12px; font-size: 13px; }
+  .fg-demo-play { top: 76px; left: 12px; height: 40px; padding: 0 16px; font-size: 15px; }
+  .fg-mid-demo { height: 44px; font-size: 16px; }
+}
 .fg-mid-next strong { font-family: Cinzel, Georgia, serif; color: #fbbc28; }
 
 /* Phone (Phase B): banners under the 64px strip, wrapping; the middle boxes narrower */

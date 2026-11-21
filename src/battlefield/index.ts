@@ -118,8 +118,18 @@ export function mountBattlefield(opts: MountOptions): void {
     leave.textContent = COPY.battlefield.demoLeave;
     leave.addEventListener("click", () => opts.demo.stop());
     demoBar.append(demoText, leave);
-    host.append(demoBar);
-    window.setInterval(() => (demoBar.hidden = !opts.demo.active()), 250);
+    // "Play a demo round": always there (bottom left on a wide screen, top left on a smaller one), except during one
+    const demoPlay = document.createElement("button");
+    demoPlay.type = "button";
+    demoPlay.className = "fg-demo-play";
+    demoPlay.textContent = COPY.battlefield.demoPlay;
+    demoPlay.addEventListener("click", () => opts.demo.start());
+    host.append(demoBar, demoPlay);
+    window.setInterval(() => {
+      const on = opts.demo.active();
+      demoBar.hidden = !on;
+      demoPlay.hidden = on;
+    }, 250);
     scene.cardsOnPage = true;
     scene.hud.attachBanners(banners);
     scene.hud.attachDom(new TopBar(host, {
