@@ -1,0 +1,29 @@
+{
+  "contractVersion": 3,
+  "network": "mainnet",
+  "gameCategory": "32a900577b6d386ac310075e2e2230a5c937af5924ad77a7b0025b8bd987da2b",
+  "pusdCategory": "2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544",
+  "state": {
+    "address": "bitcoincash:pwcfe62jxy9zuc4ccqc42tyh2llhn8drjhhxsjxlgcgmglxemd92khk26dwg8",
+    "tokenAddress": "bitcoincash:rwcfe62jxy9zuc4ccqc42tyh2llhn8drjhhxsjxlgcgmglxemd92k99km503v",
+    "lockingBytecode": "aa20b09ce952310a2e62b8c031552c9757ff799da395ee6848df4611b47cd9db4aab87"
+  },
+  "pot": {
+    "address": "bitcoincash:pv85lznhwjukyusq6fdgqk3es290mcg83sqhyfzfzm237e5h25v42e8qx4ce3",
+    "tokenAddress": "bitcoincash:rv85lznhwjukyusq6fdgqk3es290mcg83sqhyfzfzm237e5h25v42t5u8veq6",
+    "lockingBytecode": "aa200f4f8a7774b9627200d25a805a39828afde1078c0172244916d51f669755195587"
+  },
+  "refereePubkey": "03cca65576f8e17edb1f495e819d89d45fcbe6373d18a7f9590c2f060de15faf69",
+  "params": {
+    "openingPrice": "500",
+    "feePercent": "2",
+    "cutPercent": "10",
+    "cap": "5000",
+    "protectsPerReign": 2,
+    "unit": "100",
+    "fallbackBlocks": 12
+  },
+  "creatorPkh": "cfc2c6fa15ec114f462b7b31fd1fbf7e028b7f87",
+  "prepTxid": "32a900577b6d386ac310075e2e2230a5c937af5924ad77a7b0025b8bd987da2b",
+  "initTxid": "a818364c563cfda3f401aa45cb027e4a5c882d14c7e784283cec395c93ffdbe0"
+}
