@@ -33,6 +33,8 @@ export type MountOptions = {
   myKeys: () => string[]; // the player's own key hashes (game wallet, own wallet)
   page: () => PageView; // the page's own state, for the action bar
   run: PageDo; // the page's own handlers: conquer, protect, claim, cancel
+  demo: { start: () => void; stop: () => void; active: () => boolean }; // "Play a demo round" (src/demoRound.ts)
+  onReady?: () => void; // the art is in and the loading screen is gone
 };
 const sameKey = (a: string, b: string) => a.slice(0, 22).toLowerCase() === b.slice(0, 22).toLowerCase();
 
@@ -104,7 +106,20 @@ export function mountBattlefield(opts: MountOptions): void {
       if (!held) director?.tick();
     });
     // The top bar, the banners and the middle box over the field take over the canvas plates and cards
-    banners = new Banners(host, isMe);
+    banners = new Banners(host, isMe, opts.demo);
+    // While a demo round plays: what it is, and the way back to the real round
+    const demoBar = document.createElement("div");
+    demoBar.className = "fg-demo";
+    demoBar.hidden = true;
+    const demoText = document.createElement("span");
+    demoText.textContent = COPY.battlefield.demoBadge;
+    const leave = document.createElement("button");
+    leave.type = "button";
+    leave.textContent = COPY.battlefield.demoLeave;
+    leave.addEventListener("click", () => opts.demo.stop());
+    demoBar.append(demoText, leave);
+    host.append(demoBar);
+    window.setInterval(() => (demoBar.hidden = !opts.demo.active()), 250);
     scene.cardsOnPage = true;
     scene.hud.attachBanners(banners);
     scene.hud.attachDom(new TopBar(host, {
@@ -117,6 +132,7 @@ export function mountBattlefield(opts: MountOptions): void {
     }));
     connection();
     loading.done();
+    opts.onReady?.();
     // The page may have sent its first snapshot while the art was still loading
     if (early && !held) director.onSnapshot(early, CONFIG.kingdom.openingPrice);
     early = null;

@@ -25,12 +25,15 @@ export class Banners {
   private midKick: HTMLDivElement;
   private midTitle: HTMLDivElement;
   private midNext: HTMLDivElement;
+  private midDemo: HTMLButtonElement; // "Play a demo round", or "Play again" when a demo round is over
   private counting = false; // the box shows the next round's countdown
 
   private isMe: (key: string | null) => boolean;
+  private demo: { start: () => void; active: () => boolean } | null;
 
-  constructor(host: HTMLElement, isMe: (key: string | null) => boolean) {
+  constructor(host: HTMLElement, isMe: (key: string | null) => boolean, demo: { start: () => void; active: () => boolean } | null = null) {
     this.isMe = isMe;
+    this.demo = demo;
     const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "") => {
       const e = document.createElement(tag);
       if (cls) e.className = cls;
@@ -49,7 +52,11 @@ export class Banners {
     this.midKick = el("div", "fg-mid-kick");
     this.midTitle = el("div", "fg-mid-title");
     this.midNext = el("div", "fg-mid-next");
-    this.mid.append(this.midKick, this.midTitle, this.midNext);
+    this.midDemo = el("button", "fg-mid-demo");
+    this.midDemo.type = "button";
+    this.midDemo.hidden = true;
+    this.midDemo.addEventListener("click", () => this.demo?.start());
+    this.mid.append(this.midKick, this.midTitle, this.midNext, this.midDemo);
     host.append(this.mid, this.strip, this.pops);
     setInterval(() => {
       if (this.counting) this.paintNext();
@@ -102,6 +109,11 @@ export class Banners {
       this.midKick.hidden = kick === "";
       this.midTitle.textContent = title;
       this.midNext.textContent = "";
+      // A demo round from any quiet moment; "Play again" once a demo round is over
+      const demoOn = this.demo?.active() ?? false;
+      const demoLabel = !this.demo ? null : !demoOn ? T.demoPlay : state.status === "over" ? T.demoAgain : null;
+      this.midDemo.hidden = demoLabel === null;
+      if (demoLabel !== null) this.midDemo.textContent = demoLabel;
       this.mid.hidden = false;
     };
     if (state.status === "waiting") return box("fg-waiting", "", T.waitingTitle);

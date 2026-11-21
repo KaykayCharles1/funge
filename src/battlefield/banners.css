@@ -28,6 +28,19 @@
 .fg-won .fg-mid-title { color: #fbbc28; }
 .fg-mid-next { font-size: 19px; margin-top: 10px; }
 .fg-mid-next:empty { display: none; }
+.fg-mid-demo { margin-top: 14px; height: 46px; padding: 0 26px; border-radius: 999px; border: 0; cursor: pointer; background: #fbbc28; color: #0f243d;
+  box-shadow: 0 4px 0 #0f243d; font-family: "Alegreya Sans", sans-serif; font-size: 18px; font-weight: 700; }
+.fg-mid-demo[hidden] { display: none; }
+.fg-mid-demo:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+/* "Demo round · demo PUSD" and Leave demo, on the field while a demo round plays */
+.fg-demo { position: absolute; left: 24px; top: 104px; z-index: 19; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px;
+  background: rgba(15, 26, 51, 0.92); border: 2px solid #fbbc28; border-radius: 999px; font-family: "Alegreya Sans", sans-serif; color: #f8eeca;
+  font-size: 15px; font-weight: 700; }
+.fg-demo[hidden] { display: none; }
+.fg-demo button { height: 34px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #fbbc28; background: #0f243d; color: #fbbc28;
+  font: inherit; cursor: pointer; }
+.fg-demo button:focus-visible { outline: 3px solid #fcd34d; outline-offset: 2px; }
+@media (max-width: 699px) { .fg-demo { top: 76px; left: 12px; font-size: 13px; } .fg-mid-demo { height: 44px; font-size: 16px; } }
 .fg-mid-next strong { font-family: Cinzel, Georgia, serif; color: #fbbc28; }
 
 /* Phone (Phase B): banners under the 64px strip, wrapping; the middle boxes narrower */
