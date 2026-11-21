@@ -3,7 +3,8 @@
 # round is deployed (paid by the deploy wallet). The new files are committed to main; Cloudflare publishes them and
 # the Referee picks them up by itself (FUNGE_GAMES_URL). Render is only restarted when the Referee has not picked a
 # file up for 5 minutes. Run it by hand from the Actions tab too.
-# One network per run (the "network" choice; the 15-minute schedule runs chipnet). Each network has its own secrets:
+# The 15-minute schedule runs both networks, side by side; a run by hand (or from a page) runs the one network chosen.
+# Each network has its own secrets:
 #   chipnet: FUNGE_DEPLOY_SEED, RENDER_DEPLOY_HOOK
 #   mainnet: FUNGE_DEPLOY_SEED_MAINNET, RENDER_DEPLOY_HOOK_MAINNET (deploy wallet seed phrase; Render's deploy hook link)
 name: Next round
@@ -26,18 +27,21 @@ on:
 permissions:
   contents: write
 
-# Never two runs at once for one network: two robots could each deploy a round.
-concurrency:
-  group: next-round-${{ inputs.network || 'chipnet' }}
-  cancel-in-progress: false
-
 jobs:
   next-round:
+    strategy:
+      fail-fast: false # one network failing must not stop the other
+      matrix:
+        network: ${{ github.event_name == 'schedule' && fromJSON('["chipnet","mainnet"]') || fromJSON(format('["{0}"]', inputs.network || 'chipnet')) }}
+    # Never two runs at once for one network: two robots could each deploy a round.
+    concurrency:
+      group: next-round-${{ matrix.network }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      VITE_FUNGE_NETWORK: ${{ inputs.network || 'chipnet' }}
-      REFEREE: ${{ (inputs.network || 'chipnet') == 'mainnet' && 'https://referee-mainnet.funge.cash' || 'https://referee.funge.cash' }}
+      VITE_FUNGE_NETWORK: ${{ matrix.network }}
+      REFEREE: ${{ matrix.network == 'mainnet' && 'https://referee-mainnet.funge.cash' || 'https://referee.funge.cash' }}
     steps:
       # main as it is now, not as it was when this run was queued: an earlier run may have just pushed a new round
       - uses: actions/checkout@v5
