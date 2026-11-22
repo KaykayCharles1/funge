@@ -90,3 +90,6 @@
   .fg-main.fg-off { font-size: 17px; }
   .fg-chip { padding: 0 12px 0 8px; gap: 8px; font-size: 16px; }
 }
+
+/* The own wallet's coin in the chip (a class, not a style attribute: the live site's CSP drops those) */
+.fg-chip-own { width: 26px; height: 26px; border-radius: 50%; }

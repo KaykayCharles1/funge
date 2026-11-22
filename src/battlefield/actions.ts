@@ -208,7 +208,7 @@ export function mountActionBar(
           ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
           : icon === "none"
             ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f3cf74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6.5 16 4l1.2 2.5"/><rect x="4" y="6.5" width="17" height="12.5" rx="2"/><path d="M17 12.5h.5"/></svg>'
-            : `<img src="${PUSD_ICON}" alt="" style="width:26px;height:26px;border-radius:50%">`;
+            : `<img src="${PUSD_ICON}" alt="" width="26" height="26" class="fg-chip-own">`;
       }
       chip.setAttribute("aria-label", `${word}. ${T.openWallet}`);
     }

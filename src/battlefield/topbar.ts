@@ -248,7 +248,8 @@ export class TopBar {
       this.sub.style.display = "none";
       return;
     }
-    this.avatar.setAttribute("style", avatarStyle(king.portrait, PHONE.matches ? 40 : 54));
+    // Through the DOM, not a style attribute: the live site's CSP (style-src 'self') drops style attributes
+    this.avatar.style.cssText = avatarStyle(king.portrait, PHONE.matches ? 40 : 54);
     this.last = { king, state };
     this.avatar.setAttribute("aria-label", king.name);
     this.name.textContent = this.o.isMe(state.king) ? T.youName(king.name) : king.name;
