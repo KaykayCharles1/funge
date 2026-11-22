@@ -107,5 +107,4 @@ CashScript 0.14, libauth, Cauldron (through `@cashlab/cauldron`), WizardConnect,
 - [docs/REFEREE.md](docs/REFEREE.md): what the referee can and cannot do
 - [docs/EVENTS.md](docs/EVENTS.md): the events the referee sends to the page
 - [docs/RUNBOOK.md](docs/RUNBOOK.md): running Funge on mainnet and chipnet
-- [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md): what is not finished
 - [docs/journey.md](docs/journey.md): how Funge was built
