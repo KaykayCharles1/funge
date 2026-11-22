@@ -219,7 +219,7 @@ export function mountActionBar(
     const king = k ? (k.holder ?? r!.king) : null;
     const mine = !!r && r.status === "open" && v.actingPkh !== null && king === v.actingPkh;
     const ended = !r || !!v.ended || r.status === "settled";
-    const claimable = !!r && r.status === "over" && v.kingIsMine;
+    const claimable = !v.demo && !!r && r.status === "over" && v.kingIsMine; // the demo shows its win on the field
 
     // Main button. Hidden for the king (the protect row shows instead) and once the round is over, except the winner's Claim.
     let label = "…", enabled = false, busy = false, show = true;

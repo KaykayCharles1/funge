@@ -55,6 +55,40 @@ function icon(c: Coin, size: string): HTMLElement {
   }, { once: true });
   return img;
 }
+// After a swap went through: a card at the top of the side panel, "Swapped / 1.00 PUSD for 0.0052 BCH", with the
+// logo of the coin sold. It fades away after 4 seconds; X removes it at once.
+const CARD_MS = 4_000;
+let cardTimer: number | undefined;
+function swappedCard(sold: Coin, soldAmount: bigint, got: Coin, gotAmount: bigint) {
+  document.getElementById("swDone")?.remove();
+  clearTimeout(cardTimer);
+  const card = document.createElement("div");
+  card.id = "swDone";
+  card.setAttribute("role", "status");
+  const words = document.createElement("div");
+  words.className = "sw-done-words";
+  const title = document.createElement("div");
+  title.className = "sw-done-title";
+  title.textContent = T.swapped;
+  const line = document.createElement("div");
+  line.className = "sw-done-line";
+  line.textContent = T.swappedLine(`${amountText(sold, soldAmount)} ${sold}`, `${amountText(got, gotAmount)} ${got}`);
+  words.append(title, line);
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "sw-done-x";
+  x.setAttribute("aria-label", T.close);
+  x.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; // a fixed drawing
+  card.append(icon(sold, "sw-done-logo"), words, x);
+  ($("swReview").parentElement ?? document.body).append(card); // in the battlefield: the side panel
+  const fade = () => {
+    clearTimeout(cardTimer);
+    card.classList.add("sw-done-out");
+    window.setTimeout(() => card.remove(), 300);
+  };
+  x.addEventListener("click", () => card.remove());
+  cardTimer = window.setTimeout(fade, CARD_MS);
+}
 function badge(id: string, c: Coin) {
   $(id).replaceChildren(icon(c, "h-6 w-6"), document.createTextNode(c));
 }
@@ -514,6 +548,7 @@ export function initSwap(
         return;
       }
       closeReview();
+      swappedCard(top(), topAmount(r.tx), bottom(), got);
       input("swSell").value = "";
       input("swBuy").value = "";
       void update();
@@ -522,6 +557,7 @@ export function initSwap(
       setTimeout(() => void balances(), 8_000);
       return;
     }
+    let sold = topAmount(r.tx);
     try {
       await swap.sendSwap(provider, r.tx);
       got = bottomAmount(r.tx);
@@ -539,6 +575,7 @@ export function initSwap(
             const tx = await swap.buildSwap(provider, w.wallet, q);
             await swap.sendSwap(provider, tx);
             got = bottomAmount(tx);
+            sold = topAmount(tx);
           }
         } catch (e2) {
           console.error(e2);
@@ -556,6 +593,7 @@ export function initSwap(
       return; // the window stays open with the reason; Close goes back to the form
     }
     closeReview();
+    swappedCard(top(), sold, bottom(), got);
     input("swSell").value = "";
     input("swBuy").value = "";
     void update();

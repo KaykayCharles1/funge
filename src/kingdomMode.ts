@@ -23,7 +23,8 @@ import { kingdomAct, kingdomCancel, kingdomProtect } from "./referee/kingdomActi
 import { kingdomActExternal, kingdomCancelExternal, kingdomProtectExternal } from "./referee/kingdomExternal.ts";
 import { kingdomSettleWithoutReferee, watchKingdomChain } from "./referee/kingdomFallback.ts";
 import type { KingdomChainWatch } from "./referee/kingdomFallback.ts";
-import { playMockRound } from "./mockRound.ts";
+import type { playMockRound } from "./mockRound.ts";
+import { DEMO_ME, DEMO_ROUND_ID, DemoRound } from "./demoRound.ts";
 import { markNextRoundAlmost, nextRoundLine, nextRoundReady, resetNextRoundWait, startNextRoundWait } from "./nextRound.ts";
 import { emitSceneEvent, emitSceneSnapshot } from "./sceneBus.ts";
 import { vault } from "./wallet/vault.ts";
@@ -80,6 +81,7 @@ let chainBusy = false;
 let fallbackBusy = false;
 let fallbackNote = "";
 let mockActive = false; // the dev-only mock round is on screen: the real server is not asked about anything
+let demo: DemoRound | null = null; // "Play a demo round" is on screen (src/demoRound.ts); mockActive is on with it
 let mockShift = 0; // how far the mock moved the clock, so it can be put back
 let mockRun = 0; // changes when a mock is started or stopped, so an old script notices it was cancelled
 const warned = new Set<string>(); // "deadline:level" for each clock warning already raised
@@ -92,12 +94,13 @@ const externalPkh = (): string | null => {
   return w.status === "connected" ? w.pkhHex : null;
 };
 // Every key that counts as "you": the game wallet and/or a connected own wallet
-const myKeys = () => [getLocalWallet()?.pkhHex, externalPkh()].filter((k): k is string => !!k);
+// In the demo round the player is the demo key only, so a real wallet is never mistaken for a demo king
+const myKeys = () => (demo ? [DEMO_ME] : [getLocalWallet()?.pkhHex, externalPkh()].filter((k): k is string => !!k));
 const isMine = (key: string | null) => key !== null && myKeys().includes(key);
 // The previous king is stored as the first 11 bytes of the key hash, so it is compared by prefix
 const isMinePrefix = (prefix: string) => myKeys().some((k) => k.startsWith(prefix));
 // The wallet that would play right now: a wallet the player explicitly connected wins; otherwise the game wallet
-const actingPkh = (): string | null => externalPkh() ?? getLocalWallet()?.pkhHex ?? null;
+const actingPkh = (): string | null => (demo ? DEMO_ME : externalPkh() ?? getLocalWallet()?.pkhHex ?? null);
 
 function setExternalVisible(visible: boolean) {
   show("wallet", visible);
@@ -661,7 +664,9 @@ function waitForNextRound() {
     switchToRound(next);
   };
   const check = async () => {
-    if (checking) return;
+    // Not while a demo round plays: the switch would clear the demo's round from the page. Leaving the demo reloads
+    // the page, which loads the new round then.
+    if (checking || demo) return;
     checking = true;
     try {
       if (++checks % 100 === 0) ask(); // every 5 minutes, in case the first ask did not start it
@@ -718,6 +723,7 @@ async function firstRound(): Promise<GameKingdom> {
 // Show the new round in place: the wallet stays unlocked and connected. Everything tied to the old round is
 // dropped, then the usual first load runs again for the new one (snapshot, history, live socket).
 function switchToRound(next: GameKingdom) {
+  if (demo) return; // see waitForNextRound: the demo's reload loads the new round
   try {
     watcher?.close();
     watcher = null;
@@ -754,9 +760,10 @@ async function loadHistory() {
 
 function applySnapshot(s: RoundSnapshot) {
   if (!mockActive && s.gameId !== game.gameCategory) return; // a late answer about the round before a switch
+  if (demo && s.gameId !== DEMO_ROUND_ID) return; // a real answer still on its way when the demo started
   round = s;
   emitSceneSnapshot(s, mockActive ? "mock" : "server");
-  if (s.kingdom) lastLive = s;
+  if (s.kingdom && !demo) lastLive = s;
   watcher?.setSeq(s.lastSeq); // the snapshot already includes every event up to here
   renderAll();
   $("status").textContent = `Updated ${new Date().toLocaleTimeString()}`;
@@ -768,6 +775,7 @@ function applySnapshot(s: RoundSnapshot) {
 
 // Instant reaction to a pushed event, then the server's snapshot confirms it
 function onEvent(e: RefereeEvent) {
+  if (demo && e.roundId !== DEMO_ROUND_ID) return; // a real event still on its way when the demo started
   emitSceneEvent(e, mockActive ? "mock" : "server");
   feed.set(e.seq, e);
   const r = round;
@@ -813,29 +821,6 @@ function checkClockWarnings() {
   );
 }
 
-// Dev page only: replay a scripted round through the same handlers that real events use
-async function startMock(label: (t: string) => void) {
-  mockActive = true;
-  const me = ++mockRun;
-  clearTimeout(timer);
-  watcher?.close();
-  watcher = null;
-  feed.clear();
-  warned.clear();
-  round = null;
-  await playMockRound({
-    now: serverNow,
-    shiftClock: (ms) => {
-      mockShift += ms;
-      shiftClockForMock(ms);
-    },
-    onEvent,
-    onSnapshot: applySnapshot,
-    sleep,
-    cancelled: () => me !== mockRun,
-    label,
-  });
-}
 function stopMock() {
   mockRun++;
   shiftClockForMock(-mockShift);
@@ -847,33 +832,29 @@ function stopMock() {
   renderAll();
   kick();
 }
-function installMockButton() {
-  if (!import.meta.env.DEV) return; // not part of the production build
-  const bar = document.createElement("div");
-  bar.className = "fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-xs text-slate-200 ring-1 ring-slate-600";
-  const text = document.createElement("span");
-  text.textContent = "Dev: mock round";
-  const play = document.createElement("button");
-  play.id = "mockPlayBtn";
-  play.className = "rounded-lg bg-amber-500 px-3 py-1 font-semibold text-slate-900";
-  play.textContent = "Play mock round";
-  const stop = document.createElement("button");
-  stop.id = "mockStopBtn";
-  stop.className = "hidden rounded-lg bg-slate-600 px-3 py-1";
-  stop.textContent = "Back to the real round";
-  play.addEventListener("click", () => {
-    play.disabled = true;
-    show("mockStopBtn", true);
-    void startMock((t) => (text.textContent = t)).finally(() => (play.disabled = false));
-  });
-  stop.addEventListener("click", () => {
-    stopMock();
-    text.textContent = "Dev: mock round";
-    stop.classList.add("hidden");
-  });
-  bar.append(text, play, stop);
-  document.body.append(bar);
+// "Play a demo round": the real round steps aside (nothing is asked of the server meanwhile, as for the mock round)
+// and the demo plays through the same handlers. Leaving it brings the real round back.
+export function startDemo(): void {
+  demo?.stop();
+  mockActive = true;
+  mockRun++;
+  clearTimeout(timer);
+  watcher?.close();
+  watcher = null;
+  feed.clear();
+  warned.clear();
+  round = null;
+  demo = new DemoRound({ now: serverNow, onEvent, onSnapshot: applySnapshot, changed: renderAll });
+  demo.start();
 }
+// Leaving the demo reloads the battlefield page as it is without the demo (a ?demo=1 link loses its demo=1): the
+// cleanest way back to the real round, whatever the server answers meanwhile
+export function leaveDemo(): void {
+  const url = new URL(location.href);
+  url.searchParams.delete("demo");
+  location.assign(url.toString());
+}
+export const demoActive = () => demo !== null;
 
 async function tick() {
   if (running || mockActive) return;
@@ -997,7 +978,6 @@ export async function startKingdomMode() {
     }
   });
   renderAll();
-  installMockButton();
   void tick();
 }
 
@@ -1015,7 +995,14 @@ function mountBattlefieldIfAsked() {
   $("app").style.display = "none";
   import("./battlefield/index.ts")
     // "you" (both wallets), and the page's own state and handlers for the action bar (see battlefieldPage below)
-    .then((m) => m.mountBattlefield({ myKeys, page: battlefieldPage, run: battlefieldDo }))
+    .then((m) => {
+      // ?demo=1: straight into a demo round once the field is ready (a link for people trying the game on their own)
+      const demoLink = new URLSearchParams(location.search).get("demo") === "1";
+      m.mountBattlefield({
+        myKeys, page: battlefieldPage, run: battlefieldDo, demo: { start: startDemo, stop: leaveDemo, active: demoActive },
+        onReady: demoLink ? startDemo : undefined,
+      });
+    })
     .catch((e) => {
       console.error("battlefield failed to load:", e instanceof Error ? e.message : String(e));
       boot.remove();
@@ -1061,9 +1048,10 @@ export function battlefieldPage() {
   const protectBtn = (i: number) => document.getElementById(`kProt${i}`) as HTMLButtonElement | null;
   const pusdText = document.getElementById("lwPusd")?.textContent ?? "";
   const m = /^(\d+)\.(\d{2}) PUSD$/.exec(pusdText);
-  return {
+  const view = {
     round,
-    mock: mockActive,
+    mock: mockActive && !demo,
+    demo: demo ? { over: demo.over } : null,
     ended: endedShown,
     net,
     act: actState(), // { enabled, label, hint } as the old main button shows it
@@ -1096,17 +1084,40 @@ export function battlefieldPage() {
       pusd: m ? BigInt(m[1] + m[2]) : null, // game wallet PUSD in base units, when shown
     },
   };
+  if (!demo) return view;
+  // The demo round: demo PUSD in the wallet chip, no wallet needed, and only the demo's own moves
+  const balance = demo.balance;
+  return {
+    ...view,
+    // The real round's ending ("This round is finished", waiting for the next round) is not the demo's: the demo's
+    // own end comes from its snapshot (status "over")
+    ended: false,
+    act: { enabled: demo.canConquer(), label: "", hint: "" },
+    busy: false, external: false, signPrompt: "", signLeftMs: null, note: null,
+    protect: demo.protectState(),
+    cancelRound: { ...view.cancelRound, show: false, enabled: false },
+    needsProfile: !demo.hasProfile(),
+    claiming: false,
+    wallet: {
+      game: true, vault: "unlocked" as ReturnType<typeof vault.state>, externalName: null,
+      pusdText: `${units(String(balance))} PUSD`, bchText: "0.01000000 BCH", pusd: balance,
+    },
+  };
 }
 export const battlefieldDo = {
   act: (profile?: { name: string; avatarId: string }, agreed?: bigint) => {
+    if (demo) return demo.conquer(profile);
     bfActStartedAt = Date.now();
     onAct(profile, agreed);
   },
   protect: (i: number) => {
+    if (demo) return demo.protect(i);
     bfActStartedAt = Date.now();
     onProtect(i);
   },
-  claim: () => void onClaim(),
+  claim: () => {
+    if (!demo) void onClaim();
+  },
   cancelRound: () => {
     bfActStartedAt = Date.now();
     onCancelRound();
