@@ -256,6 +256,22 @@ export const COPY = {
     description: "A battle for the throne game on Bitcoin Cash. One Kingdom, one King, one PUSD Treasury. The last king wins it all.",
     title: "Funge",
     tagline: "Conquer the throne. The last king wins the Treasury.",
+    // The project strip at the very top, for the hackathon judges: the event, the address for votes, and the links.
+    // On a phone it scrolls from right to left.
+    strip: {
+      label: "Project information",
+      event: "BCH BLAZE 2026",
+      votes: "Funge votes:",
+      address: "bitcoincash:zrrefj3c74fffqatf7l2cftfmr2p0xd8k5ma09clk2",
+      copy: "Copy",
+      copied: "Copied",
+      opensNew: "(opens in a new tab)",
+      links: [
+        { text: "Presentation", href: "https://docs.google.com/presentation/d/1Mp6ganeNi_efnJHrHYXZPEYHYWe_ctCsJlwc_65o-iM/present?slide=id.g38e0854b437_1_0", lead: true },
+        { text: "Forked Repo", href: "https://github.com/KaykayCharles1/funge-pre-demo", lead: false },
+        { text: "GitHub", href: "https://github.com/KaykayCharles1/funge", lead: false },
+      ],
+    },
     // The hero (built first, section by section)
     logoAlt: "Funge",
     navLabel: "Page sections",

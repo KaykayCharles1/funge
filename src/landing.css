@@ -1356,3 +1356,76 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .social, .social__tip { transition: none; }
 }
+
+/* ---------------- The project strip above the hero (for the hackathon judges) ---------------- */
+
+.strip {
+  position: relative;
+  z-index: 6;
+  overflow: hidden;
+  background: var(--box-deep);
+  border-bottom: 1px solid rgb(224 169 58 / 0.35);
+  font-family: var(--text);
+  font-size: 0.95rem;
+  color: var(--cream-dim);
+}
+.strip__track { display: flex; }
+.strip__row {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2vw, 1.75rem);
+  min-height: 3.25rem;
+  padding: 0.4rem clamp(1rem, 3.5vw, 3rem);
+  white-space: nowrap;
+}
+.strip__row[aria-hidden="true"] { display: none; } /* the second copy is only for the moving strip on phones */
+.strip__event { font-weight: 700; color: var(--logo-gold); letter-spacing: 0.02em; }
+.strip__votes { display: inline-flex; align-items: center; gap: 0.6rem; }
+.strip__addr {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88rem;
+  color: var(--cream);
+}
+.strip__copy {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgb(224 169 58 / 0.45);
+  border-radius: 6px;
+  background: var(--box);
+  color: var(--foil-hi);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.strip__copy:hover { background: var(--board); border-color: var(--foil); }
+.strip__links { display: inline-flex; align-items: center; gap: clamp(1rem, 2vw, 1.5rem); margin-left: auto; }
+.strip__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--cream-dim);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+.strip__link:hover { color: var(--cream); }
+.strip__link--lead { font-weight: 700; color: var(--foil-hi); }
+.strip__link--lead:hover { color: var(--logo-gold); }
+.strip__ext { width: 0.95em; height: 0.95em; }
+.strip__copy:focus-visible, .strip__link:focus-visible { outline: 2px solid var(--foil-hi); outline-offset: 2px; border-radius: 4px; }
+
+/* Phones and narrow screens: the row moves from right to left, so the strip stays one short line */
+@media (max-width: 1100px) {
+  .strip { font-size: 0.9rem; }
+  .strip__track { width: max-content; animation: strip-move 32s linear infinite; }
+  .strip__row, .strip__row[aria-hidden="true"] { display: flex; flex: none; min-height: 2.75rem; padding: 0.3rem 1.25rem; gap: 1.25rem; }
+  .strip__links { margin-left: 0; }
+  .strip:hover .strip__track, .strip:focus-within .strip__track, .strip:active .strip__track { animation-play-state: paused; }
+}
+@keyframes strip-move { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (max-width: 1100px) and (prefers-reduced-motion: reduce) {
+  .strip { overflow-x: auto; scrollbar-width: none; }
+  .strip__track { animation: none; }
+  .strip__row[aria-hidden="true"] { display: none; }
+}
