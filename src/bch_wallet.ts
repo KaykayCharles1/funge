@@ -71,6 +71,23 @@ manager.on("disconnect", (_reason, message) => {
 
 manager.on("reconnecting", () => set({ error: "Connection to the wallet relay dropped. Reconnecting…" }));
 
+// Pairing by the copied link: the player leaves this tab for the wallet app, and the relay library, on a hidden tab,
+// closes its connection and treats every message before that moment as already read. The wallet's answer
+// (wallet_ready) arrives while the tab is hidden, so on return it would be dropped as old and the panel would wait
+// forever. While not yet paired, when the tab is shown again, accept messages from the moment the link was made.
+let relayClient: { setLastProcessedTimestamp(t: number): void } | null = null;
+let linkMadeAt = 0;
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || state.status !== "waiting" || !state.qrUri || !relayClient) return;
+    try {
+      relayClient.setLastProcessedTimestamp(Math.max(1, linkMadeAt - 2));
+    } catch (e) {
+      console.warn(e);
+    }
+  });
+}
+
 export function startConnection(forceNew: boolean) {
   cleanupRelay();
   if (forceNew) manager.clearStoredSession();
@@ -81,7 +98,10 @@ export function startConnection(forceNew: boolean) {
       : undefined;
   if (stored?.paths && resume) manager.restoreSessionPaths(stored.paths);
 
+  linkMadeAt = Math.floor(Date.now() / 1000);
+  relayClient = null;
   relay = initiateDappRelay(({ client, status }) => {
+    relayClient = client;
     manager.updateConnection(client, status);
     if (status.status === "connected") set({ error: null });
   }, resume ? { existingCredentials: resume } : undefined);
