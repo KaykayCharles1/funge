@@ -1383,7 +1383,7 @@ body {
 .strip__event { font-weight: 700; color: var(--logo-gold); letter-spacing: 0.02em; }
 .strip__votes { display: inline-flex; align-items: center; gap: 0.6rem; }
 .strip__addr {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: ui-monospace, monospace; /* the system's own fixed-width face, for the address */
   font-size: 0.88rem;
   color: var(--cream);
 }
