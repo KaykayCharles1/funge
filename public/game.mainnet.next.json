@@ -1,17 +1,17 @@
 {
   "contractVersion": 3,
   "network": "mainnet",
-  "gameCategory": "807d99a5e29caee45bf71e0f50dd9cb0c7d82b27bc95f608f448f6248abb9480",
+  "gameCategory": "0b004167c22fda828c5050ceedd6fe17a38349cd856f87e22169ad240e7132bc",
   "pusdCategory": "2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544",
   "state": {
-    "address": "bitcoincash:pdqyjccrr6lmt5s5l74anp598v6772zzwqljf57al44smerlqmth5ajkg74wx",
-    "tokenAddress": "bitcoincash:rdqyjccrr6lmt5s5l74anp598v6772zzwqljf57al44smerlqmth50p2f85hd",
-    "lockingBytecode": "aa20404963031ebfb5d214ffabd986853b35ef2842703f24d3ddfd6b0de47f06d77a87"
+    "address": "bitcoincash:pvq750memy6kyajc4alzl7n5a7pa85tzm3rmlm5xejv2tyzdw5wl5qq9cdf3l",
+    "tokenAddress": "bitcoincash:rvq750memy6kyajc4alzl7n5a7pa85tzm3rmlm5xejv2tyzdw5wl5jnee5gg5",
+    "lockingBytecode": "aa2001ea3f79d935627658af7e2ffa74ef83d3d162dc47bfee86cc98a5904d751dfa87"
   },
   "pot": {
-    "address": "bitcoincash:p0vahxqeu7g6pg4da6afynxnw0fg0cjszsgqq74k0rhlth6w90ffxuxme9583",
-    "tokenAddress": "bitcoincash:r0vahxqeu7g6pg4da6afynxnw0fg0cjszsgqq74k0rhlth6w90ffxw48cu476",
-    "lockingBytecode": "aa20d9db9819e791a0a2adeeba924cd373d287e2501410007ab678eff5df4e2bd29387"
+    "address": "bitcoincash:pdrk4unwx2u04e75l0edmkxfgp32yhsnj0zrr8pkvz9ycwggpnmpqaw8mczj3",
+    "tokenAddress": "bitcoincash:rdrk4unwx2u04e75l0edmkxfgp32yhsnj0zrr8pkvz9ycwggpnmpq0am6prt6",
+    "lockingBytecode": "aa20476af26e32b8fae7d4fbf2ddd8c94062a25e1393c4319c36608a4c39080cf61087"
   },
   "refereePubkey": "03cca65576f8e17edb1f495e819d89d45fcbe6373d18a7f9590c2f060de15faf69",
   "params": {
@@ -24,6 +24,6 @@
     "fallbackBlocks": 12
   },
   "creatorPkh": "cfc2c6fa15ec114f462b7b31fd1fbf7e028b7f87",
-  "prepTxid": "807d99a5e29caee45bf71e0f50dd9cb0c7d82b27bc95f608f448f6248abb9480",
-  "initTxid": "16872ee96b9962f83f81dc298796d55be10cf810a3e901eadf81a53b653e29c9"
+  "prepTxid": "0b004167c22fda828c5050ceedd6fe17a38349cd856f87e22169ad240e7132bc",
+  "initTxid": "a9ef768deb2083ebe65c54999c93a4f867001b15292a131b9e4cef2e80cf79f7"
 }
