@@ -160,14 +160,15 @@ export const COPY = {
     have: (amount: string) => `You have ${amount}`,
     max: "Max",
     allBch: "Max",
-    nfts: (n: number) => `Also send my trophies and other NFTs (${n})`,
+    nfts: (n: number) => `Also send the other tokens in this wallet (${n})`,
+    otherLabel: "Other tokens",
     review: "Withdraw",
     cancel: "Cancel",
     checking: "Checking…",
     confirmTitle: "Confirm Transaction",
     confirmPusd: (amount: string) => `${amount} PUSD`,
     confirmBch: (amount: string) => `${amount} BCH`,
-    confirmNfts: (n: number) => `${n} trophy or NFT${n === 1 ? "" : "s"}`,
+    confirmNfts: (n: number) => `${n} other token${n === 1 ? "" : "s"}`,
     confirmTo: "To",
     confirmFee: (amount: string) => `${amount} BCH`,
     feeLabel: "Network fee",
@@ -357,7 +358,7 @@ export const COPY = {
             },
             {
               q: "Why Bitcoin Cash?",
-              a: (_r: FaqNumbers): FaqBlock[] => ["Funge needs fast, cheap moves and a Treasury no one can run off with. On Bitcoin Cash a move costs a fraction of a cent, and the Treasury is held by a smart contract that can only pay the last king. PUSD and your trophy live on the same chain."],
+              a: (_r: FaqNumbers): FaqBlock[] => ["Funge needs fast, cheap moves and a Treasury no one can run off with. On Bitcoin Cash a move costs a fraction of a cent, and the Treasury is held by a smart contract that can only pay the last king."],
             },
           ],
         },
@@ -432,7 +433,7 @@ export const COPY = {
         {
           title: "The Treasury",
           text: (r: HowtoNumbers) => `Each time a throne is taken, ${r.cut} of the kingdom's value goes into the Treasury, same with every protection. When the round ends, the last king wins it all.`,
-          alt: "An overflowing treasure chest with a golden trophy and crown, between a violet banner and a crimson banner, with the keep in the distance.",
+          alt: "An overflowing treasure chest of gold with a crown, between a violet banner and a crimson banner, with the keep in the distance.",
         },
       ],
       closing: "Ready to take the throne?",
@@ -492,13 +493,10 @@ export const COPY = {
     overSomeone: (pool: string, who: string) => `Time ran out. The last king (${who}) wins the pool of ${pool} PUSD.`,
     wonTitle: "You won the pool!",
     otherWonTitle: "The kingdom has a winner",
-    // A finished round with one king (cancelled, or nobody challenged): the trophy cannot tell which, so one wording
+    // A finished round with one king (cancelled, or nobody challenged): the page cannot tell which, so one wording
     aloneMine: "Round cancelled. Pool returned",
     aloneOther: "Round cancelled. Pool returned",
     endedKings: "Kings crowned",
-    trophyGame: "An immutable trophy NFT is in your game wallet. To see it in another wallet, restore your seed phrase there.",
-    trophyMine: "An immutable trophy NFT was sent to your wallet.",
-    trophyOther: "An immutable trophy NFT was sent to the winner.",
   },
 
   // The battlefield's wallet panel (src/battlefield/walletPanel.ts): picking a wallet, creating, importing, unlocking

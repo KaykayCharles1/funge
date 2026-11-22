@@ -215,7 +215,7 @@ export function initWithdraw(
       // BCH only when the player asked for it: a PUSD payment carries a little BCH of its own (the network's minimum
       // for a token output), and that arrives with the PUSD, so it is not a separate line
       if (sats === "all" || sats > 0n) row(T.bchLabel, T.confirmBch(bch(plan.sats)));
-      if (plan.nfts > 0) row("NFT", T.confirmNfts(plan.nfts));
+      if (plan.nfts > 0) row(T.otherLabel, T.confirmNfts(plan.nfts));
       const short = dest.address.length > 30 ? `${dest.address.slice(0, 16)}…${dest.address.slice(-8)}` : dest.address;
       row(T.confirmTo, short, dest.address);
       row(T.feeLabel, T.confirmFee(bch(plan.fee)));
