@@ -27,7 +27,7 @@ King Satoshi holds the throne with one minute on the clock and raises his walls.
 - **Conquer.** Anyone can take the throne by paying the kingdom's value plus 2%. The king who loses the throne gets 92% of the value back, and 10% goes into the treasury. Every conquest makes the kingdom worth more.
 - **Protect.** The king can raise the walls by 1, 2 or 5 PUSD, at most twice per reign, up to a value of 50.00. That money goes into the treasury and makes the next conquest cost more. Protecting closes in the last 30 seconds.
 - **The clock.** A round starts with 5:00. Every conquest adds 0:30, never above 5:00. With under a minute left, a conquest adds 0:10 instead, never above 1:00. Protecting doesn't touch the clock.
-- **Win.** When the clock runs out, the last king wins the whole treasury and a trophy NFT. The winner presses Claim. If nobody does, the referee settles the round by itself 30 seconds later. If the referee is ever gone, anyone can settle after 12 blocks, and the contract still pays the last king.
+- **Win.** When the clock runs out, the last king wins the whole PUSD treasury. The winner presses Claim. If nobody does, the referee settles the round by itself 30 seconds later. If the referee is ever gone, anyone can settle after 12 blocks, and the contract still pays the last king.
 - **Cancel round.** While nobody has conquered yet, the first king may cancel the round and take the whole treasury back.
 
 Full rules with worked examples: [docs/KINGDOM.md](docs/KINGDOM.md).
@@ -40,15 +40,15 @@ Full rules with worked examples: [docs/KINGDOM.md](docs/KINGDOM.md).
 - **Game wallet.** A small wallet that lives in your browser, protected by a password, with your recovery phrase stored encrypted on your device. One tap per move, no pop-ups. Keep only what you play with in it, and back up the phrase.
 - **Your own wallet, through WizardConnect.** Connect Paytaca, Cashonize or another WizardConnect wallet by scanning the QR code or copying the link. You approve each move in your wallet. The panel shows the balance across all of your wallet's addresses, the way your wallet app does.
 
-Both wallets get the same tools in the wallet panel: **Swap** and **Withdraw** (send PUSD, BCH or trophies to another address). With WizardConnect, your wallet app approves each one.
+Both wallets get the same tools in the wallet panel: **Swap** and **Withdraw** (send PUSD or BCH to another address). With WizardConnect, your wallet app approves each one.
 
 **Getting PUSD.** The wallet panel has an in-game swap from BCH to PUSD and back, routed through Cauldron's pools. It shows the price impact and the network cost, and a **Swapped** card confirms each swap. It works with both kinds of wallet. On the test site, a faucet gives free test PUSD and BCH.
 
-**Withdrawing.** **Withdraw** sends PUSD, BCH, or your trophies and other NFTs to any Bitcoin Cash address. You review the amount, the address and the network fee before it goes, and a link to the transaction on the explorer confirms it. With WizardConnect, it uses the coins on all of your wallet's addresses, your wallet app approves it, and anything not sent stays in your wallet.
+**Withdrawing.** **Withdraw** sends PUSD or BCH to any Bitcoin Cash address. You review the amount, the address and the network fee before it goes, and a link to the transaction on the explorer confirms it. With WizardConnect, it uses the coins on all of your wallet's addresses, your wallet app approves it, and anything not sent stays in your wallet.
 
 ## How it works
 
-- **The state contract** ([contracts/FungeKingdom.cash](contracts/FungeKingdom.cash)) holds the throne as an NFT. Its commitment stores the number of conquests, the king, the kingdom's value, the protects used this reign and a short mark of the previous king. It checks every payment: open, conquer, protect, cancel and settle.
+- **The state contract** ([contracts/FungeKingdom.cash](contracts/FungeKingdom.cash)) holds the throne. It stores the number of conquests, the king, the kingdom's value, the protects used this reign and a short mark of the previous king. It checks every payment: open, conquer, protect, cancel and settle.
 - **The treasury contract** ([contracts/FungePot.cash](contracts/FungePot.cash)) holds the PUSD. It can only be spent in a transaction that also spends the throne.
 - **The referee** ([server/](server/)) runs the clock. It signs moves that arrive before the deadline, plus one second of grace, and broadcasts them. The contract needs its signature to open, conquer, protect and settle early. The referee decides *when*, never *who gets paid*: the contract always pays the last king. It pushes every move to the page over a WebSocket, so all players see the same battle. See [docs/REFEREE.md](docs/REFEREE.md).
 - **The page** builds each move in the browser and signs it with the player's wallet. The referee then adds its signature and broadcasts it. Chain data comes from several Electrum servers, and the page moves on to the next one if one fails.
