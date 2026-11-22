@@ -261,13 +261,13 @@ export const COPY = {
     strip: {
       label: "Project information",
       event: "BCH BLAZE 2026",
-      votes: "Funge votes:",
+      votes: "Ember votes:",
       address: "bitcoincash:zrrefj3c74fffqatf7l2cftfmr2p0xd8k5ma09clk2",
       copy: "Copy",
       copied: "Copied",
       opensNew: "(opens in a new tab)",
       links: [
-        { text: "Presentation", href: "https://docs.google.com/presentation/d/1Mp6ganeNi_efnJHrHYXZPEYHYWe_ctCsJlwc_65o-iM/present?slide=id.g38e0854b437_1_0", lead: true },
+        { text: "Presentation", href: "https://docs.google.com/presentation/d/1Mp6ganeNi_efnJHrHYXZPEYHYWe_ctCsJlwc_65o-iM/present?slide=id.p", lead: true },
         { text: "Forked Repo", href: "https://github.com/KaykayCharles1/funge-pre-demo", lead: false },
         { text: "GitHub", href: "https://github.com/KaykayCharles1/funge", lead: false },
       ],
