@@ -1,17 +1,17 @@
 {
   "contractVersion": 3,
   "network": "mainnet",
-  "gameCategory": "32a900577b6d386ac310075e2e2230a5c937af5924ad77a7b0025b8bd987da2b",
+  "gameCategory": "807d99a5e29caee45bf71e0f50dd9cb0c7d82b27bc95f608f448f6248abb9480",
   "pusdCategory": "2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544",
   "state": {
-    "address": "bitcoincash:pwcfe62jxy9zuc4ccqc42tyh2llhn8drjhhxsjxlgcgmglxemd92khk26dwg8",
-    "tokenAddress": "bitcoincash:rwcfe62jxy9zuc4ccqc42tyh2llhn8drjhhxsjxlgcgmglxemd92k99km503v",
-    "lockingBytecode": "aa20b09ce952310a2e62b8c031552c9757ff799da395ee6848df4611b47cd9db4aab87"
+    "address": "bitcoincash:pdqyjccrr6lmt5s5l74anp598v6772zzwqljf57al44smerlqmth5ajkg74wx",
+    "tokenAddress": "bitcoincash:rdqyjccrr6lmt5s5l74anp598v6772zzwqljf57al44smerlqmth50p2f85hd",
+    "lockingBytecode": "aa20404963031ebfb5d214ffabd986853b35ef2842703f24d3ddfd6b0de47f06d77a87"
   },
   "pot": {
-    "address": "bitcoincash:pv85lznhwjukyusq6fdgqk3es290mcg83sqhyfzfzm237e5h25v42e8qx4ce3",
-    "tokenAddress": "bitcoincash:rv85lznhwjukyusq6fdgqk3es290mcg83sqhyfzfzm237e5h25v42t5u8veq6",
-    "lockingBytecode": "aa200f4f8a7774b9627200d25a805a39828afde1078c0172244916d51f669755195587"
+    "address": "bitcoincash:p0vahxqeu7g6pg4da6afynxnw0fg0cjszsgqq74k0rhlth6w90ffxuxme9583",
+    "tokenAddress": "bitcoincash:r0vahxqeu7g6pg4da6afynxnw0fg0cjszsgqq74k0rhlth6w90ffxw48cu476",
+    "lockingBytecode": "aa20d9db9819e791a0a2adeeba924cd373d287e2501410007ab678eff5df4e2bd29387"
   },
   "refereePubkey": "03cca65576f8e17edb1f495e819d89d45fcbe6373d18a7f9590c2f060de15faf69",
   "params": {
@@ -24,6 +24,6 @@
     "fallbackBlocks": 12
   },
   "creatorPkh": "cfc2c6fa15ec114f462b7b31fd1fbf7e028b7f87",
-  "prepTxid": "32a900577b6d386ac310075e2e2230a5c937af5924ad77a7b0025b8bd987da2b",
-  "initTxid": "a818364c563cfda3f401aa45cb027e4a5c882d14c7e784283cec395c93ffdbe0"
+  "prepTxid": "807d99a5e29caee45bf71e0f50dd9cb0c7d82b27bc95f608f448f6248abb9480",
+  "initTxid": "16872ee96b9962f83f81dc298796d55be10cf810a3e901eadf81a53b653e29c9"
 }
