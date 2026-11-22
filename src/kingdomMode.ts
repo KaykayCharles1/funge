@@ -951,7 +951,7 @@ export async function startKingdomMode() {
     setTimeout(() => void refreshBalances(provider), 2_000);
     setTimeout(() => void refreshBalances(provider), 8_000);
   });
-  initWithdraw(provider, getLocalWallet, () => acting || swapping(), () => {
+  initWithdraw(provider, swapSource, () => acting || swapping(), () => {
     setTimeout(() => void refreshBalances(provider), 2_000);
     setTimeout(() => void refreshBalances(provider), 8_000);
   });

@@ -3,7 +3,7 @@
 // wallet is asked to sign only its own inputs (they follow the pool inputs), then the page sends the transaction.
 import { binToHex, encodeTransaction, hexToBin } from "@bitauth/libauth";
 import { placeholderP2PKHUnlocker } from "cashscript";
-import type { ElectrumNetworkProvider, SpendableUtxo } from "cashscript";
+import type { ElectrumNetworkProvider, SpendableUtxo, TransactionBuilder } from "cashscript";
 import { manager } from "./bch_wallet.ts";
 import { lockToAddress, p2pkhLock } from "./lib/chain.ts";
 import { toRelaySafe } from "./lib/relay.ts";
@@ -45,14 +45,27 @@ export function externalBalances(coins: WalletCoin[], pusdCategory: string): { s
 }
 
 // Ask the wallet to sign its inputs. Returns the signed transaction, or why nothing was sent.
-export async function signSwap(
+export function signSwap(
   tx: SwapTx,
   coins: WalletCoin[],
   userPrompt: string,
   signal: AbortSignal,
 ): ReturnType<typeof signWithWallet> {
+  return signOwnInputs(tx.builder, tx.walletInputs, tx.firstWalletInput, coins, userPrompt, signal);
+}
+
+// Any transaction whose own-wallet inputs are `inputs`, starting at input `first` (a swap: after the pool inputs; a
+// withdrawal: all of them, from 0). The wallet signs those, each with the key of the address it sits on.
+export async function signOwnInputs(
+  builder: TransactionBuilder,
+  inputs: SpendableUtxo[],
+  first: number,
+  coins: WalletCoin[],
+  userPrompt: string,
+  signal: AbortSignal,
+): ReturnType<typeof signWithWallet> {
   const byKey = new Map(coins.map((c) => [keyOf(c.utxo), c]));
-  const wc = tx.builder.generateWcTransactionObject({ broadcast: false, userPrompt });
+  const wc = builder.generateWcTransactionObject({ broadcast: false, userPrompt });
   const request = {
     transaction: {
       transaction: binToHex(encodeTransaction(wc.transaction)),
@@ -60,9 +73,9 @@ export async function signSwap(
       broadcast: false,
       userPrompt,
     },
-    inputPaths: tx.walletInputs.map((u, i): [number, string, number] => {
+    inputPaths: inputs.map((u, i): [number, string, number] => {
       const c = byKey.get(keyOf(u))!;
-      return [tx.firstWalletInput + i, c.path, c.index];
+      return [first + i, c.path, c.index];
     }),
   } as unknown as Parameters<typeof manager.signTransaction>[0];
   return signWithWallet(request, signal);

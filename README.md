@@ -37,8 +37,10 @@ Full rules with worked examples: [docs/KINGDOM.md](docs/KINGDOM.md).
 **The battlefield.** The game is an animated battlefield built with Phaser. Armies march on the castle at every conquest, walls rise at every protect, and coins fly into the treasury. Each player chooses a name and a King or Queen portrait before their first move, and the top bar shows who holds the throne, its value, the treasury and the clock. Sound is off until you turn it on. An **Invite friends** button shares a link to the round.
 
 **Two ways to pay:**
-- **Game wallet.** A small wallet that lives in your browser, protected by a password, with your recovery phrase stored encrypted on your device. One tap per move, no pop-ups. It can swap and withdraw. Keep only what you play with in it, and back up the phrase.
+- **Game wallet.** A small wallet that lives in your browser, protected by a password, with your recovery phrase stored encrypted on your device. One tap per move, no pop-ups. Keep only what you play with in it, and back up the phrase.
 - **Your own wallet, through WizardConnect.** Connect Paytaca, Cashonize or another WizardConnect wallet by scanning the QR code or copying the link. You approve each move in your wallet. The panel shows the balance across all of your wallet's addresses, the way your wallet app does.
+
+Both wallets get the same tools in the wallet panel: **Swap** and **Withdraw** (send PUSD, BCH or trophies to another address). With WizardConnect, your wallet app approves each one.
 
 **Getting PUSD.** The wallet panel has an in-game swap from BCH to PUSD and back, routed through Cauldron's pools. It shows the price impact and the network cost, and a **Swapped** card confirms each swap. It works with both kinds of wallet. On the test site, a faucet gives free test PUSD and BCH.
 
