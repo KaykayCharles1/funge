@@ -318,7 +318,7 @@ export const COPY = {
           items: [
             {
               q: "What is Funge?",
-              a: (_r: FaqNumbers): FaqBlock[] => ["Funge is a battle for the throne on Bitcoin Cash. One kingdom, one king, one Treasury. Take the throne by paying what the kingdom is worth, defend it, and be king when the clock runs out to win the whole Treasury and a trophy."],
+              a: (_r: FaqNumbers): FaqBlock[] => ["Funge is a fast-paced fantasy game where Kings and Queens battle for the treasury of Funge Kingdom. The last king at the end of a round wins it all."],
             },
             {
               q: "How long does a round last?",
@@ -343,7 +343,7 @@ export const COPY = {
             },
             {
               q: "Where can I get PUSD?",
-              a: (_r: FaqNumbers): FaqBlock[] => ["Swap BCH for PUSD on Cauldron DEX, or, coming soon, right inside Funge with the in-game swap."],
+              a: (_r: FaqNumbers): FaqBlock[] => ["Swap from BCH to PUSD in the in-game dex."],
             },
             {
               q: "How much do I need to play?",
