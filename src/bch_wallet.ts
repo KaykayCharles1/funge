@@ -100,6 +100,11 @@ export function startConnection(forceNew: boolean) {
 
   linkMadeAt = Math.floor(Date.now() / 1000);
   relayClient = null;
+  // The manager hooks its message listener onto the first relay client it is given, once per page
+  // (@wizardconnect/dapp updateConnection: listenerAttached). Each connection here makes a new client, so without this
+  // a second connection in the same page (Cancel and try again, Disconnect then connect, a resume then a new pairing)
+  // never hears the wallet's wallet_ready and waits until a reload.
+  (manager as unknown as { listenerAttached: boolean }).listenerAttached = false;
   relay = initiateDappRelay(({ client, status }) => {
     relayClient = client;
     manager.updateConnection(client, status);
