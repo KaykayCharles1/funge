@@ -238,6 +238,9 @@ export const COPY = {
     approve: "Approve in your wallet…", // an own wallet (WizardConnect) is asked to sign
     walletPrompt: (sell: string, buy: string) => `Swap ${sell} for ${buy} on Funge`, // shown in the wallet app
     retrying: "Price moved a little. Trying again…",
+    // the card at the top of the panel after a swap went through
+    swapped: "Swapped",
+    swappedLine: (sold: string, got: string) => `${sold} for ${got}`,
     errors: {
       pools_changed: "The price moved more than your slippage. Nothing was spent. Review again.",
       busy: "Wait until your move is confirmed, then try again.",

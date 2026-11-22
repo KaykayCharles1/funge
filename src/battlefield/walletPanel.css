@@ -252,3 +252,21 @@
   .fg-w-back { min-height: 44px; }
   .fg-w-textlink { min-height: 44px; }
 }
+
+/* After a swap: "Swapped" card at the top of the side panel, under its tabs (src/swapUI.ts swappedCard) */
+#swDone { position: absolute; top: 86px; left: 16px; right: 16px; z-index: 80; display: flex; align-items: center; gap: 14px;
+  padding: 14px 12px 14px 16px; background: #0f1a33; border: 1.5px solid #e0a93a; border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); color: #f4ead2; font-family: "Alegreya Sans", "Segoe UI", sans-serif;
+  animation: sw-done-in 220ms ease-out; transition: opacity 300ms ease, transform 300ms ease; }
+#swDone.sw-done-out { opacity: 0; transform: translateY(-6px); }
+#swDone .sw-done-logo { width: 40px; height: 40px; }
+#swDone .sw-done-words { flex: 1; min-width: 0; }
+#swDone .sw-done-title { font-size: 18px; font-weight: 700; color: #f8eeca; line-height: 1.2; }
+#swDone .sw-done-line { font-size: 15px; color: #cfc5ab; margin-top: 2px; overflow-wrap: anywhere; }
+#swDone .sw-done-x { align-self: flex-start; width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; border-radius: 50%; background: transparent; color: #f3cf74; cursor: pointer; }
+#swDone .sw-done-x:hover { background: #15234a; color: #f8eeca; }
+#swDone .sw-done-x:focus-visible { outline: 3px solid #fcd34d; outline-offset: 1px; }
+@keyframes sw-done-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 699px) { #swDone { top: 82px; left: 12px; right: 12px; } }
+@media (prefers-reduced-motion: reduce) { #swDone { animation: none; transition: none; } }
