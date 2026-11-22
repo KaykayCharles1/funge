@@ -614,8 +614,6 @@ function renderEnded(r: EndedKingdom) {
   $("endedPot").textContent = `${formatUnits(r.potPaid, CONFIG.pusdDecimals)} PUSD`;
   $("endedPassesLabel").textContent = COPY.kingdom.endedKings;
   $("endedPasses").textContent = String(r.passes);
-  $("endedTrophy").textContent =
-    getLocalWallet()?.pkhHex === r.winnerPkh ? COPY.kingdom.trophyGame : mine ? COPY.kingdom.trophyMine : COPY.kingdom.trophyOther;
   $("endedTx").textContent = `Settlement transaction: ${r.settleTxid}${r.confirmed ? "" : " (waiting for confirmation)"}`;
 }
 
