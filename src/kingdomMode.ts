@@ -664,7 +664,9 @@ function waitForNextRound() {
     switchToRound(next);
   };
   const check = async () => {
-    if (checking) return;
+    // Not while a demo round plays: the switch would clear the demo's round from the page. Leaving the demo reloads
+    // the page, which loads the new round then.
+    if (checking || demo) return;
     checking = true;
     try {
       if (++checks % 100 === 0) ask(); // every 5 minutes, in case the first ask did not start it
@@ -721,6 +723,7 @@ async function firstRound(): Promise<GameKingdom> {
 // Show the new round in place: the wallet stays unlocked and connected. Everything tied to the old round is
 // dropped, then the usual first load runs again for the new one (snapshot, history, live socket).
 function switchToRound(next: GameKingdom) {
+  if (demo) return; // see waitForNextRound: the demo's reload loads the new round
   try {
     watcher?.close();
     watcher = null;
@@ -1086,7 +1089,10 @@ export function battlefieldPage() {
   const balance = demo.balance;
   return {
     ...view,
-    act: { ...view.act, enabled: demo.canConquer() },
+    // The real round's ending ("This round is finished", waiting for the next round) is not the demo's: the demo's
+    // own end comes from its snapshot (status "over")
+    ended: false,
+    act: { enabled: demo.canConquer(), label: "", hint: "" },
     busy: false, external: false, signPrompt: "", signLeftMs: null, note: null,
     protect: demo.protectState(),
     cancelRound: { ...view.cancelRound, show: false, enabled: false },
