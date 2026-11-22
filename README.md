@@ -44,6 +44,8 @@ Both wallets get the same tools in the wallet panel: **Swap** and **Withdraw** (
 
 **Getting PUSD.** The wallet panel has an in-game swap from BCH to PUSD and back, routed through Cauldron's pools. It shows the price impact and the network cost, and a **Swapped** card confirms each swap. It works with both kinds of wallet. On the test site, a faucet gives free test PUSD and BCH.
 
+**Withdrawing.** **Withdraw** sends PUSD, BCH, or your trophies and other NFTs to any Bitcoin Cash address. You review the amount, the address and the network fee before it goes, and a link to the transaction on the explorer confirms it. With WizardConnect, it uses the coins on all of your wallet's addresses, your wallet app approves it, and anything not sent stays in your wallet.
+
 ## How it works
 
 - **The state contract** ([contracts/FungeKingdom.cash](contracts/FungeKingdom.cash)) holds the throne as an NFT. Its commitment stores the number of conquests, the king, the kingdom's value, the protects used this reign and a short mark of the previous king. It checks every payment: open, conquer, protect, cancel and settle.
