@@ -40,6 +40,40 @@ function svg(viewBox: string, paths: string[], attrs: Record<string, string> = {
 // The one drawn icon: an arrow into the battle
 const arrow = () => svg("0 0 24 24", ["M4 12h14", "M13 6l6 6-6 6"], { fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "stroke-linejoin": "round" });
 
+// The project strip above the hero, for the hackathon judges: the event, the address for votes (with Copy), and the
+// presentation and code links. Wide screens: one row. Phones: the row scrolls from right to left (a second, hidden
+// copy follows the first so the loop has no gap); it pauses while touched, hovered or focused, and stands still,
+// scrollable by hand, for people who ask for less motion.
+function strip(): HTMLElement {
+  const S = L.strip;
+  const external = () => svg("0 0 24 24", ["M14 4h6v6", "M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"], {
+    fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", class: "strip__ext",
+  });
+  const row = (copyOf: boolean) => {
+    const hidden: Record<string, string> = copyOf ? { tabindex: "-1" } : {};
+    const copyBtn = h("button", { type: "button", class: "strip__copy", ...hidden }, S.copy);
+    copyBtn.addEventListener("click", () => {
+      void navigator.clipboard?.writeText(S.address).then(() => {
+        for (const b of document.querySelectorAll<HTMLButtonElement>(".strip__copy")) b.textContent = S.copied;
+        window.setTimeout(() => {
+          for (const b of document.querySelectorAll<HTMLButtonElement>(".strip__copy")) b.textContent = S.copy;
+        }, 1500);
+      });
+    });
+    return h("div", { class: "strip__row", ...(copyOf ? { "aria-hidden": "true" } : {}) },
+      h("span", { class: "strip__event" }, S.event),
+      h("span", { class: "strip__votes" }, h("span", { class: "strip__label" }, S.votes), h("code", { class: "strip__addr" }, S.address), copyBtn),
+      h("span", { class: "strip__links" },
+        ...S.links.map((l) =>
+          h("a", { class: `strip__link${l.lead ? " strip__link--lead" : ""}`, href: l.href, target: "_blank", rel: "noopener noreferrer", ...hidden },
+            l.text, l.lead ? null : external(), h("span", { class: "sr-only" }, ` ${S.opensNew}`)),
+        ),
+      ),
+    );
+  };
+  return h("aside", { class: "strip", "aria-label": S.label }, h("div", { class: "strip__track" }, row(false), row(true)));
+}
+
 // The hero: the painted valley is the sky the page opens in. The logo and one line sit in its open sky, the painting
 // fades into the light page, and the real battlefield rises in a frame across that line.
 function hero(): HTMLElement {
@@ -801,6 +835,7 @@ document.title = L.pageTitle;
 document.head.append(h("meta", { name: "description", content: L.description }));
 document.getElementById("landing")!.append(
   h("a", { class: "skip", href: "#howto" }, L.howto.title),
+  strip(),
   hero(),
   h("main", {},
     howto(),

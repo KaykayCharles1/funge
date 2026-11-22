@@ -256,6 +256,22 @@ export const COPY = {
     description: "A battle for the throne game on Bitcoin Cash. One Kingdom, one King, one PUSD Treasury. The last king wins it all.",
     title: "Funge",
     tagline: "Conquer the throne. The last king wins the Treasury.",
+    // The project strip at the very top, for the hackathon judges: the event, the address for votes, and the links.
+    // On a phone it scrolls from right to left.
+    strip: {
+      label: "Project information",
+      event: "BCH BLAZE 2026",
+      votes: "Ember votes:",
+      address: "bitcoincash:zrrefj3c74fffqatf7l2cftfmr2p0xd8k5ma09clk2",
+      copy: "Copy",
+      copied: "Copied",
+      opensNew: "(opens in a new tab)",
+      links: [
+        { text: "Presentation", href: "https://docs.google.com/presentation/d/1Mp6ganeNi_efnJHrHYXZPEYHYWe_ctCsJlwc_65o-iM/present?slide=id.p", lead: true },
+        { text: "Forked Repo", href: "https://github.com/KaykayCharles1/funge-pre-demo", lead: false },
+        { text: "GitHub", href: "https://github.com/KaykayCharles1/funge", lead: false },
+      ],
+    },
     // The hero (built first, section by section)
     logoAlt: "Funge",
     navLabel: "Page sections",
@@ -302,7 +318,7 @@ export const COPY = {
           items: [
             {
               q: "What is Funge?",
-              a: (_r: FaqNumbers): FaqBlock[] => ["Funge is a battle for the throne on Bitcoin Cash. One kingdom, one king, one Treasury. Take the throne by paying what the kingdom is worth, defend it, and be king when the clock runs out to win the whole Treasury and a trophy."],
+              a: (_r: FaqNumbers): FaqBlock[] => ["Funge is a fast-paced fantasy game where Kings and Queens battle for the treasury of Funge Kingdom. The last king at the end of a round wins it all."],
             },
             {
               q: "How long does a round last?",
@@ -327,7 +343,7 @@ export const COPY = {
             },
             {
               q: "Where can I get PUSD?",
-              a: (_r: FaqNumbers): FaqBlock[] => ["Swap BCH for PUSD on Cauldron DEX, or, coming soon, right inside Funge with the in-game swap."],
+              a: (_r: FaqNumbers): FaqBlock[] => ["Swap from BCH to PUSD in the in-game dex."],
             },
             {
               q: "How much do I need to play?",
