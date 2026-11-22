@@ -13,6 +13,11 @@ export type WithdrawWallet = {
   lock: Uint8Array;
   tokenAddress: string;
   unlockP2PKH: () => Unlocker;
+  // An own wallet (WizardConnect): its coins sit on several of its addresses (coins), each with a placeholder the
+  // wallet signs later (unlockFor), and a slightly higher fee rate so the real signatures still fit the fee
+  coins?: SpendableUtxo[];
+  unlockFor?: (coin: SpendableUtxo) => Unlocker;
+  feeRate?: number;
 };
 
 export type DestinationError = "empty" | "invalid" | "network" | "script" | "self";
@@ -58,6 +63,7 @@ export type WithdrawPlan = {
   sats: bigint; // BCH that reaches the destination, including what travels with the PUSD and NFT outputs
   nfts: number;
   fee: bigint;
+  inputs: SpendableUtxo[]; // the wallet's coins, in input order (an own wallet signs each one)
 };
 
 export type WithdrawError = "nothing" | "no_pusd" | "no_bch" | "too_small" | "busy";
@@ -71,7 +77,7 @@ export class WithdrawFailure extends Error {
 
 const sum = (xs: bigint[]) => xs.reduce((a, b) => a + b, 0n);
 
-// Builds the transfer from all of the wallet's coins. What is not sent comes back to the game wallet:
+// Builds the transfer from all of the wallet's coins. What is not sent comes back to the wallet (its first address):
 // the rest of the PUSD, other tokens, the NFTs when they stay, and the BCH change.
 export async function planWithdraw(
   provider: NetworkProvider,
@@ -79,7 +85,8 @@ export async function planWithdraw(
   pusdCategory: string,
   req: WithdrawRequest,
 ): Promise<WithdrawPlan> {
-  const coins = await provider.getUtxosForLockingBytecode(wallet.lock);
+  const coins = wallet.coins ?? (await provider.getUtxosForLockingBytecode(wallet.lock));
+  const feeRate = wallet.feeRate ?? FEE_RATE;
   const isPusd = (u: SpendableUtxo) => u.token?.category === pusdCategory && !u.token.nft;
   const pusdHeld = sum(coins.filter(isPusd).map((u) => u.token!.amount));
   const nftCoins = coins.filter((u) => u.token?.nft);
@@ -90,7 +97,8 @@ export async function planWithdraw(
   if (req.sats !== "all" && req.sats > 0n && req.sats < DUST) throw new WithdrawFailure("too_small");
 
   const home = wallet.tokenAddress;
-  const builder = new TransactionBuilder({ provider }).addInputs(coins, wallet.unlockP2PKH());
+  const builder = new TransactionBuilder({ provider });
+  for (const u of coins) builder.addInput(u, wallet.unlockFor ? wallet.unlockFor(u) : wallet.unlockP2PKH());
   const outs: Output[] = [];
   let toThem = 0n;
   if (req.pusd > 0n) {
@@ -114,7 +122,7 @@ export async function planWithdraw(
 
   const before = builder.outputs.length;
   try {
-    builder.addBchChangeOutputIfNeeded({ to: req.sats === "all" ? req.to : wallet.lock, feeRate: FEE_RATE });
+    builder.addBchChangeOutputIfNeeded({ to: req.sats === "all" ? req.to : wallet.lock, feeRate });
   } catch {
     throw new WithdrawFailure("no_bch"); // not enough BCH for the outputs and the fee
   }
@@ -124,7 +132,7 @@ export async function planWithdraw(
     toThem += added;
   }
   const fee = sum(coins.map((u) => u.satoshis)) - sum(builder.outputs.map((o) => o.amount));
-  return { builder, pusd: req.pusd, sats: toThem, nfts: req.nfts ? nftCoins.length : 0, fee };
+  return { builder, pusd: req.pusd, sats: toThem, nfts: req.nfts ? nftCoins.length : 0, fee, inputs: coins };
 }
 
 export async function sendWithdraw(plan: WithdrawPlan): Promise<string> {

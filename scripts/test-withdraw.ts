@@ -145,5 +145,38 @@ async function refused(p: Promise<unknown>, code: string) {
   console.log("ok    nothing to send, too much, too small, not enough for the fee");
 }
 
+// 6. An own wallet (WizardConnect): coins on two of its addresses, each input signed with its own address's key (the
+//    wallet app does this); what is not sent goes back to its first address
+{
+  const { chain, wallet: first, friend } = setup();
+  const second = walletFromMnemonic(newMnemonic()); // stands in for the wallet's next address
+  const at = (w: typeof first, satoshis: bigint, token?: { amount: bigint; category: string }) => {
+    const u = { txid: hex32(), vout: 0, satoshis, token };
+    chain.addUtxo(lockToAddress(w.lock, false), u);
+    return u;
+  };
+  at(first, 40_000n);
+  const pusdCoin = at(second, 1_000n, { amount: 500n, category: PUSD });
+  at(second, 30_000n);
+  const firstCoins = await chain.getUtxos(lockToAddress(first.lock, false));
+  const coins = [...firstCoins, ...(await chain.getUtxos(lockToAddress(second.lock, false)))];
+  const onFirst = (u: { txid: string }) => firstCoins.some((c) => c.txid === u.txid);
+  const own = {
+    pkhHex: first.pkhHex, lock: first.lock, tokenAddress: lockToAddress(first.lock, true),
+    unlockP2PKH: () => { throw new Error("an own wallet signs per coin"); },
+    coins, unlockFor: (u: { txid: string }) => (onFirst(u) ? first.unlockP2PKH() : second.unlockP2PKH()), feeRate: 1.2,
+  };
+  const plan = await planWithdraw(chain, own, PUSD, { to: friend.lock, pusd: 300n, sats: 0n, nfts: false });
+  assert.equal(plan.inputs.length, 3, "every coin of the wallet, on both addresses");
+  assert.ok(plan.inputs.some((u) => u.txid === pusdCoin.txid));
+  const txid = await sendWithdraw(plan);
+  assert.equal((await paid(chain, txid, friend.lock)).pusd, 300n);
+  const back = await paid(chain, txid, first.lock);
+  assert.equal(back.pusd, 200n, "the rest of the PUSD goes back to the first address");
+  assert.ok(back.sats > 60_000n, "and the BCH change");
+  assert.equal((await paid(chain, txid, second.lock)).sats, 0n, "nothing is left on the other address");
+  console.log("ok    an own wallet: coins on several addresses, change back to its first address");
+}
+
 
 console.log("\nall withdraw tests passed");

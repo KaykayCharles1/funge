@@ -175,6 +175,8 @@ export const COPY = {
     send: "Withdraw",
     back: "Back",
     sending: "Sending…",
+    approve: "Approve in your wallet…", // an own wallet (WizardConnect) is asked to sign
+    walletPrompt: (what: string) => `Withdraw ${what} from Funge`, // shown in the wallet app
     sent: "Transaction Successful",
     explorer: (network: string) => (network === "mainnet" ? "View on the explorer ↗" : "View on the testnet explorer ↗"),
     done: "Done",
@@ -183,7 +185,7 @@ export const COPY = {
       invalid: "That is not a valid Bitcoin Cash address. Check for a missing or extra character.",
       network: "That address is for another network.",
       script: "Send to a personal wallet address, not a contract.",
-      self: "That is this game wallet's own address. Paste the address of your other wallet.",
+      self: "That is this wallet's own address. Paste the address of your other wallet.",
       amount: "Enter an amount, for example 12.50.",
       nothing: "Enter how much PUSD or BCH to send.",
       no_pusd: "That is more PUSD than this wallet holds.",

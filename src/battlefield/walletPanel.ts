@@ -135,7 +135,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   const review = document.getElementById("swReview");
   const panelEl = page.closest(".fg-panel");
   if (review) (panelEl ?? hold).append(review);
-  hold.addEventListener("withdraw-done", () => go("home"));
+  hold.addEventListener("withdraw-done", () => go(getWalletState().status === "connected" ? "wc" : "home"));
   const old = {
     local: document.getElementById("localWallet"),
     own: document.getElementById("wallet"),
@@ -166,7 +166,7 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
   // The screen the wallet's state calls for (an onboarding flow in progress keeps its screen)
   function auto(): Screen {
     const own = getWalletState().status !== "idle";
-    if (own || wantsOwn) return screen === "swap-old" && getWalletState().status === "connected" ? "swap-old" : "wc";
+    if (own || wantsOwn) return (screen === "swap-old" || screen === "withdraw-old") && getWalletState().status === "connected" ? screen : "wc";
     const state = vault.state();
     if (state === "unlocked") return !vault.hasPassword() ? "pick" : [...OLD_TOOLS, "backup", "delete"].includes(screen) ? screen : "home";
     if (state === "locked") return pickFirst ? "pick" : screen === "forgot" ? "forgot" : "locked";
@@ -878,10 +878,14 @@ export function mountWalletPanel(page: HTMLElement, view: () => PageView): { onO
       // Stops once these cards are off the screen: a reconnect draws new ones, and only their timer keeps reading
       const timer = window.setInterval(() => (coins.isConnected ? void read() : window.clearInterval(timer)), 15_000);
     }
-    // Swap (Get PUSD): the same box as the game wallet's; the wallet app approves it. No Withdraw: the coins are
-    // already in the player's own wallet.
-    const swap = button("fg-w-line", COPY.swap.button, () => go("swap-old"));
-    box.append(swap);
+    // Swap and Withdraw: the same boxes and the same buttons as the game wallet's; the wallet app approves each one
+    const tools = el("div", "fg-w-two");
+    tools.style.marginTop = "0";
+    tools.append(
+      button("fg-w-line", COPY.swap.button, () => go("swap-old")),
+      button("fg-w-line", COPY.withdraw.button, () => go("withdraw-old")),
+    );
+    box.append(tools);
     if (CONFIG.network === "chipnet") box.append(faucetCard(s.pkhHex ?? ""));
   }
 

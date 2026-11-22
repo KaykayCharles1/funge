@@ -5,11 +5,16 @@ import { formatUnits } from "./lib/format.ts";
 import {
   planWithdraw, readAmount, readDestination, sendWithdraw, WithdrawFailure, type WithdrawPlan,
 } from "./lib/withdraw.ts";
-import type { LocalWallet } from "./wallet/local.ts";
+import type { WalletCoin } from "./lib/walletCoins.ts";
+import type { SwapSource } from "./swapUI.ts";
 import { onLocalWalletChange } from "./walletUI.ts";
 
-// "Withdraw" in the game wallet: send PUSD, BCH and trophies to the player's own wallet, with a review step.
+// "Withdraw": send PUSD, BCH and trophies from the wallet that plays to another wallet, with a review step. The game
+// wallet signs at once; an own wallet (WizardConnect) is asked to approve in its app, then the page sends it.
 // The transfer itself: src/lib/withdraw.ts.
+const SIGN_TIMEOUT_MS = 180_000; // how long the own wallet has to approve, as for a move
+let external: Promise<typeof import("./swapExternal.ts")> | null = null;
+const loadExternal = () => (external ??= import("./swapExternal.ts"));
 const T = COPY.withdraw;
 const $ = (id: string) => document.getElementById(id)!;
 const input = (id: string) => $(id) as HTMLInputElement;
@@ -34,6 +39,7 @@ function oneCoin() {
   lock(["wdPusd", "wdPusdMax"], addr && bchOn && !pusdOn);
 }
 let plan: WithdrawPlan | null = null;
+let ownCoins: WalletCoin[] | null = null; // an own wallet's coins, for its signing (null: the game wallet)
 let sending = false;
 
 function say(text: string, isError: boolean) {
@@ -84,12 +90,13 @@ function close() {
   if (sending) return;
   show("wdBox", false);
   plan = null;
+  ownCoins = null;
 }
 
-// wallet: the game wallet when it is unlocked; busy: a move is being sent; onSent: refresh the balances
+// source: the wallet that plays (null: none); busy: a move is being sent; onSent: refresh the balances
 export function initWithdraw(
   provider: ElectrumNetworkProvider,
-  wallet: () => LocalWallet | null,
+  wallet: () => SwapSource | null,
   busy: () => boolean,
   onSent: () => void,
 ) {
@@ -114,7 +121,7 @@ export function initWithdraw(
 
   let held = { sats: 0n, pusd: 0n, nfts: 0 };
   onLocalWalletChange(() => {
-    if (!wallet()) close(); // locked or deleted: the form goes with it
+    if (!wallet()) close(); // locked or deleted, and no own wallet: the form goes with it
   });
 
   $("lwWithdrawBtn").addEventListener("click", async () => {
@@ -132,7 +139,11 @@ export function initWithdraw(
     show("wdBox", true);
     $("wdBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
     try {
-      held = await w.getBalances(provider);
+      if (w.kind === "external") {
+        const ext = await loadExternal();
+        const own = await ext.externalSwapWallet(provider, w.pkhHex);
+        held = { ...ext.externalBalances(own.coins, pusdCategory()), nfts: own.coins.filter((c) => c.utxo.token?.nft).length };
+      } else held = await w.wallet.getBalances(provider);
     } catch {
       held = { sats: 0n, pusd: 0n, nfts: 0 };
     }
@@ -172,7 +183,8 @@ export function initWithdraw(
     const w = wallet();
     if (!w) return;
     if (busy()) return say(T.errors.busy!, true);
-    const dest = readDestination(input("wdAddress").value, CONFIG.network as "mainnet" | "chipnet", w.pkhHex);
+    const pkhHex = w.kind === "external" ? w.pkhHex : w.wallet.pkhHex;
+    const dest = readDestination(input("wdAddress").value, CONFIG.network as "mainnet" | "chipnet", pkhHex);
     if (!dest.ok) return say(T.errors[dest.error]!, true);
     const pusdUnits = readAmount(input("wdPusd").value, CONFIG.pusdDecimals);
     const sats = bchAll ? "all" : readAmount(input("wdBch").value, 8);
@@ -180,7 +192,12 @@ export function initWithdraw(
     button("wdReview").disabled = true;
     say("", false); // no "Checking…" line: the button waits quietly
     try {
-      plan = await planWithdraw(provider, w, pusdCategory(), { to: dest.lock, pusd: pusdUnits, sats, nfts: input("wdNfts").checked });
+      // An own wallet: all its coins across its addresses, each signed later in the wallet app
+      const own = w.kind === "external" ? await (await loadExternal()).externalSwapWallet(provider, w.pkhHex) : null;
+      const from = own ? { ...own.wallet, pkhHex } : w.kind === "local" ? w.wallet : null;
+      if (!from) return;
+      plan = await planWithdraw(provider, from, pusdCategory(), { to: dest.lock, pusd: pusdUnits, sats, nfts: input("wdNfts").checked });
+      ownCoins = own ? own.coins : null;
       // One row per thing sent (only what was filled in), then the address and the fee
       const list = $("wdConfirmList");
       list.replaceChildren();
@@ -224,7 +241,26 @@ export function initWithdraw(
     button("wdBack").disabled = true;
     say("", false); // no "Sending…" line: the buttons wait quietly
     try {
-      const txid = await sendWithdraw(plan);
+      let txid: string;
+      if (ownCoins) {
+        // The own wallet signs every input (they are all its coins), then the page sends it
+        button("wdSend").textContent = T.approve;
+        const what = [plan.pusd > 0n ? `${pusd(plan.pusd)} PUSD` : "", plan.sats > 0n && plan.pusd === 0n ? `${bch(plan.sats)} BCH` : ""]
+          .filter(Boolean).join(" + ") || T.confirmNfts(plan.nfts);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(new Error("Timed out waiting for your wallet")), SIGN_TIMEOUT_MS);
+        try {
+          const signed = await (await loadExternal()).signOwnInputs(plan.builder, plan.inputs, 0, ownCoins, T.walletPrompt(what), controller.signal);
+          if (!signed.ok) {
+            say(signed.text, true);
+            return;
+          }
+          button("wdSend").textContent = T.sending;
+          txid = await provider.sendRawTransaction(signed.signedHex);
+        } finally {
+          clearTimeout(timer);
+        }
+      } else txid = await sendWithdraw(plan);
       plan = null;
       say("", false);
       const link = doneBox()?.querySelector("a");
@@ -236,6 +272,7 @@ export function initWithdraw(
       say(T.errors.failed!, true);
     } finally {
       sending = false;
+      button("wdSend").textContent = T.send;
       button("wdSend").disabled = false;
       button("wdBack").disabled = false;
     }
